@@ -1,0 +1,80 @@
+= Golem Project: Agent Standards & Conventions (AGENTS.adoc)
+Michael Bernstein <zopemaven@gmail.com>
+v0.1.0
+:toc: left
+:icons: font
+:sectanchors:
+:source-highlighter: highlight.js
+
+This document establishes the official development standards, architectural invariants, code styles, and operational protocols for any AI agent or human contributor working on Golem (`golem-pub`).
+
+---
+
+== 1. Core Architectural Invariants
+
+Every code modification and new component must respect Golem’s core architectural foundation.
+
+=== 1.1 AsciiDoc-First Paradigm
+*   **The Parser:** All document reading must flow through the `asciidoctrine` parser.
+*   **The Docstrings:** All programmatic docstring extraction must compile using the `asciidocstring` package, keeping docstring representations inside standard AsciiDoc AST/ASG nodes.
+*   **The Tests:** All in-documentation interactive code blocks are tested using `asciidoctest` integrated directly into Pytest.
+
+=== 1.2 The Directed Acyclic Graph (DAG) for Incremental Rebuilds
+*   All file inclusion dependencies (`include::file.adoc[]` or `include::file.adoc[attributes]`) must be modeled as a **Directed Acyclic Graph (DAG)** of compilation nodes.
+*   Compilation caching is strictly monitored via SHA-256 file hashing inside `.golem/cache.json`.
+*   **Safety Rule:** Any modification to an include target must recursively trigger recompilation of all parent and ancestor files referencing it.
+
+=== 1.3 Strict Typings & Python 3.10+
+*   The package utilizes type annotations for all public interfaces and internal systems.
+*   Run `mypy` locally to verify type safety.
+*   Avoid using `Any` where precise `asciidoctrine.nodes.Node`, `typing.Union`, or custom types can be specified.
+
+---
+
+== 2. Coding Style & Linting Standards
+
+To maintain codebase health and consistency, comply with the following standards:
+
+=== 2.1 Formatter and Linter
+*   **Formatting:** Use `black` for automatic code formatting (line length: 88).
+*   **Linting:** Use `flake8` or `ruff` to scan for style inconsistencies, syntax issues, and unused imports.
+*   **Verification:** Ensure no code is committed that breaks the automated matrix checks defined inside `.github/workflows/ci.yml`.
+
+=== 2.2 AST & ASG Manipulation
+*   When transforming document structures or adding macros, subclass `asciidoctrine.nodes.NodeTransformer` or implement hook callbacks using `pluggy` to mutate elements cleanly.
+*   Do not perform raw regex-based HTML translations. Always traverse nodes using structured class visitors.
+
+---
+
+== 3. Theme & Design Philosophy
+
+Golem’s UI design must feel premium, fast, responsive, and completely accessible.
+
+=== 3.1 CSS Variable Configuration
+*   Themes must rarely require overriding structural HTML files.
+*   Aesthetic variations (backgrounds, fonts, colors, border-radii) are controlled strictly via **CSS Custom Properties** (e.g., `--golem-color-primary`).
+
+=== 3.2 HTML5 Semantic Outlines
+*   Layout templates use **Chameleon** TAL templates and conform strictly to semantic HTML5 outlines:
+    *   `<header id="golem-header">` for site-wide headers.
+    *   `<aside id="golem-sidebar-left">` for sitemap/left navigation.
+    *   `<main id="golem-content">` containing `<article class="golem-doc">` for rendered pages.
+    *   `<aside id="golem-sidebar-right">` for active page table of contents.
+    *   `<footer id="golem-footer">` for structural copyright text.
+
+---
+
+== 4. Testing Requirements
+
+*   All testing suites reside under the `tests/` directory.
+*   Use `pytest` to execute core unit and integration tests.
+*   When contributing a new feature (such as a CLI argument or template layout macro), **always** write an accompanying test verifying its execution and side-effects.
+
+---
+
+== 5. Agent Communication & Hand-off Protocol
+
+When handing off work to a subsequent agent or finishing a session:
+1.  **State Documentation:** Write a clear hand-off summary capturing the exact accomplishments, files modified, and issues resolved.
+2.  **Upstream Links:** Ensure any open or resolved upstream issues on `asciidoctrine`, `asciidocstring`, or `asciidoctest` are logged with their official GitHub issue URLs.
+3.  **Local Checks:** Run `pytest` and linter checks to ensure the working branch remains in a passing state.

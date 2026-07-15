@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "golem-pub"
+version = "0.1.0"
+description = "A static site generator built on AsciiDoc, designed for highly technical interactive documentation."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Michael Bernstein" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "asciidoctrine>=0.1.0a8",
+    "asciidocstring>=0.1.0a3",
+    "asciidoctest>=0.1.0a3",
+    "chameleon",
+    "pluggy",
+    "pdoc",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "flake8",
+    "mypy",
+]
+
+[project.scripts]
+golem = "golem.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["golem"]
+
