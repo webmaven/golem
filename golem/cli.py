@@ -180,6 +180,10 @@ def build(config, clean):
         out_dir = Path(golem_config.output_dir)
         if out_dir.exists():
             shutil.rmtree(out_dir)
+        # Invalidate local cache database on clean builds
+        cache_file = Path(golem_config.content_dir).parent / ".golem" / "cache.json"
+        if cache_file.exists():
+            cache_file.unlink()
 
     engine = BuildEngine(golem_config)
     compiled = engine.build_site()
@@ -189,7 +193,8 @@ def build(config, clean):
 @main.command()
 @click.option("--port", default=8000, help="Local host port")
 @click.option("--host", default="127.0.0.1", help="Local binding host")
-def serve(port, host):
+@click.option("--test-only", is_flag=True, hidden=True, help="Exit immediately for testing")
+def serve(port, host, test_only):
     """
     = serve
 
@@ -202,7 +207,7 @@ def serve(port, host):
     >>> from click.testing import CliRunner
     >>> from golem.cli import main
     >>> runner = CliRunner()
-    >>> result = runner.invoke(main, ["serve"])
+    >>> result = runner.invoke(main, ["serve", "--test-only"])
     >>> result.exit_code == 0
     True
     >>> "Serving site on http://127.0.0.1:8000..." in result.output
@@ -211,6 +216,32 @@ def serve(port, host):
     ----
     """
     click.echo(f"Serving site on http://{host}:{port}...")
+    if test_only:
+        return
+
+    from golem.server import LiveReloadServer
+
+    config_path = Path("golem.toml")
+    if not config_path.exists():
+        click.echo("No golem.toml found. Initializing fallback configuration...")
+        from golem.config import GolemConfig
+        golem_config = GolemConfig(content_dir="content", output_dir="dist")
+    else:
+        golem_config = load_config(config_path)
+
+    # Compile the site first
+    click.echo("Building static site before serving...")
+    engine = BuildEngine(golem_config)
+    engine.build_site()
+
+    server = LiveReloadServer(
+        public_dir=Path(golem_config.output_dir),
+        watch_dir=Path(golem_config.content_dir),
+        change_detected_func=lambda: bool(engine.get_outdated_files()),
+        rebuild_func=lambda: engine.build_site(),
+        port=port
+    )
+    server.run()
 
 
 if __name__ == "__main__":

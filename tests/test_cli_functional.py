@@ -38,3 +38,19 @@ def test_cli_build_respects_clean_flag(tmp_path):
         # Stale file must be cleaned, but active index compiled
         assert not old_file.exists()
         assert Path("dist/index.html").exists()
+
+
+def test_cli_build_clean_rebuilds_all(tmp_path):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        runner.invoke(main, ["init"])
+
+        # 1. First build (creates cache.json and dist/index.html)
+        res_1 = runner.invoke(main, ["build"])
+        assert res_1.exit_code == 0
+        assert Path("dist/index.html").exists()
+
+        # 2. Second build with --clean (empties output folder, MUST rebuild index.html)
+        res_2 = runner.invoke(main, ["build", "--clean"])
+        assert res_2.exit_code == 0
+        assert Path("dist/index.html").exists()
