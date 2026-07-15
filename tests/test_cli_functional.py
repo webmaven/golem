@@ -188,6 +188,24 @@ def test_cli_init_standalone_scaffolds_full_site(tmp_path):
         assert 'static_dir = "static"' in golem_toml_content
         assert 'templates_dir = "templates"' in golem_toml_content
 
-
-
-
+def test_cli_init_library_scaffolds_full_site_nested(tmp_path):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        # Create mock pyproject.toml to signal library setup
+        pyproject = Path("pyproject.toml")
+        pyproject.write_text("[tool.poetry]\nname='my-lib'\n", encoding="utf-8")
+        
+        result = runner.invoke(main, ["init", "--template", "site"])
+        assert result.exit_code == 0
+        
+        # Verify docs/ folder and nested docs/index.adoc exist
+        assert Path("docs/index.adoc").exists()
+        
+        # Verify static and templates directories were scaffolded INSIDE docs/
+        assert Path("docs/static/css/custom.css").exists()
+        assert Path("docs/templates/page.pt").exists()
+        
+        # Verify pyproject.toml was configured with nested paths
+        pyproject_content = pyproject.read_text(encoding="utf-8")
+        assert 'static_dir = "docs/static"' in pyproject_content
+        assert 'templates_dir = "docs/templates"' in pyproject_content

@@ -103,8 +103,8 @@ author = "Michael Bernstein"
 content_dir = "docs"
 output_dir = "dist"
 theme = "default"
-static_dir = "static"
-templates_dir = "templates"
+static_dir = "docs/static"
+templates_dir = "docs/templates"
 """
             else:
                 content += """
@@ -119,6 +119,8 @@ theme = "default"
 """
             pyproject_toml.write_text(content, encoding="utf-8")
         content_dir = Path("docs")
+        static_path = Path("docs/static")
+        templates_path = Path("docs/templates")
     else:
         golem_toml = Path("golem.toml")
         if not golem_toml.exists():
@@ -153,13 +155,14 @@ theme = "default"
                     encoding="utf-8",
                 )
         content_dir = Path("content")
+        static_path = Path("static")
+        templates_path = Path("templates")
 
     content_dir.mkdir(exist_ok=True)
 
     # Scaffold static and templates directories if site layout is active
     if is_site_layout:
-        static_dir = Path("static")
-        css_dir = static_dir / "css"
+        css_dir = static_path / "css"
         css_dir.mkdir(parents=True, exist_ok=True)
         custom_css = css_dir / "custom.css"
         if not custom_css.exists():
@@ -189,9 +192,8 @@ body {
                 encoding="utf-8",
             )
 
-        templates_dir = Path("templates")
-        templates_dir.mkdir(exist_ok=True)
-        page_template = templates_dir / "page.pt"
+        templates_path.mkdir(exist_ok=True)
+        page_template = templates_path / "page.pt"
         if not page_template.exists():
             page_template.write_text(
                 """\
@@ -228,7 +230,7 @@ body {
             )
 
     scaffold_docs = True
-    if any(content_dir.iterdir()):
+    if any(f.name not in ("static", "templates", ".DS_Store") for f in content_dir.iterdir()):
         try:
             scaffold_docs = click.confirm(
                 f"The directory '{content_dir}' is not empty. Scaffold default documentation files?",
