@@ -26,3 +26,75 @@ The `golem.toml` file contains:
 
 * `[site]`:: Primary metadata (e.g. `title` and `author`).
 * `[build]`:: Compilation variables (e.g. `content_dir` and `output_dir`).
+
+
+== Live-Reload Development Server
+
+Golem includes an integrated, multi-threaded, zero-dependency development server that compiles your site on-the-fly and immediately reloads your open browser tabs when changes are made.
+
+To launch the local development server:
+
+[source,bash]
+----
+golem serve --port 8000
+----
+
+This starts the Golem web server on `http://localhost:8000`.
+
+=== The Live-Reload Sequence
+
+Here is the exact live-reloading sequence that Golem coordinates in the background:
+
+[literal]
+----
+  +-------------+            +--------------------+            +-------------+
+  |   Browser   |            |  LiveReloadServer  |            | BuildEngine |
+  +------+------+            +---------+----------+            +------+------+
+         |                             |                              |
+         |  1. Request /index.html     |                              |
+         +---------------------------->+                              |
+         |                             |                              |
+         |  2. Intercept & Inject SSE  |                              |
+         |     Live-Reload Script      |                              |
+         |                             |                              |
+         |  3. Serve HTML              |                              |
+         +<----------------------------+                              |
+         |                             |                              |
+         |  4. Open EventSource        |                              |
+         |     Conn /__livereload      |                              |
+         +---------------------------->+                              |
+         |                             |                              |
+         |                             |  5. Poll files every ~500ms |
+         |                             +------------+                 |
+         |                             |            |                 |
+         |                             |<-----------+                 |
+         |                             |                              |
+         |                             |  6. Check Outdated Files     |
+         |                             +----------------------------->+
+         |                             |                              |
+         |                             |  7. Detect mismatch hash     |
+         |                             +<-----------------------------+
+         |                             |                              |
+         |                             |  8. Rebuild Outdated Site    |
+         |                             +----------------------------->+
+         |                             |                              |
+         |                             |  9. Save updated cache       |
+         |                             +<-----------------------------+
+         |                             |                              |
+         |  10. Push 'reload' Event    |                              |
+         +<----------------------------+                              |
+         |                             |                              |
+         |  11. Reload Tab & Get HTML  |                              |
+         +---------------------------->+                              |
+         |                             |                              |
+----
+
+=== How Caching & Invalidation Works
+
+To keep the development feedback loop extremely fast, Golem uses a high-performance **Directed Acyclic Graph (DAG) Cache** located in `.golem/cache.json`.
+
+*   **Atomic Cache Persistence:** Golem writes cache databases atomically. If a compilation is aborted (such as pressing `Ctrl+C`), Golem guarantees your state is not corrupted.
+*   **Recursive Deletion Tracking:** If you delete an included asset, the compiler automatically detects the missing node, walks the inclusion-DAG recursively to invalidate all parent pages, and purges the stale entry.
+*   **Non-AsciiDoc Asset Monitoring:** If you edit an included non-AsciiDoc file (such as a source code listing or data file), the engine notices the SHA-256 modification and re-builds its parent pages.
+*   **Global Asset Tracking:** Golem monitors global assets such as the active Chameleon layout template (`themes/<theme>/skeleton.pt`) and the central configuration file (`golem.toml`). If a global asset changes, the entire site is recompiled to propagate style or layout changes instantly.
+
