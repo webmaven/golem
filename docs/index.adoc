@@ -1,0 +1,15 @@
+= Welcome to Golem
+:golem-version: 1.0.0
+
+Golem is a next-generation, high-performance static site generator powered by native AsciiDoc parsing and robust Chameleon cascading templates.
+
+== Features
+
+- **Blazing Fast Incremental Builds**:: Native cache DAG tracking means only modified files and their inclusion ancestors are re-compiled.
+- **Cascading Themes**:: Custom HTML5 template layouts with seamless fallbacks.
+- **Embedded Python Doctests**:: Programmatic API testing integrated directly inside standard docstrings.
+
+== Navigation
+
+- Read the detailed instructions in the link:user_manual.html[User Manual].
+- Learn the programmatic Python API in the link:developer_guide.html[Developer Guide].
