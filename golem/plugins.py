@@ -1,5 +1,6 @@
 import os
 import sys
+import logging
 import importlib.util
 import pluggy
 from pathlib import Path
@@ -30,7 +31,7 @@ class GolemSpecs:
         """Executed after Chameleon layout compilation completes."""
         return html_content
 
-def get_plugin_manager(plugins_dir: Path = None) -> pluggy.PluginManager:
+def get_plugin_manager(plugins_dir: Path | None = None) -> pluggy.PluginManager:
     pm = pluggy.PluginManager(HOOK_NAMESPACE)
     pm.hookimpl = hookimpl
     pm.add_hookspecs(GolemSpecs)
@@ -40,14 +41,20 @@ def get_plugin_manager(plugins_dir: Path = None) -> pluggy.PluginManager:
     
     # 2. Local plugins folder discovery
     if plugins_dir and plugins_dir.exists() and plugins_dir.is_dir():
-        sys.path.insert(0, str(plugins_dir.resolve()))
+        resolved_path = str(plugins_dir.resolve())
+        if resolved_path not in sys.path:
+            sys.path.insert(0, resolved_path)
         for file in plugins_dir.glob("*.py"):
             if file.name == "__init__.py":
                 continue
             module_name = file.stem
-            spec = importlib.util.spec_from_file_location(module_name, file)
-            if spec and spec.loader:
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
-                pm.register(module)
+            try:
+                spec = importlib.util.spec_from_file_location(module_name, file)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    sys.modules[module_name] = module
+                    spec.loader.exec_module(module)
+                    pm.register(module)
+            except Exception as e:
+                logging.warning("Failed to load local plugin %s: %s", file, e)
     return pm
