@@ -7,7 +7,7 @@ name = "golem-pub"
 version = "0.1.0a1"
 description = "A static site generator built on AsciiDoc, designed for highly technical interactive documentation."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 license = { text = "Apache-2.0" }
 authors = [
     { name = "Michael Bernstein" }
