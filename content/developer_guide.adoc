@@ -1,0 +1,37 @@
+= Golem Developer Guide
+Michael Bernstein
+v0.1.0
+
+Welcome to Golem's compiler integration guide. This document demonstrates how
+programmatic callers can invoke the compilation engine directly.
+
+== PageCompiler API
+
+The `PageCompiler` converts parsed body fragments into structured HTML.
+
+[source,python]
+----
+from golem.config import GolemConfig
+from golem.templates import PageCompiler
+
+config = GolemConfig(output_dir="dist")
+compiler = PageCompiler(config)
+html = compiler.compile_page("Developer Guide", "<p>Content goes here</p>", "")
+assert "Developer Guide" in html
+----
+
+== BuildEngine API
+
+The `BuildEngine` controls site discovery, incremental updates, and cache writing.
+
+[source,python]
+----
+from golem.config import GolemConfig
+from golem.engine import BuildEngine
+from pathlib import Path
+
+config = GolemConfig(content_dir="content", output_dir="dist")
+engine = BuildEngine(config, cache_file=Path(".golem/cache.json"))
+outdated = engine.get_outdated_files()
+print(f"Discovered {len(outdated)} outdated files.")
+----

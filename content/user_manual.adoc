@@ -1,0 +1,28 @@
+= Golem SSG User Manual
+Michael Bernstein
+v0.1.0
+
+This is the primary user manual for Golem, a Python-native static site generator
+built for high-performance interactive documentation.
+
+== Getting Started
+
+To initialize a new Golem project, run the `init` command in your terminal:
+
+[source,bash]
+----
+golem init
+----
+
+This creates a standard project directory structure:
+
+* `golem.toml`:: Primary project configuration file.
+* `content/`:: Source folder containing all `.adoc` (AsciiDoc) source materials.
+* `themes/`:: Optional custom layout styles and templates.
+
+== Configuration Options
+
+The `golem.toml` file contains:
+
+* `[site]`:: Primary metadata (e.g. `title` and `author`).
+* `[build]`:: Compilation variables (e.g. `content_dir` and `output_dir`).
