@@ -15,7 +15,7 @@ Golem static site generator.
 from pathlib import Path
 import shutil
 import click
-from golem.config import load_config
+from golem.config import load_config, find_default_config_path
 from golem.engine import BuildEngine
 
 
@@ -82,10 +82,32 @@ def init(template, output_dir):
     """
     click.echo(f"Initializing golem project using template '{template}'...")
 
-    golem_toml = Path("golem.toml")
-    if not golem_toml.exists():
-        golem_toml.write_text(
-            """\
+    pyproject_toml = Path("pyproject.toml")
+    if pyproject_toml.exists():
+        click.echo("Found pyproject.toml! Configuring Golem under [tool.golem]...")
+        with open(pyproject_toml, "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        if "[tool.golem]" not in content and "[tool.golem." not in content:
+            if content and not content.endswith("\n"):
+                content += "\n"
+            content += """
+[tool.golem.site]
+title = "Golem Documentation"
+author = "Michael Bernstein"
+
+[tool.golem.build]
+content_dir = "docs"
+output_dir = "dist"
+theme = "default"
+"""
+            pyproject_toml.write_text(content, encoding="utf-8")
+        content_dir = Path("docs")
+    else:
+        golem_toml = Path("golem.toml")
+        if not golem_toml.exists():
+            golem_toml.write_text(
+                """\
 [site]
 title = "Golem Documentation"
 author = "Michael Bernstein"
@@ -95,23 +117,34 @@ content_dir = "content"
 output_dir = "dist"
 theme = "default"
 """,
-            encoding="utf-8",
-        )
+                encoding="utf-8",
+            )
+        content_dir = Path("content")
 
-    content_dir = Path("content")
     content_dir.mkdir(exist_ok=True)
 
-    index_adoc = content_dir / "index.adoc"
-    if not index_adoc.exists():
-        index_adoc.write_text(
-            """\
+    scaffold_docs = True
+    if any(content_dir.iterdir()):
+        try:
+            scaffold_docs = click.confirm(
+                f"The directory '{content_dir}' is not empty. Scaffold default documentation files?",
+                default=False,
+            )
+        except (click.Abort, Exception):
+            scaffold_docs = False
+
+    if scaffold_docs:
+        index_adoc = content_dir / "index.adoc"
+        if not index_adoc.exists():
+            index_adoc.write_text(
+                """\
 = Welcome to Golem
 Michael Bernstein
 
 This is the homepage of your newly initialized Golem static documentation portal.
 """,
-            encoding="utf-8",
-        )
+                encoding="utf-8",
+            )
 
     click.echo("Initialization complete! Project structure is ready.")
 
@@ -174,6 +207,8 @@ def build(config, clean):
     click.echo("Building static site...")
 
     config_path = Path(config)
+    if config == "golem.toml" and not config_path.exists():
+        config_path = find_default_config_path()
     golem_config = load_config(config_path)
 
     if clean:
@@ -221,7 +256,7 @@ def serve(port, host, test_only):
 
     from golem.server import LiveReloadServer
 
-    config_path = Path("golem.toml")
+    config_path = find_default_config_path()
     if not config_path.exists():
         click.echo("No golem.toml found. Initializing fallback configuration...")
         from golem.config import GolemConfig
