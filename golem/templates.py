@@ -17,9 +17,10 @@ DEFAULT_TEMPLATE = """\
     <title>${title}</title>
     <style>
         :root {
-            --golem-bg: #121214;
+            --golem-bg: #0f0f11;
             --golem-fg: #e2e8f0;
             --golem-primary: #818cf8;
+            --golem-accent: #a5b4fc;
         }
         body {
             background-color: var(--golem-bg);
@@ -31,9 +32,9 @@ DEFAULT_TEMPLATE = """\
             min-height: 100vh;
         }
         #golem-header {
-            background: #1e1e24;
+            background: #151518;
             padding: 15px 20px;
-            border-bottom: 1px solid #2e2e38;
+            border-bottom: 1px solid #222228;
         }
         #golem-header h1 {
             margin: 0;
@@ -46,23 +47,50 @@ DEFAULT_TEMPLATE = """\
         }
         #golem-sidebar-left {
             width: 250px;
-            background: #1e1e24;
+            background: #151518;
             padding: 20px;
-            border-right: 1px solid #2e2e38;
+            border-right: 1px solid #222228;
+        }
+        #golem-sidebar-left h3 {
+            margin-top: 0;
+            color: #94a3b8;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        #golem-sidebar-left ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #golem-sidebar-left li {
+            margin-bottom: 10px;
+        }
+        #golem-sidebar-left a {
+            color: var(--golem-fg);
+            text-decoration: none;
+            font-size: 1rem;
+            transition: color 0.2s ease, padding-left 0.2s ease;
+        }
+        #golem-sidebar-left a:hover {
+            color: var(--golem-accent);
+            padding-left: 4px;
         }
         #golem-content {
             flex: 1;
             padding: 40px;
+            max-width: 800px;
+            line-height: 1.6;
         }
         #golem-sidebar-right {
             width: 200px;
             padding: 20px;
-            border-left: 1px solid #2e2e38;
+            border-left: 1px solid #222228;
         }
         #golem-footer {
-            background: #1e1e24;
+            background: #151518;
             padding: 15px 20px;
-            border-top: 1px solid #2e2e38;
+            border-top: 1px solid #222228;
             text-align: center;
             font-size: 0.875rem;
             color: #64748b;
@@ -75,7 +103,12 @@ DEFAULT_TEMPLATE = """\
     </header>
     <div id="golem-wrapper">
         <aside id="golem-sidebar-left">
-            <h3>Documentation</h3>
+            <h3>Navigation</h3>
+            <ul>
+                <li><a href="index.html">Welcome</a></li>
+                <li><a href="user_manual.html">User Manual</a></li>
+                <li><a href="developer_guide.html">Developer Guide</a></li>
+            </ul>
         </aside>
         <main id="golem-content">
             <h1>${title}</h1>
