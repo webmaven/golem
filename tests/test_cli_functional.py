@@ -62,7 +62,7 @@ def test_cli_init_with_existing_pyproject_toml(tmp_path):
         # 1. Create a mock pre-existing pyproject.toml
         pyproject = Path("pyproject.toml")
         pyproject.write_text("""[tool.poetry]
-name = "my_library"
+name = "my_package"
 version = "0.1.0"
 """, encoding="utf-8")
 
@@ -77,7 +77,7 @@ version = "0.1.0"
         assert "[tool.golem.build]" in content
         assert "content_dir = \"docs\"" in content
 
-        # 4. Assert library docs/ folder is scaffolded instead of content/
+        # 4. Assert package docs/ folder is scaffolded instead of content/
         assert not Path("content").exists()
         assert Path("docs/index.adoc").exists()
         assert "Welcome to Golem" in Path("docs/index.adoc").read_text(encoding="utf-8")
@@ -107,7 +107,7 @@ def test_cli_init_idempotency(tmp_path):
         # --- Pyproject Mode Idempotency ---
         pyproject = Path("pyproject.toml")
         pyproject.write_text("""[tool.poetry]
-name = "library"
+name = "package"
 """, encoding="utf-8")
 
         # 1st execution
@@ -188,10 +188,10 @@ def test_cli_init_standalone_scaffolds_full_site(tmp_path):
         assert 'static_dir = "static"' in golem_toml_content
         assert 'templates_dir = "templates"' in golem_toml_content
 
-def test_cli_init_library_scaffolds_full_site_nested(tmp_path):
+def test_cli_init_package_scaffolds_full_site_nested(tmp_path):
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):
-        # Create mock pyproject.toml to signal library setup
+        # Create mock pyproject.toml to signal package setup
         pyproject = Path("pyproject.toml")
         pyproject.write_text("[tool.poetry]\nname='my-lib'\n", encoding="utf-8")
         

@@ -47,7 +47,7 @@ def main(version):
 
 
 @main.command()
-@click.option("--template", default="library", help="Project template type")
+@click.option("--template", default="package", help="Project template type")
 @click.option("--output-dir", help="Override build output directory")
 def init(template, output_dir):
     """
@@ -60,7 +60,7 @@ def init(template, output_dir):
     | Option | Description
 
     | `--template`
-    | Project layout profile (e.g. `library` or `simple`).
+    | Project layout profile (e.g. `package` or `simple`).
 
     | `--output-dir`
     | Optional build override path.
