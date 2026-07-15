@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "golem-pub"
+name = "golem-docs"
 version = "0.1.0a1"
 description = "A static site generator built on AsciiDoc, designed for highly technical interactive documentation."
 readme = "README.md"
