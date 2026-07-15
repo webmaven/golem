@@ -169,4 +169,25 @@ def test_cli_init_non_empty_docs_accept_never_overwrite(tmp_path):
         assert other_file.read_text(encoding="utf-8") == "Other content"
 
 
+def test_cli_init_standalone_scaffolds_full_site(tmp_path):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        result = runner.invoke(main, ["init"])
+        assert result.exit_code == 0
+        
+        # Verify standalone configuration and content folder
+        assert Path("golem.toml").exists()
+        assert Path("content/index.adoc").exists()
+        
+        # Verify static and templates directories were scaffolded
+        assert Path("static/css/custom.css").exists()
+        assert Path("templates/page.pt").exists()
+        
+        # Verify golem.toml contains static_dir and templates_dir settings
+        golem_toml_content = Path("golem.toml").read_text(encoding="utf-8")
+        assert 'static_dir = "static"' in golem_toml_content
+        assert 'templates_dir = "templates"' in golem_toml_content
+
+
+
 

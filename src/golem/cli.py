@@ -83,6 +83,8 @@ def init(template, output_dir):
     click.echo(f"Initializing golem project using template '{template}'...")
 
     pyproject_toml = Path("pyproject.toml")
+    is_site_layout = template in ("site", "book", "simple") or not pyproject_toml.exists()
+
     if pyproject_toml.exists():
         click.echo("Found pyproject.toml! Configuring Golem under [tool.golem]...")
         with open(pyproject_toml, "r", encoding="utf-8") as f:
@@ -91,7 +93,21 @@ def init(template, output_dir):
         if "[tool.golem]" not in content and "[tool.golem." not in content:
             if content and not content.endswith("\n"):
                 content += "\n"
-            content += """
+            if is_site_layout:
+                content += """
+[tool.golem.site]
+title = "Golem Documentation"
+author = "Michael Bernstein"
+
+[tool.golem.build]
+content_dir = "docs"
+output_dir = "dist"
+theme = "default"
+static_dir = "static"
+templates_dir = "templates"
+"""
+            else:
+                content += """
 [tool.golem.site]
 title = "Golem Documentation"
 author = "Michael Bernstein"
@@ -106,8 +122,25 @@ theme = "default"
     else:
         golem_toml = Path("golem.toml")
         if not golem_toml.exists():
-            golem_toml.write_text(
-                """\
+            if is_site_layout:
+                golem_toml.write_text(
+                    """\
+[site]
+title = "Golem Documentation"
+author = "Michael Bernstein"
+
+[build]
+content_dir = "content"
+output_dir = "dist"
+theme = "default"
+static_dir = "static"
+templates_dir = "templates"
+""",
+                    encoding="utf-8",
+                )
+            else:
+                golem_toml.write_text(
+                    """\
 [site]
 title = "Golem Documentation"
 author = "Michael Bernstein"
@@ -117,11 +150,82 @@ content_dir = "content"
 output_dir = "dist"
 theme = "default"
 """,
-                encoding="utf-8",
-            )
+                    encoding="utf-8",
+                )
         content_dir = Path("content")
 
     content_dir.mkdir(exist_ok=True)
+
+    # Scaffold static and templates directories if site layout is active
+    if is_site_layout:
+        static_dir = Path("static")
+        css_dir = static_dir / "css"
+        css_dir.mkdir(parents=True, exist_ok=True)
+        custom_css = css_dir / "custom.css"
+        if not custom_css.exists():
+            custom_css.write_text(
+                """\
+:root {
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --bg-color: #fafafa;
+    --text-color: #222222;
+    --accent-color: #10b981;
+}
+
+body {
+    font-family: var(--font-sans);
+    background: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+""",
+                encoding="utf-8",
+            )
+
+        templates_dir = Path("templates")
+        templates_dir.mkdir(exist_ok=True)
+        page_template = templates_dir / "page.pt"
+        if not page_template.exists():
+            page_template.write_text(
+                """\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${site_title} - ${title}</title>
+    <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <span class="logo">${site_title}</span>
+            <span class="author">By ${site_author}</span>
+        </div>
+    </header>
+
+    <div class="main-layout container">
+        <main class="content-pane">
+            <article class="page-body">
+                <h1>${title}</h1>
+                <div tal:content="structure body">
+                    AsciiDoc content renders here.
+                </div>
+            </article>
+        </main>
+    </div>
+</body>
+</html>
+""",
+                encoding="utf-8",
+            )
 
     scaffold_docs = True
     if any(content_dir.iterdir()):
