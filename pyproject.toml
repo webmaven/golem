@@ -35,6 +35,9 @@ dev = [
     "mypy",
     "requests",
 ]
+docs = [
+    "golem-pub",
+]
 
 [project.scripts]
 golem = "golem.cli:main"
