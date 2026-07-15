@@ -146,7 +146,9 @@ class HtmlRenderer:
         if code and not code.endswith("\n"):
             code += "\n"
             
-        self.output.append(f'<pre><code class="language-{lang}">{code}</code></pre>\n')
+        import html
+        escaped_code = html.escape(code)
+        self.output.append(f'<pre><code class="language-{lang}">{escaped_code}</code></pre>\n')
 
 def render_body(asg_root: Node) -> str:
     renderer = HtmlRenderer()
