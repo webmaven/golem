@@ -15,14 +15,12 @@ def test_incremental_build_integration(tmp_path):
     output_dir = tmp_path / "dist"
 
     file_a = content_dir / "index.adoc"
-    file_a.write_text("= Welcome\ninclude::sidebar.adoc[]", encoding="utf-8")
+    file_a.write_text("= Welcome\ninclude::sidebar.adoc[]\n", encoding="utf-8")
 
     file_b = content_dir / "sidebar.adoc"
-    file_b.write_text("Sidebar details", encoding="utf-8")
+    file_b.write_text("Sidebar details\n", encoding="utf-8")
 
-    config = GolemConfig(
-        content_dir=str(content_dir), output_dir=str(output_dir)
-    )
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(output_dir))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     # First compilation (both files get compiled/recorded in dependency cache)
@@ -37,7 +35,7 @@ def test_incremental_build_integration(tmp_path):
     assert len(compiled_empty) == 0
 
     # Third execution: modify child sidebar file, which invalidates and triggers parent rebuild
-    file_b.write_text("Sidebar details modified", encoding="utf-8")
+    file_b.write_text("Sidebar details modified\n", encoding="utf-8")
     engine3 = BuildEngine(config, cache_file=tmp_path / "cache.json")
     compiled_rebuilt = engine3.build_site()
 
