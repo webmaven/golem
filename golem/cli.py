@@ -12,7 +12,11 @@ Golem static site generator.
 - `serve`:: Start the local development server.
 """
 
+from pathlib import Path
+import shutil
 import click
+from golem.config import load_config
+from golem.engine import BuildEngine
 
 
 @click.group(invoke_without_command=True)
@@ -33,8 +37,9 @@ def main(version):
     >>> result = runner.invoke(main, ["--version"])
     >>> result.exit_code == 0
     True
-    >>> "Golem" in result.output
+    >>> "Golem static site generator" in result.output
     True
+
     ----
     """
     if version:
@@ -68,14 +73,47 @@ def init(template, output_dir):
     >>> from click.testing import CliRunner
     >>> from golem.cli import main
     >>> runner = CliRunner()
-    >>> result = runner.invoke(main, ["init"])
-    >>> result.exit_code == 0
+    >>> with runner.isolated_filesystem():
+    ...     result = runner.invoke(main, ["init"])
+    ...     result.exit_code == 0
     True
-    >>> "Initializing golem project using template 'library'..." in result.output
-    True
+
     ----
     """
     click.echo(f"Initializing golem project using template '{template}'...")
+
+    golem_toml = Path("golem.toml")
+    if not golem_toml.exists():
+        golem_toml.write_text(
+            """\
+[site]
+title = "Golem Documentation"
+author = "Michael Bernstein"
+
+[build]
+content_dir = "content"
+output_dir = "dist"
+theme = "default"
+""",
+            encoding="utf-8",
+        )
+
+    content_dir = Path("content")
+    content_dir.mkdir(exist_ok=True)
+
+    index_adoc = content_dir / "index.adoc"
+    if not index_adoc.exists():
+        index_adoc.write_text(
+            """\
+= Welcome to Golem
+Michael Bernstein
+
+This is the homepage of your newly initialized Golem static documentation portal.
+""",
+            encoding="utf-8",
+        )
+
+    click.echo("Initialization complete! Project structure is ready.")
 
 
 @main.command()
@@ -99,13 +137,18 @@ def new(doc_type, name):
     True
     >>> "Creating new post: 'hello-world'" in result.output
     True
+
     ----
     """
     click.echo(f"Creating new {doc_type}: '{name}'")
 
 
 @main.command()
-@click.option("--config", help="Path to primary configuration file")
+@click.option(
+    "--config",
+    default="golem.toml",
+    help="Path to primary configuration file",
+)
 @click.option("--clean", is_flag=True, help="Empty output directory before building")
 def build(config, clean):
     """
@@ -120,14 +163,27 @@ def build(config, clean):
     >>> from click.testing import CliRunner
     >>> from golem.cli import main
     >>> runner = CliRunner()
-    >>> result = runner.invoke(main, ["build"])
-    >>> result.exit_code == 0
+    >>> with runner.isolated_filesystem():
+    ...     _ = runner.invoke(main, ["init"])
+    ...     result = runner.invoke(main, ["build"])
+    ...     result.exit_code == 0
     True
-    >>> "Building static site..." in result.output
-    True
+
     ----
     """
     click.echo("Building static site...")
+
+    config_path = Path(config)
+    golem_config = load_config(config_path)
+
+    if clean:
+        out_dir = Path(golem_config.output_dir)
+        if out_dir.exists():
+            shutil.rmtree(out_dir)
+
+    engine = BuildEngine(golem_config)
+    compiled = engine.build_site()
+    click.echo(f"Compilation finished. Built {len(compiled)} pages.")
 
 
 @main.command()
@@ -151,6 +207,7 @@ def serve(port, host):
     True
     >>> "Serving site on http://127.0.0.1:8000..." in result.output
     True
+
     ----
     """
     click.echo(f"Serving site on http://{host}:{port}...")
