@@ -33,6 +33,7 @@ dev = [
     "black",
     "flake8",
     "mypy",
+    "requests",
 ]
 
 [project.scripts]
