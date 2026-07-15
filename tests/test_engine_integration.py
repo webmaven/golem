@@ -15,7 +15,7 @@ def test_incremental_build_integration(tmp_path):
     output_dir = tmp_path / "dist"
 
     file_a = content_dir / "index.adoc"
-    file_a.write_text("= Welcome\ninclude::sidebar.adoc[]\n", encoding="utf-8")
+    file_a.write_text("= Welcome\n\ninclude::sidebar.adoc[]\n", encoding="utf-8")
 
     file_b = content_dir / "sidebar.adoc"
     file_b.write_text("Sidebar details\n", encoding="utf-8")

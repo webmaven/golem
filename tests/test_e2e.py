@@ -24,7 +24,7 @@ def test_full_golem_workflow_e2e(tmp_path):
         # Update index.adoc to include the sidebar
         index = Path("content/index.adoc")
         index.write_text(
-            "= My Golem Documentation\ninclude::sidebar.adoc[]\n",
+            "= My Golem Documentation\n\ninclude::sidebar.adoc[]\n",
             encoding="utf-8",
         )
 

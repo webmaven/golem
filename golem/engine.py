@@ -221,14 +221,21 @@ class BuildEngine:
                 body_content = render_body(asg)
 
                 # Extract title for layout framing
+                title_str = ""
                 if isinstance(asg, dict):
                     title_str = asg.get("title", "")
+                    if not title_str and asg.get("header"):
+                        header = asg["header"]
+                        if isinstance(header, dict) and header.get("title"):
+                            title_nodes = header["title"]
+                            if isinstance(title_nodes, list) and len(title_nodes) > 0:
+                                title_str = title_nodes[0].get("value", "")
                     if not title_str and asg.get("blocks"):
                         first_block = asg["blocks"][0]
                         if first_block.get("name") == "title":
                             title_str = first_block.get("value", "")
                 else:
-                    title_str = getattr(asg, "title", "Golem Doc")
+                    title_str = getattr(asg, "title", "")
 
                 if not title_str:
                     title_str = "Golem Doc"
