@@ -1,11 +1,19 @@
+"""
+= CLI Tests for Golem
+
+This module contains functional tests for verifying that the Click-based command-line interface and its subcommands function correctly.
+"""
+
 from click.testing import CliRunner
 from golem.cli import main
+
 
 def test_cli_version():
     runner = CliRunner()
     result = runner.invoke(main, ["--version"])
     assert result.exit_code == 0
     assert "Golem" in result.output
+
 
 def test_cli_subcommands_exist():
     runner = CliRunner()
