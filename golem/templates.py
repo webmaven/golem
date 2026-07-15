@@ -1,4 +1,11 @@
-# golem/templates.py
+"""
+= Page Layout Compilation
+
+This module handles loading and compiling physical Chameleon `.pt` templates
+from disk, with standard fallback to an integrated HTML5 layout.
+"""
+
+from pathlib import Path
 from chameleon import PageTemplate
 from golem.config import GolemConfig
 
@@ -53,14 +60,76 @@ DEFAULT_TEMPLATE = """\
 </html>
 """
 
-class PageCompiler:
-    def __init__(self, config: GolemConfig):
-        self.config = config
-        self.template = PageTemplate(DEFAULT_TEMPLATE)
 
-    def compile_page(self, title: str, body_content: str, toc_html: str) -> str:
-        return self.template(
-            title=title,
-            body_content=body_content,
-            toc_html=toc_html
-        )
+class PageCompiler:
+    """
+    = PageCompiler
+
+    Compiles body fragments into complete HTML pages using Chameleon templates.
+
+    === Examples
+
+    [source,python]
+    ----
+    >>> from golem.config import GolemConfig
+    >>> from golem.templates import PageCompiler
+    >>> config = GolemConfig(output_dir="dist")
+    >>> compiler = PageCompiler(config)
+    >>> html = compiler.compile_page("Sample Page", "<p>Paragraph content</p>", "")
+    >>> "<title>Sample Page</title>" in html
+    True
+    >>> "<p>Paragraph content</p>" in html
+    True
+    ----
+    """
+
+    def __init__(self, config: GolemConfig):
+        """
+        == __init__
+
+        Initialize the compiler with a Golem configuration.
+        """
+        self.config = config
+        self.default_template = PageTemplate(DEFAULT_TEMPLATE)
+
+    def compile_page(
+        self,
+        title: str,
+        body_content: str,
+        toc_html: str,
+        template_path: Path | None = None,
+    ) -> str:
+        """
+        == compile_page
+
+        Compile a full static page.
+
+        === Arguments
+
+        - `title`:: Document title.
+        - `body_content`:: Processed HTML body text.
+        - `toc_html`:: Rendered Table of Contents HTML.
+        - `template_path`:: Optional layout override path.
+        """
+        if template_path and template_path.exists():
+            try:
+                with open(template_path, "r", encoding="utf-8") as f:
+                    template_content = f.read()
+                template = PageTemplate(template_content)
+            except Exception:
+                template = self.default_template
+        else:
+            # Fallback to configured themes folder override if exists
+            theme_dir = Path("themes") / self.config.theme
+            skeleton_pt = theme_dir / "skeleton.pt"
+            if skeleton_pt.exists():
+                try:
+                    with open(skeleton_pt, "r", encoding="utf-8") as f:
+                        template_content = f.read()
+                    template = PageTemplate(template_content)
+                except Exception:
+                    template = self.default_template
+            else:
+                template = self.default_template
+
+        return template(title=title, body_content=body_content, toc_html=toc_html)
