@@ -17,6 +17,12 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
+[project.urls]
+Homepage = "https://github.com/webmaven/golem"
+Documentation = "https://webmaven.github.io/golem/"
+Repository = "https://github.com/webmaven/golem.git"
+Issues = "https://github.com/webmaven/golem/issues"
+
 dependencies = [
     "asciidoctrine>=0.1.0a8",
     "asciidocstring>=0.1.0a3",
