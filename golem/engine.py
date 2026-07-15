@@ -46,6 +46,9 @@ class BuildEngine:
         """
         self.config = config
         self.content_dir = Path(config.content_dir).resolve()
+        self.config_path = (
+            Path(config.config_path) if config.config_path else Path("golem.toml")
+        )
         self.cache_file = (
             cache_file or Path(config.content_dir).parent / ".golem" / "cache.json"
         )
@@ -70,11 +73,23 @@ class BuildEngine:
         """
         == save_cache
 
-        Persist DAG compilation hashes back to the local file system.
+        Persist DAG compilation hashes back to the local file system atomically.
         """
+        import os
+        import tempfile
+
         self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.cache_file, "w") as f:
-            json.dump(self.cache_data, f, indent=2)
+        dir_path = self.cache_file.parent
+        with tempfile.NamedTemporaryFile("w", dir=dir_path, delete=False, encoding="utf-8") as tf:
+            json.dump(self.cache_data, tf, indent=2)
+            temp_name = tf.name
+
+        try:
+            os.replace(temp_name, self.cache_file)
+        except Exception:
+            if os.path.exists(temp_name):
+                os.unlink(temp_name)
+            raise
 
     def _get_sha256(self, path: Path) -> str:
         """
@@ -92,34 +107,98 @@ class BuildEngine:
         """
         == get_outdated_files
 
-        Resolve file hashes and walk parents recursively to flag outdated nodes.
+        Resolve file hashes, detect deleted files, purge orphaned cache keys,
+        and walk parents recursively to flag outdated nodes in the DAG.
         """
         outdated = set()
         if not self.content_dir.exists():
             return outdated
-        all_files = list(self.content_dir.glob("**/*.adoc"))
 
-        # 1. Map current file hashes and identify immediately changed files
-        current_hashes = {}
+        # 1. Get all actual files present on disk
+        all_files = list(self.content_dir.glob("**/*.adoc"))
+        current_abs_files = {str(f.resolve()) for f in all_files}
+
+        # 2. Identify deleted files (present in cache but missing from disk)
+        cached_files = set(self.cache_data.get("files", {}).keys())
+        deleted_files = set()
+        for f_abs_str in cached_files:
+            if not Path(f_abs_str).exists():
+                deleted_files.add(f_abs_str)
+
         changed_directly = set()
+
+        # Mark deleted files as directly changed to trigger parent invalidation
+        for d in deleted_files:
+            changed_directly.add(Path(d))
+
+        # 3. Map current file hashes and identify immediately changed files
         for f in all_files:
             f_abs = f.resolve()
-            h = self._get_sha256(f)
-            current_hashes[str(f_abs)] = h
-            cached_hash = self.cache_data["files"].get(str(f_abs))
-            if cached_hash != h:
+            try:
+                h = self._get_sha256(f)
+                cached_hash = self.cache_data["files"].get(str(f_abs))
+                if cached_hash != h:
+                    changed_directly.add(f_abs)
+                    outdated.add(f_abs)
+            except Exception:
+                # If there's an issue reading a file, treat it as changed/outdated
                 changed_directly.add(f_abs)
                 outdated.add(f_abs)
 
-        # 2. Re-verify the DAG: pull and resolve all native inclusions
+        # Check all non-adoc files listed in cached_files that are still on disk
+        for f_abs_str in cached_files:
+            if f_abs_str in deleted_files:
+                continue
+            f_path = Path(f_abs_str)
+            if f_path.suffix != ".adoc":
+                try:
+                    h = self._get_sha256(f_path)
+                    cached_hash = self.cache_data["files"].get(f_abs_str)
+                    if cached_hash != h:
+                        changed_directly.add(f_path)
+                except Exception:
+                    changed_directly.add(f_path)
+
+        # Check if the global config file or layout template has changed.
+        global_changed = False
+
+        if self.config_path.exists():
+            h_config = self._get_sha256(self.config_path)
+            cached_config = self.cache_data.get("meta", {}).get("config_file")
+            if cached_config != h_config:
+                global_changed = True
+                self.cache_data.setdefault("meta", {})["config_file"] = h_config
+
+        # Check template skeleton.pt
+        theme_dir = Path("themes") / self.config.theme
+        skeleton_pt = theme_dir / "skeleton.pt"
+        if skeleton_pt.exists():
+            h_pt = self._get_sha256(skeleton_pt)
+            cached_pt = self.cache_data.get("meta", {}).get("skeleton_pt")
+            if cached_pt != h_pt:
+                global_changed = True
+                self.cache_data.setdefault("meta", {})["skeleton_pt"] = h_pt
+
+        # If a global layout or config changed, we must mark all existing .adoc documents as outdated!
+        if global_changed:
+            logging.info("[BuildEngine] Global configuration or template change detected. Invalidating all pages...")
+            outdated.update(all_files)
+            # Short-circuit and return full re-build
+            if deleted_files or global_changed:
+                for d in deleted_files:
+                    self.cache_data["files"].pop(d, None)
+                    self.cache_data["dependencies"].pop(d, None)
+                self.save_cache()
+            return outdated
+
+        # 4. Re-verify the DAG: resolve reverse dependencies (parent links)
         reverse_deps: dict[str, set[str]] = {}
-        for f in all_files:
-            f_abs = str(f.resolve())
+        for f_abs in cached_files | current_abs_files:
             cached_deps = self.cache_data["dependencies"].get(f_abs, [])
             for dep in cached_deps:
                 reverse_deps.setdefault(dep, set()).add(f_abs)
 
-        # Recursively propagate changed files back up to their parents (ancestors)
+        # Recursively propagate changed/deleted files back up to their parents (ancestors)
         queue = list(changed_directly)
         visited = set(queue)
         while queue:
@@ -128,9 +207,17 @@ class BuildEngine:
             for p in parents:
                 p_path = Path(p)
                 if p_path not in visited:
-                    outdated.add(p_path)
+                    if p_path.exists():
+                        outdated.add(p_path)
                     visited.add(p_path)
                     queue.append(p_path)
+
+        # 5. Purge deleted files from the cache database
+        if deleted_files or global_changed:
+            for d in deleted_files:
+                self.cache_data["files"].pop(d, None)
+                self.cache_data["dependencies"].pop(d, None)
+            self.save_cache()
 
         return outdated
 
@@ -143,9 +230,8 @@ class BuildEngine:
         p_abs = str(path.resolve())
         self.cache_data["files"][p_abs] = self._get_sha256(path)
         if included_files is not None:
-            self.cache_data["dependencies"][p_abs] = [
-                str(Path(f).resolve()) for f in included_files
-            ]
+            unique_deps = list(dict.fromkeys(str(Path(f).resolve()) for f in included_files))
+            self.cache_data["dependencies"][p_abs] = unique_deps
         else:
             deps = []
             try:
@@ -184,6 +270,16 @@ class BuildEngine:
             # De-duplicate and make sure all are absolute paths as strings
             unique_deps = list(dict.fromkeys(str(Path(d).resolve()) for d in deps))
             self.cache_data["dependencies"][p_abs] = unique_deps
+
+        # Compute and record the SHA-256 hashes for all of the dependency files as well!
+        for dep in unique_deps:
+            dep_path = Path(dep)
+            if dep_path.exists():
+                try:
+                    self.cache_data["files"][dep] = self._get_sha256(dep_path)
+                except Exception:
+                    pass
+
         self.save_cache()
 
     def build_site(self) -> list[Path]:

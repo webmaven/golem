@@ -14,6 +14,8 @@ class GolemConfig:
     content_dir: str = "content"
     output_dir: str = "dist"
     theme: str = "default"
+    config_path: str | None = None
+
 
 def load_config(config_path: Path) -> GolemConfig:
     if not config_path.exists():
@@ -28,4 +30,6 @@ def load_config(config_path: Path) -> GolemConfig:
         content_dir=build_data.get("content_dir", "content"),
         output_dir=build_data.get("output_dir", "dist"),
         theme=build_data.get("theme", "default"),
+        config_path=str(config_path.resolve()),
     )
+

@@ -59,3 +59,170 @@ def test_engine_build_site_unit(tmp_path):
     compiled = engine.build_site()
     assert len(compiled) == 1
     assert compiled[0] == tmp_path / "dist" / "test.html"
+
+
+def test_cache_file_deletion_propagation(tmp_path):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+
+    file_a = content_dir / "index.adoc"
+    file_a.write_text("= Welcome\n\ninclude::sidebar.adoc[]\n", encoding="utf-8")
+
+    file_b = content_dir / "sidebar.adoc"
+    file_b.write_text("Sidebar content\n", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    # Initial build and cache update
+    engine.build_site()
+
+    # Verify that the cache maps file_b as a dependency of file_a
+    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(str(file_a.resolve()), [])
+
+    # Second check (unmodified) should be empty
+    assert len(engine.get_outdated_files()) == 0
+
+    # Delete the included sidebar.adoc on disk
+    file_b.unlink()
+
+    # The engine must detect the deletion, propagate it to parent index.adoc, and clean up the cache
+    outdated = engine.get_outdated_files()
+    assert file_a.resolve() in outdated
+    assert str(file_b.resolve()) not in engine.cache_data["files"]
+
+
+def test_cache_global_config_edit_propagation(tmp_path):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+
+    file_a = content_dir / "index.adoc"
+    file_a.write_text("= Welcome\n\nContent here\n", encoding="utf-8")
+
+    config_path = tmp_path / "golem.toml"
+    config_path.write_text("[site]\ntitle = 'Old Title'\n", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(tmp_path / "dist"),
+        config_path=str(config_path.resolve()),
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    # Initial build and cache update
+    engine.build_site()
+
+    # Second check (unmodified) should be empty
+    assert len(engine.get_outdated_files()) == 0
+
+    # Modify the config file
+    config_path.write_text("[site]\ntitle = 'New Title'\n", encoding="utf-8")
+
+    # The engine must detect the global config edit and invalidate index.adoc
+    outdated = engine.get_outdated_files()
+    assert file_a.resolve() in outdated
+
+
+def test_cache_global_template_edit_propagation(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+
+    file_a = content_dir / "index.adoc"
+    file_a.write_text("= Welcome\n\nContent here\n", encoding="utf-8")
+
+    theme_dir = tmp_path / "themes" / "default"
+    theme_dir.mkdir(parents=True)
+    skeleton_pt = theme_dir / "skeleton.pt"
+    skeleton_pt.write_text("<html><body>${body_content}</body></html>", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir="content",
+        output_dir="dist",
+        theme="default",
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    # Initial build and cache update
+    engine.build_site()
+
+    # Second check (unmodified) should be empty
+    assert len(engine.get_outdated_files()) == 0
+
+    # Modify the template skeleton
+    skeleton_pt.write_text("<html><body>NEW ${body_content}</body></html>", encoding="utf-8")
+
+    # The engine must detect the global template edit and invalidate index.adoc
+    outdated = engine.get_outdated_files()
+    assert file_a.resolve() in outdated
+
+
+def test_cache_non_adoc_edit_propagation(tmp_path):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+
+    file_a = content_dir / "index.adoc"
+    file_a.write_text("= Welcome\n\ninclude::code.py[]\n", encoding="utf-8")
+
+    file_b = content_dir / "code.py"
+    file_b.write_text("print('hello')\n", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    # Initial build and cache update
+    engine.build_site()
+
+    # Verify that the cache maps file_b as a dependency of file_a
+    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(str(file_a.resolve()), [])
+
+    # Second check (unmodified) should be empty
+    assert len(engine.get_outdated_files()) == 0
+
+    # Edit the non-adoc file_b on disk
+    file_b.write_text("print('hello modified')\n", encoding="utf-8")
+
+    # The engine must detect the edit of code.py and invalidate parent index.adoc
+    outdated = engine.get_outdated_files()
+    assert file_a.resolve() in outdated
+
+
+def test_cache_file_addition(tmp_path):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+
+    file_a = content_dir / "index.adoc"
+    file_a.write_text("= Welcome\n\nContent here\n", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    # Initial build
+    engine.build_site()
+    assert len(engine.get_outdated_files()) == 0
+
+    # Add a brand new file
+    file_b = content_dir / "about.adoc"
+    file_b.write_text("= About\n\nAbout content\n", encoding="utf-8")
+
+    # The engine must detect the addition of about.adoc and mark it as outdated
+    outdated = engine.get_outdated_files()
+    assert file_b.resolve() in outdated
+
+    # Compile site again
+    compiled = engine.build_site()
+    assert len(compiled) == 1
+    assert compiled[0] == tmp_path / "dist" / "about.html"
+
+    # Subsequent check should be empty
+    assert len(engine.get_outdated_files()) == 0
+
+
+
