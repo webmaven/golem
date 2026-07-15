@@ -80,6 +80,7 @@ class PageCompiler:
     True
     >>> "<p>Paragraph content</p>" in html
     True
+
     ----
     """
 
