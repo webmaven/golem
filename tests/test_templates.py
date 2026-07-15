@@ -4,8 +4,6 @@
 This module contains unit tests for verifying the Chameleon page layout compilation and theme override/fallback behaviors.
 """
 
-import pytest
-from pathlib import Path
 from golem.templates import PageCompiler
 from golem.config import GolemConfig
 
