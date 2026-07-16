@@ -263,5 +263,31 @@ def test_get_outdated_files_with_commit_false_does_not_mutate_cache(tmp_path):
     assert str((content / "sub.adoc").resolve()) not in disk_cache_after["files"]
 
 
+def test_engine_corrupt_cache_handling(tmp_path):
+    from golem.config import GolemConfig
+    from golem.engine import BuildEngine
+    
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "index.adoc").write_text("= Home\n", encoding="utf-8")
+    
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    
+    # 1. Non-JSON malformed cache file
+    cache_file = tmp_path / "corrupt_cache.json"
+    cache_file.write_text("Not valid JSON at all!!!", encoding="utf-8")
+    
+    engine = BuildEngine(config, cache_file=cache_file)
+    assert engine.cache_data == {"files": {}, "dependencies": {}}
+    # The corrupted file should have been deleted/cleared
+    assert not cache_file.exists() or cache_file.read_text().strip() == ""
+    
+    # 2. Re-building should work perfectly and write a valid JSON cache
+    engine.build_site()
+    assert cache_file.exists()
+    assert "files" in cache_file.read_text()
+
+
+
 
 

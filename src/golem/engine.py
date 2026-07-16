@@ -71,7 +71,10 @@ class BuildEngine:
                 with open(self.cache_file, "r") as f:
                     return json.load(f)
             except Exception:
-                pass
+                try:
+                    self.cache_file.unlink()
+                except Exception:
+                    pass
         return {"files": {}, "dependencies": {}}
 
     def save_cache(self):
@@ -242,7 +245,7 @@ class BuildEngine:
         else:
             deps = []
             try:
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
                 ast = asciidoctrine.parse_to_ast(content, base_dir=str(path.parent))
                 deps = ast.included_files
@@ -261,7 +264,7 @@ class BuildEngine:
                     if not f_path.exists():
                         return
                     try:
-                        with open(f_path, "r", encoding="utf-8") as f_in:
+                        with open(f_path, "r", encoding="utf-8", errors="replace") as f_in:
                             for line in f_in:
                                 m = include_regex.match(line.strip())
                                 if m:
@@ -310,7 +313,7 @@ class BuildEngine:
 
         for doc_path in to_build:
             try:
-                with open(doc_path, "r", encoding="utf-8") as f:
+                with open(doc_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
 
                 # Trigger pre-parse hooks sequentially (chain modifications)
@@ -376,6 +379,18 @@ class BuildEngine:
                 # 7. Update file dependency hash in DAG cache
                 self.update_cache_for_file(doc_path, getattr(ast, "included_files", []))
                 compiled_files.append(out_path)
+
+                # Progress logging
+                try:
+                    rel_doc = doc_path.relative_to(Path.cwd())
+                except ValueError:
+                    rel_doc = doc_path.relative_to(self.content_dir) if self.content_dir in doc_path.parents else doc_path
+                try:
+                    rel_out = out_path.relative_to(Path.cwd())
+                except ValueError:
+                    rel_out = out_path.relative_to(output_dir) if output_dir in out_path.parents else out_path
+                import click
+                click.echo(f"  [COMPILE] {rel_doc} -> {rel_out}")
             except Exception as e:
                 logging.error(f"Failed to build file {doc_path}: {e}")
 
