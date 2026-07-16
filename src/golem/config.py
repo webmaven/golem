@@ -14,6 +14,9 @@ class GolemConfig:
     content_dir: str = "content"
     output_dir: str = "dist"
     theme: str = "default"
+    templates_dir: str = "templates"
+    static_dir: str = "static"
+    plugins_dir: str = "plugins"
     config_path: str | None = None
 
 
@@ -50,6 +53,10 @@ def load_config(config_path: Path) -> GolemConfig:
         content_dir = build_data.get("content_dir") or golem_data.get("content_dir") or "content"
         output_dir = build_data.get("output_dir") or golem_data.get("output_dir") or "dist"
         theme = build_data.get("theme") or golem_data.get("theme") or "default"
+        
+        templates_dir = build_data.get("templates_dir") or golem_data.get("templates_dir") or "templates"
+        static_dir = build_data.get("static_dir") or golem_data.get("static_dir") or "static"
+        plugins_dir = build_data.get("plugins_dir") or golem_data.get("plugins_dir") or "plugins"
     else:
         site_data = data.get("site", {})
         build_data = data.get("build", {})
@@ -58,6 +65,10 @@ def load_config(config_path: Path) -> GolemConfig:
         content_dir = build_data.get("content_dir", "content")
         output_dir = build_data.get("output_dir", "dist")
         theme = build_data.get("theme", "default")
+        
+        templates_dir = build_data.get("templates_dir", "templates")
+        static_dir = build_data.get("static_dir", "static")
+        plugins_dir = build_data.get("plugins_dir", "plugins")
 
     return GolemConfig(
         site_title=site_title,
@@ -65,6 +76,9 @@ def load_config(config_path: Path) -> GolemConfig:
         content_dir=content_dir,
         output_dir=output_dir,
         theme=theme,
+        templates_dir=templates_dir,
+        static_dir=static_dir,
+        plugins_dir=plugins_dir,
         config_path=str(config_path.resolve()),
     )
 

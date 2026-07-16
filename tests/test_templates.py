@@ -65,3 +65,29 @@ def test_custom_disk_template_fallback_on_invalid_file(tmp_path):
     assert (
         "<title>Fallback Page</title>" in html
     )  # Confirms fallback to DEFAULT_TEMPLATE
+
+
+def test_custom_user_defined_page_pt_layout(tmp_path):
+    from golem.config import GolemConfig
+    from golem.templates import PageCompiler
+    
+    # Scaffold custom templates folder and custom page.pt
+    custom_tpl_dir = tmp_path / "custom_templates"
+    custom_tpl_dir.mkdir()
+    (custom_tpl_dir / "page.pt").write_text("""\
+<html>
+<body>
+    <h1>Custom Template: ${title}</h1>
+    <div tal:content="structure body_content" />
+</body>
+</html>
+""", encoding="utf-8")
+    
+    config = GolemConfig(templates_dir=str(custom_tpl_dir))
+    compiler = PageCompiler(config)
+    
+    # Compile
+    html = compiler.compile_page("Test Title", "<p>Main Body</p>", "")
+    assert "Custom Template: Test Title" in html
+    assert "<p>Main Body</p>" in html
+

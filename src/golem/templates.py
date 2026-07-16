@@ -186,17 +186,27 @@ class PageCompiler:
             except Exception:
                 template = self.default_template
         else:
-            # Fallback to configured themes folder override if exists
-            theme_dir = Path("themes") / self.config.theme
-            skeleton_pt = theme_dir / "skeleton.pt"
-            if skeleton_pt.exists():
+            # Check for user's scaffolded custom templates directory first
+            user_pt = Path(self.config.templates_dir) / "page.pt" if hasattr(self.config, "templates_dir") else None
+            if user_pt and user_pt.exists():
                 try:
-                    with open(skeleton_pt, "r", encoding="utf-8") as f:
+                    with open(user_pt, "r", encoding="utf-8") as f:
                         template_content = f.read()
                     template = PageTemplate(template_content)
                 except Exception:
                     template = self.default_template
             else:
-                template = self.default_template
+                # Fallback to configured themes folder override if exists
+                theme_dir = Path("themes") / self.config.theme
+                skeleton_pt = theme_dir / "skeleton.pt"
+                if skeleton_pt.exists():
+                    try:
+                        with open(skeleton_pt, "r", encoding="utf-8") as f:
+                            template_content = f.read()
+                        template = PageTemplate(template_content)
+                    except Exception:
+                        template = self.default_template
+                else:
+                    template = self.default_template
 
         return template(title=title, body_content=body_content, toc_html=toc_html)
