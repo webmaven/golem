@@ -103,7 +103,7 @@ class BuildEngine:
                 h.update(chunk)
         return h.hexdigest()
 
-    def get_outdated_files(self) -> set[Path]:
+    def get_outdated_files(self, commit: bool = True) -> set[Path]:
         """
         == get_outdated_files
 
@@ -167,7 +167,8 @@ class BuildEngine:
             cached_config = self.cache_data.get("meta", {}).get("config_file")
             if cached_config != h_config:
                 global_changed = True
-                self.cache_data.setdefault("meta", {})["config_file"] = h_config
+                if commit:
+                    self.cache_data.setdefault("meta", {})["config_file"] = h_config
 
         # Check template skeleton.pt
         theme_dir = Path("themes") / self.config.theme
@@ -177,14 +178,15 @@ class BuildEngine:
             cached_pt = self.cache_data.get("meta", {}).get("skeleton_pt")
             if cached_pt != h_pt:
                 global_changed = True
-                self.cache_data.setdefault("meta", {})["skeleton_pt"] = h_pt
+                if commit:
+                    self.cache_data.setdefault("meta", {})["skeleton_pt"] = h_pt
 
         # If a global layout or config changed, we must mark all existing .adoc documents as outdated!
         if global_changed:
             logging.info("[BuildEngine] Global configuration or template change detected. Invalidating all pages...")
             outdated.update(all_files)
             # Short-circuit and return full re-build
-            if deleted_files or global_changed:
+            if commit and (deleted_files or global_changed):
                 for d in deleted_files:
                     self.cache_data["files"].pop(d, None)
                     self.cache_data["dependencies"].pop(d, None)
@@ -213,7 +215,7 @@ class BuildEngine:
                     queue.append(p_path)
 
         # 5. Purge deleted files from the cache database
-        if deleted_files or global_changed:
+        if commit and (deleted_files or global_changed):
             for d in deleted_files:
                 self.cache_data["files"].pop(d, None)
                 self.cache_data["dependencies"].pop(d, None)

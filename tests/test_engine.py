@@ -225,4 +225,43 @@ def test_cache_file_addition(tmp_path):
     assert len(engine.get_outdated_files()) == 0
 
 
+def test_get_outdated_files_with_commit_false_does_not_mutate_cache(tmp_path):
+    from golem.config import GolemConfig
+    from golem.engine import BuildEngine
+    
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "index.adoc").write_text("= Home\ninclude::sub.adoc[]\n", encoding="utf-8")
+    (content / "sub.adoc").write_text("Subcontent\n", encoding="utf-8")
+    
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+    
+    # Initial build to populate cache
+    engine.build_site()
+    assert (tmp_path / "cache.json").exists()
+    
+    # Delete sub.adoc to simulate file deletion
+    (content / "sub.adoc").unlink()
+    
+    # Query outdated files with commit=False
+    outdated = engine.get_outdated_files(commit=False)
+    assert len(outdated) > 0
+    assert (content / "index.adoc").resolve() in outdated
+    
+    # Verify cache on disk STILL contains sub.adoc because commit was False!
+    import json
+    with open(tmp_path / "cache.json", "r") as f:
+        disk_cache = json.load(f)
+    assert str((content / "sub.adoc").resolve()) in disk_cache["files"]
+    
+    # Query with commit=True should now mutate and purge sub.adoc
+    outdated_commit = engine.get_outdated_files(commit=True)
+    assert len(outdated_commit) > 0
+    with open(tmp_path / "cache.json", "r") as f:
+        disk_cache_after = json.load(f)
+    assert str((content / "sub.adoc").resolve()) not in disk_cache_after["files"]
+
+
+
 

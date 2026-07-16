@@ -378,7 +378,7 @@ def serve(port, host, test_only):
     server = LiveReloadServer(
         public_dir=Path(golem_config.output_dir),
         watch_dir=Path(golem_config.content_dir),
-        change_detected_func=lambda: bool(engine.get_outdated_files()),
+        change_detected_func=lambda: bool(engine.get_outdated_files(commit=False)),
         rebuild_func=lambda: engine.build_site(),
         port=port
     )
