@@ -274,12 +274,51 @@ def new(doc_type, name):
     >>> result = runner.invoke(main, ["new", "post", "hello-world"])
     >>> result.exit_code == 0
     True
-    >>> "Creating new post: 'hello-world'" in result.output
+    >>> "Created new post" in result.output
     True
 
     ----
     """
-    click.echo(f"Creating new {doc_type}: '{name}'")
+    config_path = find_default_config_path()
+    try:
+        config = load_config(config_path)
+    except Exception as e:
+        raise click.ClickException(f"Configuration Error: {e}")
+
+    import re
+    from datetime import datetime
+
+    # Convert to lowercase kebab-case slug for the filename
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", name).lower().strip("-")
+    if not slug:
+        raise click.ClickException(f"Invalid document name: '{name}' resulting in an empty slug.")
+
+    content_dir = Path(config.content_dir)
+    target_file = content_dir / f"{slug}.adoc"
+
+    if target_file.exists():
+        raise click.ClickException(f"File already exists: {target_file}")
+
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    author = config.site_author
+
+    template = f"""= {name}
+:golem-type: {doc_type}
+:author: {author}
+:date: {current_date}
+
+== Introduction
+
+Welcome to your newly scaffolded {doc_type}: "{name}".
+"""
+    try:
+        target_file.write_text(template, encoding="utf-8")
+    except Exception as e:
+        raise click.ClickException(f"Failed to create file {target_file}: {e}")
+
+    click.echo(f"Created new {doc_type}: '{target_file}'")
 
 
 @main.command()
@@ -315,7 +354,11 @@ def build(config, clean):
     config_path = Path(config)
     if config == "golem.toml" and not config_path.exists():
         config_path = find_default_config_path()
-    golem_config = load_config(config_path)
+
+    try:
+        golem_config = load_config(config_path)
+    except Exception as e:
+        raise click.ClickException(f"Configuration Error: {e}")
 
     if clean:
         out_dir = Path(golem_config.output_dir)
@@ -326,8 +369,12 @@ def build(config, clean):
         if cache_file.exists():
             cache_file.unlink()
 
-    engine = BuildEngine(golem_config)
-    compiled = engine.build_site()
+    try:
+        engine = BuildEngine(golem_config)
+        compiled = engine.build_site()
+    except Exception as e:
+        raise click.ClickException(f"Compilation Error: {e}")
+
     click.echo(f"Compilation finished. Built {len(compiled)} pages.")
 
 
@@ -368,12 +415,18 @@ def serve(port, host, test_only):
         from golem.config import GolemConfig
         golem_config = GolemConfig(content_dir="content", output_dir="dist")
     else:
-        golem_config = load_config(config_path)
+        try:
+            golem_config = load_config(config_path)
+        except Exception as e:
+            raise click.ClickException(f"Configuration Error: {e}")
 
     # Compile the site first
     click.echo("Building static site before serving...")
-    engine = BuildEngine(golem_config)
-    engine.build_site()
+    try:
+        engine = BuildEngine(golem_config)
+        engine.build_site()
+    except Exception as e:
+        raise click.ClickException(f"Compilation Error: {e}")
 
     server = LiveReloadServer(
         public_dir=Path(golem_config.output_dir),

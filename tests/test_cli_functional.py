@@ -209,3 +209,47 @@ def test_cli_init_package_scaffolds_full_site_nested(tmp_path):
         pyproject_content = pyproject.read_text(encoding="utf-8")
         assert 'static_dir = "docs/static"' in pyproject_content
         assert 'templates_dir = "docs/templates"' in pyproject_content
+
+
+def test_cli_new_scaffolding_e2e(tmp_path):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        runner.invoke(main, ["init"])
+        
+        # 1. Scaffolding a new file
+        res = runner.invoke(main, ["new", "chapter", "Advanced Compilation"])
+        assert res.exit_code == 0
+        assert "Created" in res.output
+        
+        scaffold_file = Path("content/advanced-compilation.adoc")
+        assert scaffold_file.exists()
+        
+        content = scaffold_file.read_text(encoding="utf-8")
+        assert "= Advanced Compilation" in content
+        assert ":golem-type: chapter" in content
+        assert "Welcome to your newly scaffolded chapter" in content
+        
+        # 2. Prevent accidental overwrites
+        res_fail = runner.invoke(main, ["new", "chapter", "Advanced Compilation"])
+        assert res_fail.exit_code != 0
+        assert "already exists" in res_fail.output
+
+
+def test_cli_suppresses_tracebacks(tmp_path):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        runner.invoke(main, ["init"])
+        
+        # Write a syntactically invalid golem.toml
+        golem_toml = Path("golem.toml")
+        golem_toml.write_text("""
+[site
+title = "Malformed
+""", encoding="utf-8")
+        
+        # Run golem build and verify clean traceback suppression
+        res = runner.invoke(main, ["build"])
+        assert res.exit_code != 0
+        assert "Configuration Error" in res.output
+        assert "Traceback (most recent call" not in res.output
+
