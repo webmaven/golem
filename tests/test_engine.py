@@ -288,6 +288,123 @@ def test_engine_corrupt_cache_handling(tmp_path):
     assert "files" in cache_file.read_text()
 
 
+def test_engine_watcher_cpu_optimization(tmp_path):
+    from unittest.mock import patch
+    from golem.config import GolemConfig
+    from golem.engine import BuildEngine
+
+    content = tmp_path / "content"
+    content.mkdir()
+    file_a = content / "index.adoc"
+    file_a.write_text("= Home\n", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    # First call: populates the SHA-256 and caches it
+    h1 = engine._get_sha256(file_a)
+    assert len(h1) == 64
+
+    # Second call: should retrieve from cache without reading file again
+    with patch("builtins.open") as mock_open:
+        h2 = engine._get_sha256(file_a)
+        assert h2 == h1
+        mock_open.assert_not_called()
+
+
+def test_engine_cache_concurrency_lock(tmp_path):
+    from golem.config import GolemConfig
+    from golem.engine import BuildEngine
+    import threading
+    import time
+
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "index.adoc").write_text("= Home\n", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    acquired = []
+    
+    def worker():
+        with engine._cache_lock():
+            acquired.append("A")
+            time.sleep(0.5)
+            acquired.append("A_done")
+
+    t = threading.Thread(target=worker)
+    t.start()
+    
+    time.sleep(0.1)
+
+    start_time = time.time()
+    with engine._cache_lock():
+        acquired.append("B")
+    duration = time.time() - start_time
+
+    t.join()
+    
+    assert acquired == ["A", "A_done", "B"]
+    assert duration >= 0.3
+
+
+def test_engine_watcher_deleted_file_handling(tmp_path):
+    from golem.config import GolemConfig
+    from golem.engine import BuildEngine
+
+    content = tmp_path / "content"
+    content.mkdir()
+    file_a = content / "deleted.adoc"
+
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    # Accessing SHA-256 for a nonexistent/deleted file should return "" without raising OSError
+    h = engine._get_sha256(file_a)
+    assert h == ""
+
+
+def test_engine_cache_lock_file_creation(tmp_path):
+    from golem.config import GolemConfig
+    from golem.engine import BuildEngine
+
+    content = tmp_path / "content"
+    content.mkdir()
+
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    # Assert that accessing lock_file creates cache.lock under the correct directory
+    lock_path = tmp_path / "cache.lock"
+    with engine._cache_lock():
+        assert lock_path.exists()
+
+
+def test_engine_cache_lock_release_on_error(tmp_path):
+    from golem.config import GolemConfig
+    from golem.engine import BuildEngine
+
+    content = tmp_path / "content"
+    content.mkdir()
+
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    # Assert that if an exception is raised inside the lock block, lock is still released
+    try:
+        with engine._cache_lock():
+            raise ValueError("Intentional crash")
+    except ValueError:
+        pass
+
+    # A second acquisition should succeed immediately (if lock was not released, it would block/crash)
+    with engine._cache_lock():
+        pass
+
+
+
+
 
 
 

@@ -59,6 +59,7 @@ class BuildEngine:
         from golem.plugins import get_plugin_manager
         plugins_dir = Path(getattr(config, "plugins_dir", "plugins"))
         self.pm = get_plugin_manager(plugins_dir=plugins_dir)
+        self._sha_cache = {}
 
     def _load_cache(self) -> dict:
         """
@@ -66,16 +67,17 @@ class BuildEngine:
 
         Load and parse the DAG dependency JSON cache.
         """
-        if self.cache_file.exists():
-            try:
-                with open(self.cache_file, "r") as f:
-                    return json.load(f)
-            except Exception:
+        with self._cache_lock():
+            if self.cache_file.exists():
                 try:
-                    self.cache_file.unlink()
+                    with open(self.cache_file, "r") as f:
+                        return json.load(f)
                 except Exception:
-                    pass
-        return {"files": {}, "dependencies": {}}
+                    try:
+                        self.cache_file.unlink()
+                    except Exception:
+                        pass
+            return {"files": {}, "dependencies": {}}
 
     def save_cache(self):
         """
@@ -86,30 +88,78 @@ class BuildEngine:
         import os
         import tempfile
 
-        self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-        dir_path = self.cache_file.parent
-        with tempfile.NamedTemporaryFile("w", dir=dir_path, delete=False, encoding="utf-8") as tf:
-            json.dump(self.cache_data, tf, indent=2)
-            temp_name = tf.name
+        with self._cache_lock():
+            self.cache_file.parent.mkdir(parents=True, exist_ok=True)
+            dir_path = self.cache_file.parent
+            with tempfile.NamedTemporaryFile("w", dir=dir_path, delete=False, encoding="utf-8") as tf:
+                json.dump(self.cache_data, tf, indent=2)
+                temp_name = tf.name
 
+            try:
+                os.replace(temp_name, self.cache_file)
+            except Exception:
+                if os.path.exists(temp_name):
+                    os.unlink(temp_name)
+                raise
+
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _cache_lock(self):
+        """
+        == _cache_lock
+
+        Advisory cross-process lock using fcntl.flock on a dedicated lock file.
+        """
+        import fcntl
+        lock_path = self.cache_file.parent / "cache.lock"
+        self.cache_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        lock_fd = None
         try:
-            os.replace(temp_name, self.cache_file)
-        except Exception:
-            if os.path.exists(temp_name):
-                os.unlink(temp_name)
-            raise
+            lock_fd = open(lock_path, "w")
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
+        except (ImportError, AttributeError, OSError):
+            pass
+            
+        try:
+            yield
+        finally:
+            if lock_fd:
+                try:
+                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+                    lock_fd.close()
+                except Exception:
+                    pass
 
     def _get_sha256(self, path: Path) -> str:
         """
         == _get_sha256
 
-        Compute SHA-256 hash of a file on disk.
+        Compute SHA-256 hash of a file on disk, utilizing an in-memory mtime/size cache.
         """
+        p_abs = str(path.resolve())
+        try:
+            stat = path.stat()
+            mtime = stat.st_mtime
+            size = stat.st_size
+        except OSError:
+            return ""
+
+        if hasattr(self, "_sha_cache"):
+            cached = self._sha_cache.get(p_abs)
+            if cached and cached[0] == mtime and cached[1] == size:
+                return cached[2]
+        else:
+            self._sha_cache = {}
+
         h = hashlib.sha256()
         with open(path, "rb") as f:
             while chunk := f.read(8192):
                 h.update(chunk)
-        return h.hexdigest()
+        hexdigest = h.hexdigest()
+        self._sha_cache[p_abs] = (mtime, size, hexdigest)
+        return hexdigest
 
     def get_outdated_files(self, commit: bool = True) -> set[Path]:
         """
