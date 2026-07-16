@@ -209,4 +209,11 @@ class PageCompiler:
                 else:
                     template = self.default_template
 
-        return template(title=title, body_content=body_content, toc_html=toc_html)
+        return template(
+            title=title,
+            body_content=body_content,
+            body=body_content,
+            toc_html=toc_html,
+            site_title=getattr(self.config, "site_title", "Golem Docs"),
+            site_author=getattr(self.config, "site_author", "Anonymous"),
+        )
