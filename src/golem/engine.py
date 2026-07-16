@@ -54,6 +54,11 @@ class BuildEngine:
         )
         self.cache_data = self._load_cache()
         self.compiler = PageCompiler(config)
+        
+        # Load Pluggy Plugin Manager
+        from golem.plugins import get_plugin_manager
+        plugins_dir = Path(getattr(config, "plugins_dir", "plugins"))
+        self.pm = get_plugin_manager(plugins_dir=plugins_dir)
 
     def _load_cache(self) -> dict:
         """
@@ -308,12 +313,24 @@ class BuildEngine:
                 with open(doc_path, "r", encoding="utf-8") as f:
                     content = f.read()
 
+                # Trigger pre-parse hooks sequentially (chain modifications)
+                for impl in self.pm.hook.on_pre_parse.get_hookimpls():
+                    content = impl.function(raw_content=content)
+
                 # 1. Parse using asciidoctrine
                 ast = asciidoctrine.parse_to_ast(content, base_dir=str(doc_path.parent))
+
+                # Trigger AST hooks sequentially (chain modifications)
+                for impl in self.pm.hook.on_ast_created.get_hookimpls():
+                    ast = impl.function(ast=ast)
 
                 # 2. Resolve AST to ASG
                 resolver = ASGResolver(ast)
                 asg = resolver.resolve(ast)
+
+                # Trigger ASG hooks sequentially (chain modifications)
+                for impl in self.pm.hook.on_asg_created.get_hookimpls():
+                    asg = impl.function(asg=asg)
 
                 # 3. Render body using Golem's ASG visitor
                 body_content = render_body(asg)
@@ -342,6 +359,10 @@ class BuildEngine:
                 final_html = self.compiler.compile_page(
                     title=title_str, body_content=body_content, toc_html=""
                 )
+
+                # Trigger post-render hooks sequentially (chain modifications)
+                for impl in self.pm.hook.on_post_render.get_hookimpls():
+                    final_html = impl.function(html_content=final_html)
 
                 # 5. Resolve correct output file path
                 rel_path = doc_path.relative_to(self.content_dir)
