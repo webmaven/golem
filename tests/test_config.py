@@ -112,3 +112,36 @@ def test_find_default_config_path_resolution(tmp_path, monkeypatch):
     assert find_default_config_path() == Path("golem.toml")
 
 
+def test_config_overlap_prevention(tmp_path):
+    # Overlapping identical content and output directories
+    with pytest.raises(ValueError, match="overlap"):
+        config_file = tmp_path / "golem.toml"
+        config_file.write_text("""
+[build]
+content_dir = "docs"
+output_dir = "docs"
+""")
+        load_config(config_file)
+
+    # Nested content_dir inside output_dir
+    with pytest.raises(ValueError, match="overlap"):
+        config_file2 = tmp_path / "golem2.toml"
+        config_file2.write_text("""
+[build]
+content_dir = "dist/content"
+output_dir = "dist"
+""")
+        load_config(config_file2)
+
+
+def test_config_toml_syntax_error(tmp_path):
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+[site
+title = "Malformed
+""")
+    with pytest.raises(ValueError, match="Failed to parse configuration file"):
+        load_config(config_file)
+
+
+

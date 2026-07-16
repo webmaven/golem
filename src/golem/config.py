@@ -39,8 +39,11 @@ def find_default_config_path() -> Path:
 def load_config(config_path: Path) -> GolemConfig:
     if not config_path.exists():
         return GolemConfig()
-    with open(config_path, "rb") as f:
-        data = tomllib.load(f)
+    try:
+        with open(config_path, "rb") as f:
+            data = tomllib.load(f)
+    except Exception as e:
+        raise ValueError(f"Failed to parse configuration file '{config_path}': {e}")
 
     # Check if this is a pyproject.toml file
     if config_path.name == "pyproject.toml":
@@ -69,6 +72,23 @@ def load_config(config_path: Path) -> GolemConfig:
         templates_dir = build_data.get("templates_dir", "templates")
         static_dir = build_data.get("static_dir", "static")
         plugins_dir = build_data.get("plugins_dir", "plugins")
+
+    # Ensure resolved content_dir and output_dir do not overlap (identical or nested)
+    try:
+        content_abs = Path(content_dir).resolve()
+        output_abs = Path(output_dir).resolve()
+    except Exception:
+        content_abs = Path(content_dir).absolute()
+        output_abs = Path(output_dir).absolute()
+
+    if content_abs == output_abs:
+        raise ValueError(f"Configuration conflict: content_dir '{content_dir}' and output_dir '{output_dir}' cannot be the same path (they overlap).")
+
+    if content_abs in output_abs.parents:
+        raise ValueError(f"Configuration conflict: content_dir '{content_dir}' cannot be nested inside output_dir '{output_dir}' (they overlap).")
+
+    if output_abs in content_abs.parents:
+        raise ValueError(f"Configuration conflict: output_dir '{output_dir}' cannot be nested inside content_dir '{content_dir}' (they overlap).")
 
     return GolemConfig(
         site_title=site_title,
