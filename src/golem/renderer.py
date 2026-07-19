@@ -150,6 +150,36 @@ class HtmlRenderer:
         escaped_code = html.escape(code)
         self.output.append(f'<pre><code class="language-{lang}">{escaped_code}</code></pre>\n')
 
+    def visit_list(self, node):
+        variant = node.get("variant", "unordered") if isinstance(node, dict) else getattr(node, "variant", "unordered")
+        tag = "ol" if variant == "ordered" else "ul"
+        self.output.append(f"<{tag}>\n")
+        
+        items = node.get("items", []) if isinstance(node, dict) else getattr(node, "items", []) or getattr(node, "children", [])
+        for item in items:
+            self.visit(item)
+        self.output.append(f"</{tag}>\n")
+
+    def visit_listitem(self, node):
+        self.output.append("<li>")
+        checked = node.get("checked", None) if isinstance(node, dict) else getattr(node, "checked", None)
+        if checked is not None:
+            if checked:
+                self.output.append('<input type="checkbox" checked disabled /> ')
+            else:
+                self.output.append('<input type="checkbox" disabled /> ')
+                
+        principal = node.get("principal", []) if isinstance(node, dict) else getattr(node, "principal", [])
+        for p in principal:
+            self.visit(p)
+            
+        blocks = node.get("blocks", []) if isinstance(node, dict) else getattr(node, "blocks", [])
+        for b in blocks:
+            self.visit(b)
+            
+        self.output.append("</li>\n")
+
+
 def render_body(asg_root: Node) -> str:
     renderer = HtmlRenderer()
     return renderer.render(asg_root)
