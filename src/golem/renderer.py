@@ -215,6 +215,58 @@ class HtmlRenderer:
             self.visit(block)
         self.output.append("</div>\n")
 
+    def visit_image(self, node):
+        if isinstance(node, dict):
+            target = node.get("target", "")
+            alt = node.get("attributes", {}).get("alt", "")
+        else:
+            target = getattr(node, "target", "")
+            alt = node.attributes.get("alt", "") if hasattr(node, "attributes") else ""
+        self.output.append(f'<img src="{target}" alt="{alt}" />\n')
+
+    def visit_table(self, node):
+        self.output.append("<table>\n")
+        rows = node.get("rows", []) if isinstance(node, dict) else getattr(node, "rows", []) or getattr(node, "children", [])
+        for row in rows:
+            self.visit(row)
+        self.output.append("</table>\n")
+
+    def visit_row(self, node):
+        self.output.append("<tr>\n")
+        cells = node.get("cells", []) if isinstance(node, dict) else getattr(node, "cells", []) or getattr(node, "children", [])
+        for cell in cells:
+            self.visit(cell)
+        self.output.append("</tr>\n")
+
+    def visit_cell(self, node):
+        # Read colspan, rowspan, alignments
+        attrs = []
+        if isinstance(node, dict):
+            colspan = node.get("colspan", 1)
+            rowspan = node.get("rowspan", 1)
+            align = node.get("align", None)
+        else:
+            colspan = getattr(node, "colspan", 1)
+            rowspan = getattr(node, "rowspan", 1)
+            align = getattr(node, "align", None)
+            
+        if colspan > 1:
+            attrs.append(f'colspan="{colspan}"')
+        if rowspan > 1:
+            attrs.append(f'rowspan="{rowspan}"')
+        if align:
+            attrs.append(f'align="{align}"')
+            
+        attr_str = " " + " ".join(attrs) if attrs else ""
+        self.output.append(f"<td{attr_str}>")
+        
+        blocks = node.get("blocks", []) if isinstance(node, dict) else getattr(node, "blocks", [])
+        for block in blocks:
+            self.visit(block)
+            
+        self.output.append("</td>\n")
+
+
 
 
 def render_body(asg_root: Node) -> str:

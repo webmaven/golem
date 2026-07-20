@@ -97,3 +97,33 @@ def test_render_description_lists_and_admonitions():
     assert 'This is a note' in html_admonition
 
 
+def test_render_images_and_tables():
+    from golem.renderer import HtmlRenderer
+    from asciidoctrine.nodes import Image, Table, TableRow, TableCell, Paragraph, Text
+    
+    # Test Image
+    img = Image(target="images/logo.png", alt="Logo alt text")
+    
+    # Test Table
+    cell1 = TableCell(blocks=[Paragraph(inlines=[Text("Cell A")])])
+    cell1.colspan = 2
+    cell2 = TableCell(blocks=[Paragraph(inlines=[Text("Cell B")])])
+    cell2.align = "right"
+    
+    row = TableRow(cells=[cell1, cell2])
+    table = Table(rows=[row])
+    
+    renderer = HtmlRenderer()
+    
+    # Test Image
+    html_img = renderer.render(img)
+    assert '<img src="images/logo.png" alt="Logo alt text" />' in html_img
+    
+    # Test Table
+    html_tbl = renderer.render(table)
+    assert "<table>" in html_tbl
+    assert "<tr>" in html_tbl
+    assert '<td colspan="2">' in html_tbl
+    assert '<td align="right">' in html_tbl
+    assert "Cell A" in html_tbl
+    assert "</table>" in html_tbl
