@@ -1,5 +1,4 @@
-import asciidoctrine
-from asciidoctrine.nodes import Document, Section, Paragraph, Text, Node
+from asciidoctrine.nodes import Node
 
 class HtmlRenderer:
     def __init__(self):

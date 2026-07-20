@@ -33,7 +33,7 @@ class GolemSpecs:
 
 def get_plugin_manager(plugins_dir: Path | None = None) -> pluggy.PluginManager:
     pm = pluggy.PluginManager(HOOK_NAMESPACE)
-    pm.hookimpl = hookimpl
+    pm.hookimpl = hookimpl  # type: ignore[attr-defined]
     pm.add_hookspecs(GolemSpecs)
     
     # 1. Entry point discovery

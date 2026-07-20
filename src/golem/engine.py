@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
+from contextlib import contextmanager
 import asciidoctrine
 from asciidoctrine.resolver import ASGResolver
 from golem.config import GolemConfig
@@ -38,10 +39,10 @@ class BuildEngine:
     ----
     """
 
-    def __init__(self, config: GolemConfig, cache_file: Path = None):
+    def __init__(self, config: GolemConfig, cache_file: Path | None = None):
         """
         == __init__
-
+        
         Initialize compiler engine state and load existing DAG cache file.
         """
         self.config = config
@@ -59,7 +60,7 @@ class BuildEngine:
         from golem.plugins import get_plugin_manager
         plugins_dir = Path(getattr(config, "plugins_dir", "plugins"))
         self.pm = get_plugin_manager(plugins_dir=plugins_dir)
-        self._sha_cache = {}
+        self._sha_cache: dict[str, tuple[float, int, str]] = {}
 
     def _load_cache(self) -> dict:
         """
@@ -102,7 +103,6 @@ class BuildEngine:
                     os.unlink(temp_name)
                 raise
 
-    from contextlib import contextmanager
 
     @contextmanager
     def _cache_lock(self):
@@ -168,7 +168,7 @@ class BuildEngine:
         Resolve file hashes, detect deleted files, purge orphaned cache keys,
         and walk parents recursively to flag outdated nodes in the DAG.
         """
-        outdated = set()
+        outdated: set[Path] = set()
         if not self.content_dir.exists():
             return outdated
 
@@ -253,10 +253,10 @@ class BuildEngine:
 
         # 4. Re-verify the DAG: resolve reverse dependencies (parent links)
         reverse_deps: dict[str, set[str]] = {}
-        for f_abs in cached_files | current_abs_files:
-            cached_deps = self.cache_data["dependencies"].get(f_abs, [])
+        for f_str in cached_files | current_abs_files:
+            cached_deps = self.cache_data["dependencies"].get(f_str, [])
             for dep in cached_deps:
-                reverse_deps.setdefault(dep, set()).add(f_abs)
+                reverse_deps.setdefault(dep, set()).add(f_str)
 
         # Recursively propagate changed/deleted files back up to their parents (ancestors)
         queue = list(changed_directly)
@@ -281,7 +281,7 @@ class BuildEngine:
 
         return outdated
 
-    def update_cache_for_file(self, path: Path, included_files: list[str] = None):
+    def update_cache_for_file(self, path: Path, included_files: list[str] | None = None):
         """
         == update_cache_for_file
 
@@ -368,14 +368,14 @@ class BuildEngine:
 
                 # Trigger pre-parse hooks sequentially (chain modifications)
                 for impl in self.pm.hook.on_pre_parse.get_hookimpls():
-                    content = impl.function(raw_content=content)
+                    content = impl.function(raw_content=content)  # type: ignore[assignment]
 
                 # 1. Parse using asciidoctrine
                 ast = asciidoctrine.parse_to_ast(content, base_dir=str(doc_path.parent))
 
                 # Trigger AST hooks sequentially (chain modifications)
                 for impl in self.pm.hook.on_ast_created.get_hookimpls():
-                    ast = impl.function(ast=ast)
+                    ast = impl.function(ast=ast)  # type: ignore[assignment]
 
                 # 2. Resolve AST to ASG
                 resolver = ASGResolver(ast)
@@ -383,10 +383,10 @@ class BuildEngine:
 
                 # Trigger ASG hooks sequentially (chain modifications)
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
-                    asg = impl.function(asg=asg)
+                    asg = impl.function(asg=asg)  # type: ignore[assignment]
 
                 # 3. Render body using Golem's ASG visitor
-                body_content = render_body(asg)
+                body_content = render_body(asg)  # type: ignore[arg-type]
 
                 # Extract title for layout framing
                 title_str = ""
@@ -410,14 +410,14 @@ class BuildEngine:
 
                 # 4. Compile layout via Chameleon templates
                 from golem.renderer import generate_toc_html
-                toc_html = generate_toc_html(asg)
+                toc_html = generate_toc_html(asg)  # type: ignore[arg-type]
                 final_html = self.compiler.compile_page(
                     title=title_str, body_content=body_content, toc_html=toc_html
                 )
 
                 # Trigger post-render hooks sequentially (chain modifications)
                 for impl in self.pm.hook.on_post_render.get_hookimpls():
-                    final_html = impl.function(html_content=final_html)
+                    final_html = impl.function(html_content=final_html)  # type: ignore[assignment]
 
                 # 5. Resolve correct output file path
                 rel_path = doc_path.relative_to(self.content_dir)

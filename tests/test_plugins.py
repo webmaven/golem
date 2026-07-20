@@ -1,4 +1,3 @@
-import pytest
 from golem.plugins import get_plugin_manager
 
 def test_plugin_hook_trigger():
@@ -49,7 +48,6 @@ raise ValueError("Plugin failed intentionally during import!")
 def test_plugin_hook_execution_in_build_pipeline(tmp_path):
     from golem.config import GolemConfig
     from golem.engine import BuildEngine
-    from golem.plugins import hookimpl
     
     # Scaffold temporary site
     content = tmp_path / "content"

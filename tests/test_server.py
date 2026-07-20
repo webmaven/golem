@@ -1,9 +1,7 @@
-import pytest
 import requests
 import threading
 import time
 import socket
-from pathlib import Path
 from golem.server import LiveReloadServer
 
 

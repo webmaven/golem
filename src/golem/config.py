@@ -1,9 +1,8 @@
 # golem/config.py
-import os
 try:
     import tomllib
 except ImportError:
-    import tomli as tomllib
+    import tomli as tomllib  # type: ignore[import-not-found,no-redef]
 from dataclasses import dataclass
 from pathlib import Path
 

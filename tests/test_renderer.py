@@ -1,4 +1,3 @@
-import pytest
 import asciidoctrine
 from golem.renderer import render_body
 
@@ -131,7 +130,7 @@ def test_render_images_and_tables():
 
 def test_generate_toc_html():
     from golem.renderer import generate_toc_html
-    from asciidoctrine.nodes import Document, Section, Paragraph, Text
+    from asciidoctrine.nodes import Document, Section, Text
     
     sec1 = Section(level=1, title=[Text("Introduction")])
     sec2 = Section(level=2, title=[Text("Details")])
