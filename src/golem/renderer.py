@@ -297,29 +297,42 @@ def generate_toc_html(asg_root: Node) -> str:
     if not sections:
         return ""
         
+    base_level = sections[0].get("level", 1) if isinstance(sections[0], dict) else getattr(sections[0], "level", 1)
     toc_parts = []
     toc_parts.append('<ul class="toc-list">\n')
-    current_level = 1
+    current_level = base_level
     
     for sec in sections:
         if isinstance(sec, dict):
             level = sec.get("level", 1)
-            # Fetch raw title string
             title_nodes = sec.get("title", [])
-            title_str = "".join(n.get("value", "") if isinstance(n, dict) else getattr(n, "value", "") for n in title_nodes)
         else:
             level = getattr(sec, "level", 1)
             title_nodes = getattr(sec, "title", [])
-            if isinstance(title_nodes, list):
-                title_str = "".join(getattr(n, "value", "") for n in title_nodes)
-            else:
-                title_str = str(title_nodes)
-                
+            
+        title_str = HtmlRenderer()._get_plain_text(title_nodes)
         anchor_id = title_str.lower().replace(" ", "-").replace("_", "-")
         
-        # Simple indentation list hierarchy matching heading nesting levels
-        toc_parts.append(f'  <li class="toc-item level-{level}"><ul class="toc-level-{level}"><li><a href="#{anchor_id}">{title_str}</a></li></ul></li>\n')
+        if level < base_level:
+            level = base_level
+            
+        while current_level < level:
+            toc_parts.append('<ul class="toc-level-{}">\n'.format(current_level + 1))
+            current_level += 1
+        while current_level > level:
+            toc_parts.append('</li>\n</ul>\n')
+            current_level -= 1
+        if current_level == level and len(toc_parts) > 1:
+            if not toc_parts[-1].strip().endswith("<ul>") and not toc_parts[-1].strip().endswith(">\n") or toc_parts[-1].strip().endswith("</li>") or toc_parts[-1].strip().endswith("</a>"):
+                toc_parts.append('</li>\n')
+            elif toc_parts[-1].strip().endswith("</ul>"):
+                toc_parts.append('</li>\n')
+            
+        toc_parts.append(f'  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>')
         
-    toc_parts.append("</ul>\n")
+    while current_level > base_level:
+        toc_parts.append('</li>\n</ul>\n')
+        current_level -= 1
+    toc_parts.append('</li>\n</ul>\n')
     return "".join(toc_parts)
 

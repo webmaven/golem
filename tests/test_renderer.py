@@ -138,7 +138,7 @@ def test_generate_toc_html():
     doc = Document(blocks=[sec1, sec2])
     
     toc_html = generate_toc_html(doc)
-    assert '<ul class="toc-level-1">' in toc_html
+    assert '<ul class="toc-list">' in toc_html
     assert '<a href="#introduction">Introduction</a>' in toc_html
     assert '<ul class="toc-level-2">' in toc_html
     assert '<a href="#details">Details</a>' in toc_html
