@@ -409,8 +409,10 @@ class BuildEngine:
                     title_str = "Golem Doc"
 
                 # 4. Compile layout via Chameleon templates
+                from golem.renderer import generate_toc_html
+                toc_html = generate_toc_html(asg)
                 final_html = self.compiler.compile_page(
-                    title=title_str, body_content=body_content, toc_html=""
+                    title=title_str, body_content=body_content, toc_html=toc_html
                 )
 
                 # Trigger post-render hooks sequentially (chain modifications)

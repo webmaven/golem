@@ -272,3 +272,54 @@ class HtmlRenderer:
 def render_body(asg_root: Node) -> str:
     renderer = HtmlRenderer()
     return renderer.render(asg_root)
+
+
+def generate_toc_html(asg_root: Node) -> str:
+    sections = []
+    
+    def extract_sections(node):
+        if isinstance(node, dict):
+            if node.get("name") == "section":
+                sections.append(node)
+            for k in ["blocks", "children"]:
+                if k in node:
+                    for child in node[k]:
+                        extract_sections(child)
+        else:
+            if getattr(node, "name", "") == "section":
+                sections.append(node)
+            if hasattr(node, "walk"):
+                for child in node.walk():
+                    if child != node and getattr(child, "name", "") == "section":
+                        sections.append(child)
+                        
+    extract_sections(asg_root)
+    if not sections:
+        return ""
+        
+    toc_parts = []
+    toc_parts.append('<ul class="toc-list">\n')
+    current_level = 1
+    
+    for sec in sections:
+        if isinstance(sec, dict):
+            level = sec.get("level", 1)
+            # Fetch raw title string
+            title_nodes = sec.get("title", [])
+            title_str = "".join(n.get("value", "") if isinstance(n, dict) else getattr(n, "value", "") for n in title_nodes)
+        else:
+            level = getattr(sec, "level", 1)
+            title_nodes = getattr(sec, "title", [])
+            if isinstance(title_nodes, list):
+                title_str = "".join(getattr(n, "value", "") for n in title_nodes)
+            else:
+                title_str = str(title_nodes)
+                
+        anchor_id = title_str.lower().replace(" ", "-").replace("_", "-")
+        
+        # Simple indentation list hierarchy matching heading nesting levels
+        toc_parts.append(f'  <li class="toc-item level-{level}"><ul class="toc-level-{level}"><li><a href="#{anchor_id}">{title_str}</a></li></ul></li>\n')
+        
+    toc_parts.append("</ul>\n")
+    return "".join(toc_parts)
+

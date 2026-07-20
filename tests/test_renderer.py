@@ -127,3 +127,19 @@ def test_render_images_and_tables():
     assert '<td align="right">' in html_tbl
     assert "Cell A" in html_tbl
     assert "</table>" in html_tbl
+
+
+def test_generate_toc_html():
+    from golem.renderer import generate_toc_html
+    from asciidoctrine.nodes import Document, Section, Paragraph, Text
+    
+    sec1 = Section(level=1, title=[Text("Introduction")])
+    sec2 = Section(level=2, title=[Text("Details")])
+    doc = Document(blocks=[sec1, sec2])
+    
+    toc_html = generate_toc_html(doc)
+    assert '<ul class="toc-level-1">' in toc_html
+    assert '<a href="#introduction">Introduction</a>' in toc_html
+    assert '<ul class="toc-level-2">' in toc_html
+    assert '<a href="#details">Details</a>' in toc_html
+
