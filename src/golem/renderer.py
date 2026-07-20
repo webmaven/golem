@@ -179,6 +179,43 @@ class HtmlRenderer:
             
         self.output.append("</li>\n")
 
+    def visit_descriptionlist(self, node):
+        self.output.append("<dl>\n")
+        items = node.get("items", []) if isinstance(node, dict) else getattr(node, "items", [])
+        for item in items:
+            self.visit(item)
+        self.output.append("</dl>\n")
+
+    def visit_descriptionlistitem(self, node):
+        terms = node.get("terms", []) if isinstance(node, dict) else getattr(node, "terms", [])
+        for term in terms:
+            self.visit(term)
+        
+        self.output.append("<dd>\n")
+        blocks = node.get("blocks", []) if isinstance(node, dict) else getattr(node, "blocks", [])
+        for block in blocks:
+            self.visit(block)
+        self.output.append("</dd>\n")
+
+    def visit_descriptionlistterm(self, node):
+        self.output.append("<dt>")
+        inlines = node.get("inlines", []) if isinstance(node, dict) else getattr(node, "inlines", [])
+        for inline in inlines:
+            self.visit(inline)
+        self.output.append("</dt>\n")
+
+    def visit_admonition(self, node):
+        variant = node.get("variant", "note") if isinstance(node, dict) else getattr(node, "variant", "note")
+        variant_lower = variant.lower()
+        self.output.append(f'<div class="admonition {variant_lower}">\n')
+        self.output.append(f'<div class="admonition-title">{variant.upper()}</div>\n')
+        
+        blocks = node.get("blocks", []) if isinstance(node, dict) else getattr(node, "blocks", [])
+        for block in blocks:
+            self.visit(block)
+        self.output.append("</div>\n")
+
+
 
 def render_body(asg_root: Node) -> str:
     renderer = HtmlRenderer()

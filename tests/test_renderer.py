@@ -68,3 +68,32 @@ def test_render_lists_and_checkboxes():
     assert "</ol>" in html_ordered
     assert "<li>First item</li>" in html_ordered
 
+
+def test_render_description_lists_and_admonitions():
+    from golem.renderer import HtmlRenderer
+    from asciidoctrine.nodes import DescriptionList, DescriptionListItem, DescriptionListTerm, Paragraph, Text, Admonition
+    
+    term = DescriptionListTerm(inlines=[Text("Term 1")])
+    body = Paragraph(inlines=[Text("Definition 1")])
+    item = DescriptionListItem(terms=[term], blocks=[body])
+    dlist = DescriptionList(items=[item])
+    
+    admonition = Admonition(variant="note", blocks=[Paragraph(inlines=[Text("This is a note")])])
+    
+    renderer = HtmlRenderer()
+    
+    # Test description list rendering
+    html_dlist = renderer.render(dlist)
+    assert "<dl>" in html_dlist
+    assert "<dt>Term 1</dt>" in html_dlist
+    assert "<dd>" in html_dlist
+    assert "Definition 1" in html_dlist
+    assert "</dl>" in html_dlist
+    
+    # Test admonition rendering
+    html_admonition = renderer.render(admonition)
+    assert '<div class="admonition note">' in html_admonition
+    assert '<div class="admonition-title">NOTE</div>' in html_admonition
+    assert 'This is a note' in html_admonition
+
+
