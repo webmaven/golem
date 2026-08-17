@@ -18,12 +18,14 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "asciidoctrine>=0.1.0a9",
-    "asciidocstring>=0.1.0a3",
-    "asciidoctest>=0.1.0a3",
+    "asciidoctrine>=0.2.0a1",
+    "asciidocstring>=0.1.0a6",
+    "asciidoctest>=0.2.0a2",
+    "asciidoctype>=0.1.0a2",
     "chameleon",
+    "click",
     "pluggy",
-    "pdoc",
+    "griffe>=1.5.0",
     "tomli; python_version < '3.11'",
 ]
 
@@ -60,5 +62,15 @@ author = "Michael Bernstein"
 content_dir = "docs"
 output_dir = "dist"
 theme = "default"
+
+[tool.golem.plugins]
+plugins = [
+    "golem.plugins.doctest",
+    "golem.plugins.apidoc",
+]
+
+[tool.pytest.ini_options]
+addopts = "--ignore=SPECIFICATION.adoc"
+
 
 

@@ -196,3 +196,150 @@ nav = [
     assert config.site_url == "https://pyproject.org/docs"
     assert config.strict is True
     assert config.navigation_nav == ["01-intro.adoc", "02-guide.adoc"]
+
+
+def test_config_plugins_and_static_defaults():
+    config = GolemConfig()
+    assert config.plugins == ["golem.plugins.doctest", "golem.plugins.apidoc"]
+    assert config.static_dir == "static"
+
+
+def test_config_plugins_unspecified_in_file(tmp_path):
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+[site]
+title = "Default Plugins Docs"
+""")
+    config = load_config(config_file)
+    assert config.plugins == ["golem.plugins.doctest", "golem.plugins.apidoc"]
+    assert config.static_dir == "static"
+
+
+def test_config_plugins_golem_toml_plugins_list(tmp_path):
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+[plugins]
+plugins = ["custom.plugin1", "custom.plugin2"]
+""")
+    config = load_config(config_file)
+    assert config.plugins == ["custom.plugin1", "custom.plugin2"]
+
+
+def test_config_plugins_golem_toml_enabled_list(tmp_path):
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+[plugins]
+enabled = ["enabled.plugin1", "enabled.plugin2"]
+""")
+    config = load_config(config_file)
+    assert config.plugins == ["enabled.plugin1", "enabled.plugin2"]
+
+
+def test_config_plugins_golem_toml_toplevel_plugins(tmp_path):
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+plugins = ["top.plugin1", "top.plugin2"]
+""")
+    config = load_config(config_file)
+    assert config.plugins == ["top.plugin1", "top.plugin2"]
+
+
+def test_config_plugins_table_items_with_name(tmp_path):
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+[plugins]
+plugins = [
+    { name = "dict.plugin1", enabled = true },
+    "string.plugin2"
+]
+""")
+    config = load_config(config_file)
+    assert config.plugins == ["dict.plugin1", "string.plugin2"]
+
+    config_file_tables = tmp_path / "golem_tables.toml"
+    config_file_tables.write_text("""
+[[plugins]]
+name = "table.plugin1"
+
+[[plugins]]
+name = "table.plugin2"
+""")
+    config_tables = load_config(config_file_tables)
+    assert config_tables.plugins == ["table.plugin1", "table.plugin2"]
+
+
+def test_config_plugins_empty_list(tmp_path):
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+[plugins]
+plugins = []
+""")
+    config = load_config(config_file)
+    assert config.plugins == []
+
+    config_file_top = tmp_path / "golem_top.toml"
+    config_file_top.write_text("""
+plugins = []
+""")
+    config_top = load_config(config_file_top)
+    assert config_top.plugins == []
+
+
+def test_config_plugins_pyproject_toml(tmp_path):
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text("""
+[tool.golem.plugins]
+plugins = ["golem.plugins.doctest", "golem.plugins.apidoc"]
+""")
+    config = load_config(config_file)
+    assert config.plugins == ["golem.plugins.doctest", "golem.plugins.apidoc"]
+
+    config_file_enabled = tmp_path / "pyproject_enabled.toml"
+    config_file_enabled.write_text("""
+[tool.golem.plugins]
+enabled = ["tool.enabled1"]
+""")
+    config_enabled = load_config(config_file_enabled)
+    assert config_enabled.plugins == ["tool.enabled1"]
+
+    config_file_flat = tmp_path / "pyproject_flat.toml"
+    config_file_flat.write_text("""
+[tool.golem]
+plugins = ["tool.flat1"]
+""")
+    config_flat = load_config(config_file_flat)
+    assert config_flat.plugins == ["tool.flat1"]
+
+    config_file_table = tmp_path / "pyproject_table.toml"
+    config_file_table.write_text("""
+[[tool.golem.plugins]]
+name = "tool.table.plugin"
+""")
+    config_table = load_config(config_file_table)
+    assert config_table.plugins == ["tool.table.plugin"]
+
+    config_file_empty = tmp_path / "pyproject_empty.toml"
+    config_file_empty.write_text("""
+[tool.golem.plugins]
+plugins = []
+""")
+    config_empty = load_config(config_file_empty)
+    assert config_empty.plugins == []
+
+
+def test_config_static_dir_custom(tmp_path):
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+[build]
+static_dir = "assets"
+""")
+    config = load_config(config_file)
+    assert config.static_dir == "assets"
+
+    config_file_pyproject = tmp_path / "pyproject.toml"
+    config_file_pyproject.write_text("""
+[tool.golem.build]
+static_dir = "my_assets"
+""")
+    config_pyproject = load_config(config_file_pyproject)
+    assert config_pyproject.static_dir == "my_assets"

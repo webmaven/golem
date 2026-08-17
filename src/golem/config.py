@@ -3,10 +3,8 @@ try:
     import tomllib
 except ImportError:
     import tomli as tomllib  # type: ignore[import-not-found,no-redef]
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-
-
 from typing import Any
 
 
@@ -23,6 +21,9 @@ class GolemConfig:
     templates_dir: str = "templates"
     static_dir: str = "static"
     plugins_dir: str = "plugins"
+    plugins: list[str] = field(
+        default_factory=lambda: ["golem.plugins.doctest", "golem.plugins.apidoc"]
+    )
     config_path: str | None = None
 
 
@@ -58,6 +59,22 @@ def _parse_nav(raw_nav: Any) -> list[str] | None:
     return None
 
 
+def _parse_plugins(raw_plugins: Any) -> list[str] | None:
+    if raw_plugins is None:
+        return None
+    if isinstance(raw_plugins, list):
+        parsed = []
+        for item in raw_plugins:
+            if isinstance(item, dict) and "name" in item:
+                parsed.append(str(item["name"]))
+            elif isinstance(item, str):
+                parsed.append(item)
+            else:
+                parsed.append(str(item))
+        return parsed
+    return None
+
+
 def load_config(config_path: Path) -> GolemConfig:
     if not config_path.exists():
         return GolemConfig()
@@ -68,7 +85,9 @@ def load_config(config_path: Path) -> GolemConfig:
         raise ValueError(f"Failed to parse configuration file '{config_path}': {e}")
 
     # Check if this is a pyproject.toml file
-    if config_path.name == "pyproject.toml":
+    if config_path.name == "pyproject.toml" or (
+        "tool" in data and "golem" in data.get("tool", {})
+    ):
         golem_data = data.get("tool", {}).get("golem", {})
         site_data = golem_data.get("site", {})
         build_data = golem_data.get("build", {})
@@ -118,6 +137,21 @@ def load_config(config_path: Path) -> GolemConfig:
         plugins_dir = (
             build_data.get("plugins_dir") or golem_data.get("plugins_dir") or "plugins"
         )
+        plugins_data = golem_data.get("plugins")
+        if isinstance(plugins_data, dict):
+            raw_plugins = (
+                plugins_data.get("plugins")
+                if "plugins" in plugins_data
+                else plugins_data.get("enabled")
+            )
+        else:
+            raw_plugins = plugins_data
+        parsed_plugins = _parse_plugins(raw_plugins)
+        plugins = (
+            parsed_plugins
+            if parsed_plugins is not None
+            else ["golem.plugins.doctest", "golem.plugins.apidoc"]
+        )
         raw_nav = (
             nav_data.get("nav")
             if "nav" in nav_data
@@ -148,8 +182,23 @@ def load_config(config_path: Path) -> GolemConfig:
         theme = build_data.get("theme", "default")
 
         templates_dir = build_data.get("templates_dir", "templates")
-        static_dir = build_data.get("static_dir", "static")
+        static_dir = build_data.get("static_dir") or data.get("static_dir") or "static"
         plugins_dir = build_data.get("plugins_dir", "plugins")
+        plugins_data = data.get("plugins")
+        if isinstance(plugins_data, dict):
+            raw_plugins = (
+                plugins_data.get("plugins")
+                if "plugins" in plugins_data
+                else plugins_data.get("enabled")
+            )
+        else:
+            raw_plugins = plugins_data
+        parsed_plugins = _parse_plugins(raw_plugins)
+        plugins = (
+            parsed_plugins
+            if parsed_plugins is not None
+            else ["golem.plugins.doctest", "golem.plugins.apidoc"]
+        )
         raw_nav = (
             nav_data.get("nav")
             if "nav" in nav_data
@@ -196,5 +245,6 @@ def load_config(config_path: Path) -> GolemConfig:
         templates_dir=templates_dir,
         static_dir=static_dir,
         plugins_dir=plugins_dir,
+        plugins=plugins,
         config_path=str(config_path.resolve()),
     )
