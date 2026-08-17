@@ -717,8 +717,12 @@ class BuildEngine:
                     "message": str(e),
                     "error_type": type(e).__name__,
                     "exception": e,
-                    "line": getattr(e, "line", None),
-                    "column": getattr(e, "column", None),
+                    "line": getattr(e, "line", getattr(e, "lineno", None)),
+                    "column": getattr(
+                        e,
+                        "column",
+                        getattr(e, "offset", getattr(e, "col_offset", None)),
+                    ),
                     "context": getattr(e, "context", None),
                 }
                 self.errors.append(error_info)
