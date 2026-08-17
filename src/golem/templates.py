@@ -104,7 +104,8 @@ DEFAULT_TEMPLATE = """\
     <div id="golem-wrapper">
         <aside id="golem-sidebar-left">
             <h3>Navigation</h3>
-            <ul>
+            <div tal:condition="nav_html" tal:replace="structure nav_html" />
+            <ul tal:condition="not:nav_html">
                 <li><a href="index.html">Welcome</a></li>
                 <li><a href="user_manual.html">User Manual</a></li>
                 <li><a href="developer_guide.html">Developer Guide</a></li>
@@ -165,6 +166,7 @@ class PageCompiler:
         body_content: str,
         toc_html: str,
         template_path: Path | None = None,
+        nav_html: str = "",
     ) -> str:
         """
         == compile_page
@@ -177,6 +179,7 @@ class PageCompiler:
         - `body_content`:: Processed HTML body text.
         - `toc_html`:: Rendered Table of Contents HTML.
         - `template_path`:: Optional layout override path.
+        - `nav_html`:: Rendered left navigation HTML.
         """
         if template_path and template_path.exists():
             try:
@@ -187,7 +190,11 @@ class PageCompiler:
                 template = self.default_template
         else:
             # Check for user's scaffolded custom templates directory first
-            user_pt = Path(self.config.templates_dir) / "page.pt" if hasattr(self.config, "templates_dir") else None
+            user_pt = (
+                Path(self.config.templates_dir) / "page.pt"
+                if hasattr(self.config, "templates_dir")
+                else None
+            )
             if user_pt and user_pt.exists():
                 try:
                     with open(user_pt, "r", encoding="utf-8") as f:
@@ -214,6 +221,9 @@ class PageCompiler:
             body_content=body_content,
             body=body_content,
             toc_html=toc_html,
+            nav_html=nav_html,
+            navigation_html=nav_html,
             site_title=getattr(self.config, "site_title", "Golem Docs"),
             site_author=getattr(self.config, "site_author", "Anonymous"),
+            site_url=getattr(self.config, "site_url", None),
         )

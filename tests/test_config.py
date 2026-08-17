@@ -3,6 +3,7 @@ import pytest
 from pathlib import Path
 from golem.config import GolemConfig, load_config, find_default_config_path
 
+
 def test_config_parsing(tmp_path):
     config_file = tmp_path / "golem.toml"
     config_file.write_text("""
@@ -20,6 +21,7 @@ output_dir = "my_dist"
     assert config.content_dir == "my_content"
     assert config.output_dir == "my_dist"
 
+
 def test_load_config_non_existent():
     config = load_config(Path("non_existent_file.toml"))
     assert isinstance(config, GolemConfig)
@@ -28,6 +30,7 @@ def test_load_config_non_existent():
     assert config.content_dir == "content"
     assert config.output_dir == "dist"
     assert config.theme == "default"
+
 
 def test_config_parsing_partial(tmp_path):
     config_file_empty = tmp_path / "golem_empty.toml"
@@ -99,11 +102,11 @@ def test_find_default_config_path_resolution(tmp_path, monkeypatch):
 
     # 2. Only pyproject.toml exists but without [tool.golem] -> should return golem.toml
     pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text("[tool.poetry]\nname = \"test\"")
+    pyproject.write_text('[tool.poetry]\nname = "test"')
     assert find_default_config_path() == Path("golem.toml")
 
     # 3. pyproject.toml exists with [tool.golem] -> should return pyproject.toml
-    pyproject.write_text("[tool.golem]\ntitle = \"Test\"")
+    pyproject.write_text('[tool.golem]\ntitle = "Test"')
     assert find_default_config_path() == Path("pyproject.toml")
 
     # 4. Both exist -> should prefer golem.toml
@@ -144,4 +147,52 @@ title = "Malformed
         load_config(config_file)
 
 
+def test_config_site_url_strict_nav_defaults():
+    config = GolemConfig()
+    assert config.site_url is None
+    assert config.strict is False
+    assert config.navigation_nav is None
 
+
+def test_config_site_url_strict_nav_from_golem_toml(tmp_path):
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+[site]
+title = "My Docs"
+url = "https://example.com/docs"
+author = "Dev"
+
+[build]
+strict = true
+
+[navigation]
+nav = ["01-getting-started.adoc", "02-architecture.adoc"]
+""")
+    config = load_config(config_file)
+    assert config.site_title == "My Docs"
+    assert config.site_url == "https://example.com/docs"
+    assert config.strict is True
+    assert config.navigation_nav == ["01-getting-started.adoc", "02-architecture.adoc"]
+
+
+def test_config_pyproject_toml_site_url_strict_nav(tmp_path):
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text("""
+[tool.golem.site]
+title = "PyProject Docs"
+url = "https://pyproject.org/docs"
+
+[tool.golem.build]
+strict = true
+
+[tool.golem.navigation]
+nav = [
+    { title = "Intro", path = "01-intro.adoc" },
+    { title = "Guide", path = "02-guide.adoc" }
+]
+""")
+    config = load_config(config_file)
+    assert config.site_title == "PyProject Docs"
+    assert config.site_url == "https://pyproject.org/docs"
+    assert config.strict is True
+    assert config.navigation_nav == ["01-intro.adoc", "02-guide.adoc"]

@@ -9,13 +9,41 @@ and maps dependency links into a JSON-based DAG cache.
 import hashlib
 import json
 import logging
+import re
 from pathlib import Path
 from contextlib import contextmanager
+from typing import Any
 import asciidoctrine
 from asciidoctrine.resolver import ASGResolver
 from golem.config import GolemConfig
 from golem.renderer import render_body
 from golem.templates import PageCompiler
+
+
+def _title_from_filename(name: str) -> str:
+    """Derive display title from a filename or directory name, stripping numeric prefixes."""
+    stem = Path(name).stem if "." in name else name
+    cleaned = re.sub(r"^\d+[-_.]\s*", "", stem)
+    if not cleaned:
+        cleaned = stem
+    cleaned = cleaned.replace("-", " ").replace("_", " ")
+    return " ".join(word.capitalize() for word in cleaned.split())
+
+
+def _extract_title_from_doc(path: Path) -> str:
+    """Extract first top-level header title from an AsciiDoc file, or fallback to cleaned filename."""
+    if path.exists() and path.is_file():
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    line_s = line.strip()
+                    if line_s.startswith("= ") and not line_s.startswith("== "):
+                        title = line_s[2:].strip()
+                        if title:
+                            return title
+        except Exception:
+            pass
+    return _title_from_filename(path.name)
 
 
 class BuildEngine:
@@ -42,7 +70,7 @@ class BuildEngine:
     def __init__(self, config: GolemConfig, cache_file: Path | None = None):
         """
         == __init__
-        
+
         Initialize compiler engine state and load existing DAG cache file.
         """
         self.config = config
@@ -55,9 +83,12 @@ class BuildEngine:
         )
         self.cache_data = self._load_cache()
         self.compiler = PageCompiler(config)
-        
+        self.errors: list[dict[str, Any]] = []
+        self.diagnostics: list[dict[str, Any]] = self.errors
+
         # Load Pluggy Plugin Manager
         from golem.plugins import get_plugin_manager
+
         plugins_dir = Path(getattr(config, "plugins_dir", "plugins"))
         self.pm = get_plugin_manager(plugins_dir=plugins_dir)
         self._sha_cache: dict[str, tuple[float, int, str]] = {}
@@ -92,7 +123,9 @@ class BuildEngine:
         with self._cache_lock():
             self.cache_file.parent.mkdir(parents=True, exist_ok=True)
             dir_path = self.cache_file.parent
-            with tempfile.NamedTemporaryFile("w", dir=dir_path, delete=False, encoding="utf-8") as tf:
+            with tempfile.NamedTemporaryFile(
+                "w", dir=dir_path, delete=False, encoding="utf-8"
+            ) as tf:
                 json.dump(self.cache_data, tf, indent=2)
                 temp_name = tf.name
 
@@ -103,7 +136,6 @@ class BuildEngine:
                     os.unlink(temp_name)
                 raise
 
-
     @contextmanager
     def _cache_lock(self):
         """
@@ -112,16 +144,17 @@ class BuildEngine:
         Advisory cross-process lock using fcntl.flock on a dedicated lock file.
         """
         import fcntl
+
         lock_path = self.cache_file.parent / "cache.lock"
         self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-        
+
         lock_fd = None
         try:
             lock_fd = open(lock_path, "w")
             fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
-        except (ImportError, AttributeError, OSError):
+        except ImportError, AttributeError, OSError:
             pass
-            
+
         try:
             yield
         finally:
@@ -241,7 +274,9 @@ class BuildEngine:
 
         # If a global layout or config changed, we must mark all existing .adoc documents as outdated!
         if global_changed:
-            logging.info("[BuildEngine] Global configuration or template change detected. Invalidating all pages...")
+            logging.info(
+                "[BuildEngine] Global configuration or template change detected. Invalidating all pages..."
+            )
             outdated.update(all_files)
             # Short-circuit and return full re-build
             if commit and (deleted_files or global_changed):
@@ -281,7 +316,9 @@ class BuildEngine:
 
         return outdated
 
-    def update_cache_for_file(self, path: Path, included_files: list[str] | None = None):
+    def update_cache_for_file(
+        self, path: Path, included_files: list[str] | None = None
+    ):
         """
         == update_cache_for_file
 
@@ -290,7 +327,9 @@ class BuildEngine:
         p_abs = str(path.resolve())
         self.cache_data["files"][p_abs] = self._get_sha256(path)
         if included_files is not None:
-            unique_deps = list(dict.fromkeys(str(Path(f).resolve()) for f in included_files))
+            unique_deps = list(
+                dict.fromkeys(str(Path(f).resolve()) for f in included_files)
+            )
             self.cache_data["dependencies"][p_abs] = unique_deps
         else:
             deps = []
@@ -314,7 +353,9 @@ class BuildEngine:
                     if not f_path.exists():
                         return
                     try:
-                        with open(f_path, "r", encoding="utf-8", errors="replace") as f_in:
+                        with open(
+                            f_path, "r", encoding="utf-8", errors="replace"
+                        ) as f_in:
                             for line in f_in:
                                 m = include_regex.match(line.strip())
                                 if m:
@@ -342,12 +383,220 @@ class BuildEngine:
 
         self.save_cache()
 
+    def discover_navigation(self) -> list[dict[str, Any]]:
+        """
+        == discover_navigation
+
+        Discover hierarchical site map and navigation tree from content files,
+        supporting explicit config overrides (navigation_nav), index page pinning,
+        and numeric prefix stripping.
+        """
+        # If navigation_nav is explicitly configured, use it as manual override order
+        if (
+            self.config.navigation_nav is not None
+            and len(self.config.navigation_nav) > 0
+        ):
+            nav_items: list[dict[str, Any]] = []
+            for item in self.config.navigation_nav:
+                p = self.content_dir / item
+                title = (
+                    _extract_title_from_doc(p)
+                    if p.exists()
+                    else _title_from_filename(item)
+                )
+                rel_url = Path(item).with_suffix(".html").as_posix()
+                nav_items.append(
+                    {
+                        "title": title,
+                        "path": item,
+                        "url": rel_url,
+                        "children": [],
+                    }
+                )
+            return nav_items
+
+        if not self.content_dir.exists():
+            return []
+
+        def build_tree(current_dir: Path) -> list[dict[str, Any]]:
+            items: list[dict[str, Any]] = []
+            if not current_dir.exists():
+                return items
+
+            try:
+                entries = list(current_dir.iterdir())
+            except Exception:
+                return items
+
+            valid_entries = [
+                e
+                for e in entries
+                if not e.name.startswith(".") and not e.name.startswith("__")
+            ]
+
+            files = [e for e in valid_entries if e.is_file() and e.suffix == ".adoc"]
+            dirs = [e for e in valid_entries if e.is_dir()]
+
+            files.sort(key=lambda x: x.name.lower())
+            dirs.sort(key=lambda x: x.name.lower())
+
+            index_file: Path | None = None
+            for f in files:
+                if f.stem.lower() in ("index", "readme"):
+                    index_file = f
+                    break
+
+            if current_dir == self.content_dir and index_file is not None:
+                rel_p = index_file.relative_to(self.content_dir).as_posix()
+                rel_u = (
+                    index_file.relative_to(self.content_dir)
+                    .with_suffix(".html")
+                    .as_posix()
+                )
+                title = _extract_title_from_doc(index_file)
+                items.append(
+                    {
+                        "title": title,
+                        "path": rel_p,
+                        "url": rel_u,
+                        "children": [],
+                    }
+                )
+
+            for f in files:
+                if current_dir == self.content_dir and f == index_file:
+                    continue
+                if current_dir != self.content_dir and f == index_file:
+                    continue
+                rel_p = f.relative_to(self.content_dir).as_posix()
+                rel_u = f.relative_to(self.content_dir).with_suffix(".html").as_posix()
+                title = _extract_title_from_doc(f)
+                items.append(
+                    {
+                        "title": title,
+                        "path": rel_p,
+                        "url": rel_u,
+                        "children": [],
+                    }
+                )
+
+            for d in dirs:
+                sub_index: Path | None = None
+                try:
+                    for sub_f in d.iterdir():
+                        if (
+                            sub_f.is_file()
+                            and sub_f.suffix == ".adoc"
+                            and sub_f.stem.lower() in ("index", "readme")
+                        ):
+                            sub_index = sub_f
+                            break
+                except Exception:
+                    pass
+
+                sub_children = build_tree(d)
+
+                if sub_index is not None:
+                    sec_title = _extract_title_from_doc(sub_index)
+                    sec_url = (
+                        sub_index.relative_to(self.content_dir)
+                        .with_suffix(".html")
+                        .as_posix()
+                    )
+                    sec_path = sub_index.relative_to(self.content_dir).as_posix()
+                else:
+                    sec_title = _title_from_filename(d.name)
+                    sec_url = None
+                    sec_path = d.relative_to(self.content_dir).as_posix()
+
+                items.append(
+                    {
+                        "title": sec_title,
+                        "path": sec_path,
+                        "url": sec_url,
+                        "children": sub_children,
+                    }
+                )
+
+            return items
+
+        return build_tree(self.content_dir)
+
+    def generate_nav_html(self, current_rel_path: Path | None = None) -> str:
+        """
+        == generate_nav_html
+
+        Render navigation tree into semantic HTML with proper relative links.
+        """
+        nav_tree = self.discover_navigation()
+        if not nav_tree:
+            return ""
+
+        prefix = ""
+        if current_rel_path is not None:
+            depth = len(current_rel_path.parent.parts)
+            if depth > 0:
+                prefix = "../" * depth
+
+        def render_list(
+            items: list[dict[str, Any]], is_nested: bool = False
+        ) -> list[str]:
+            ul_class = "golem-nav-sublist" if is_nested else "golem-nav-list"
+            out = [f'<ul class="{ul_class}">\n']
+            for item in items:
+                title = item.get("title", "")
+                url = item.get("url")
+                children = item.get("children", [])
+                href = f"{prefix}{url}" if url else None
+
+                if children:
+                    out.append('  <li class="golem-nav-section">\n')
+                    if href:
+                        out.append(
+                            f'    <span class="golem-nav-section-title"><a href="{href}">{title}</a></span>\n'
+                        )
+                    else:
+                        out.append(
+                            f'    <span class="golem-nav-section-title">{title}</span>\n'
+                        )
+                    out.extend(render_list(children, is_nested=True))
+                    out.append("  </li>\n")
+                else:
+                    out.append('  <li class="golem-nav-item">')
+                    if href:
+                        out.append(f'<a href="{href}">{title}</a>')
+                    else:
+                        out.append(f"<span>{title}</span>")
+                    out.append("</li>\n")
+            out.append("</ul>\n")
+            return out
+
+        res = ['<nav class="golem-nav">\n']
+        res.extend(render_list(nav_tree, is_nested=False))
+        res.append("</nav>")
+        return "".join(res)
+
+    def _get_template_search_paths(self) -> list[Path]:
+        """Collect template search paths for asciidoctype / Chameleon."""
+        paths: list[Path] = []
+        if hasattr(self.config, "templates_dir") and self.config.templates_dir:
+            tpl_path = Path(self.config.templates_dir)
+            paths.append(tpl_path.resolve() if tpl_path.exists() else tpl_path)
+
+        if hasattr(self.config, "theme") and self.config.theme:
+            theme_path = Path("themes") / self.config.theme
+            paths.append(theme_path.resolve() if theme_path.exists() else theme_path)
+
+        return paths
+
     def build_site(self) -> list[Path]:
         """
         == build_site
 
         Orchestrate complete Golem compilation of outdated adoc pages.
         """
+        self.errors = []
+        self.diagnostics = self.errors
         compiled_files = []
         outdated = self.get_outdated_files()
 
@@ -360,6 +609,8 @@ class BuildEngine:
 
         output_dir = Path(self.config.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
+
+        search_paths = self._get_template_search_paths()
 
         for doc_path in to_build:
             try:
@@ -386,7 +637,7 @@ class BuildEngine:
                     asg = impl.function(asg=asg)  # type: ignore[assignment]
 
                 # 3. Render body using Golem's ASG visitor
-                body_content = render_body(asg)  # type: ignore[arg-type]
+                body_content = render_body(asg, search_paths=search_paths)  # type: ignore[arg-type]
 
                 # Extract title for layout framing
                 title_str = ""
@@ -410,9 +661,18 @@ class BuildEngine:
 
                 # 4. Compile layout via Chameleon templates
                 from golem.renderer import generate_toc_html
+
                 toc_html = generate_toc_html(asg)  # type: ignore[arg-type]
+
+                # Generate dynamic navigation HTML for this page
+                rel_path = doc_path.relative_to(self.content_dir)
+                nav_html = self.generate_nav_html(current_rel_path=rel_path)
+
                 final_html = self.compiler.compile_page(
-                    title=title_str, body_content=body_content, toc_html=toc_html
+                    title=title_str,
+                    body_content=body_content,
+                    toc_html=toc_html,
+                    nav_html=nav_html,
                 )
 
                 # Trigger post-render hooks sequentially (chain modifications)
@@ -420,7 +680,6 @@ class BuildEngine:
                     final_html = impl.function(html_content=final_html)  # type: ignore[assignment]
 
                 # 5. Resolve correct output file path
-                rel_path = doc_path.relative_to(self.content_dir)
                 out_path = output_dir / rel_path.with_suffix(".html")
                 out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -436,14 +695,35 @@ class BuildEngine:
                 try:
                     rel_doc = doc_path.relative_to(Path.cwd())
                 except ValueError:
-                    rel_doc = doc_path.relative_to(self.content_dir) if self.content_dir in doc_path.parents else doc_path
+                    rel_doc = (
+                        doc_path.relative_to(self.content_dir)
+                        if self.content_dir in doc_path.parents
+                        else doc_path
+                    )
                 try:
                     rel_out = out_path.relative_to(Path.cwd())
                 except ValueError:
-                    rel_out = out_path.relative_to(output_dir) if output_dir in out_path.parents else out_path
+                    rel_out = (
+                        out_path.relative_to(output_dir)
+                        if output_dir in out_path.parents
+                        else out_path
+                    )
                 import click
+
                 click.echo(f"  [COMPILE] {rel_doc} -> {rel_out}")
             except Exception as e:
+                error_info = {
+                    "file": str(doc_path),
+                    "message": str(e),
+                    "error_type": type(e).__name__,
+                    "exception": e,
+                    "line": getattr(e, "line", None),
+                    "column": getattr(e, "column", None),
+                    "context": getattr(e, "context", None),
+                }
+                self.errors.append(error_info)
                 logging.error(f"Failed to build file {doc_path}: {e}")
+                if getattr(self.config, "strict", False):
+                    raise e
 
         return compiled_files

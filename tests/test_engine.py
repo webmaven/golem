@@ -80,7 +80,9 @@ def test_cache_file_deletion_propagation(tmp_path):
     engine.build_site()
 
     # Verify that the cache maps file_b as a dependency of file_a
-    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(str(file_a.resolve()), [])
+    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(
+        str(file_a.resolve()), []
+    )
 
     # Second check (unmodified) should be empty
     assert len(engine.get_outdated_files()) == 0
@@ -137,7 +139,9 @@ def test_cache_global_template_edit_propagation(tmp_path, monkeypatch):
     theme_dir = tmp_path / "themes" / "default"
     theme_dir.mkdir(parents=True)
     skeleton_pt = theme_dir / "skeleton.pt"
-    skeleton_pt.write_text("<html><body>${body_content}</body></html>", encoding="utf-8")
+    skeleton_pt.write_text(
+        "<html><body>${body_content}</body></html>", encoding="utf-8"
+    )
 
     config = GolemConfig(
         content_dir="content",
@@ -153,7 +157,9 @@ def test_cache_global_template_edit_propagation(tmp_path, monkeypatch):
     assert len(engine.get_outdated_files()) == 0
 
     # Modify the template skeleton
-    skeleton_pt.write_text("<html><body>NEW ${body_content}</body></html>", encoding="utf-8")
+    skeleton_pt.write_text(
+        "<html><body>NEW ${body_content}</body></html>", encoding="utf-8"
+    )
 
     # The engine must detect the global template edit and invalidate index.adoc
     outdated = engine.get_outdated_files()
@@ -179,7 +185,9 @@ def test_cache_non_adoc_edit_propagation(tmp_path):
     engine.build_site()
 
     # Verify that the cache maps file_b as a dependency of file_a
-    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(str(file_a.resolve()), [])
+    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(
+        str(file_a.resolve()), []
+    )
 
     # Second check (unmodified) should be empty
     assert len(engine.get_outdated_files()) == 0
@@ -228,33 +236,36 @@ def test_cache_file_addition(tmp_path):
 def test_get_outdated_files_with_commit_false_does_not_mutate_cache(tmp_path):
     from golem.config import GolemConfig
     from golem.engine import BuildEngine
-    
+
     content = tmp_path / "content"
     content.mkdir()
-    (content / "index.adoc").write_text("= Home\ninclude::sub.adoc[]\n", encoding="utf-8")
+    (content / "index.adoc").write_text(
+        "= Home\ninclude::sub.adoc[]\n", encoding="utf-8"
+    )
     (content / "sub.adoc").write_text("Subcontent\n", encoding="utf-8")
-    
+
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
-    
+
     # Initial build to populate cache
     engine.build_site()
     assert (tmp_path / "cache.json").exists()
-    
+
     # Delete sub.adoc to simulate file deletion
     (content / "sub.adoc").unlink()
-    
+
     # Query outdated files with commit=False
     outdated = engine.get_outdated_files(commit=False)
     assert len(outdated) > 0
     assert (content / "index.adoc").resolve() in outdated
-    
+
     # Verify cache on disk STILL contains sub.adoc because commit was False!
     import json
+
     with open(tmp_path / "cache.json", "r") as f:
         disk_cache = json.load(f)
     assert str((content / "sub.adoc").resolve()) in disk_cache["files"]
-    
+
     # Query with commit=True should now mutate and purge sub.adoc
     outdated_commit = engine.get_outdated_files(commit=True)
     assert len(outdated_commit) > 0
@@ -266,22 +277,22 @@ def test_get_outdated_files_with_commit_false_does_not_mutate_cache(tmp_path):
 def test_engine_corrupt_cache_handling(tmp_path):
     from golem.config import GolemConfig
     from golem.engine import BuildEngine
-    
+
     content = tmp_path / "content"
     content.mkdir()
     (content / "index.adoc").write_text("= Home\n", encoding="utf-8")
-    
+
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
-    
+
     # 1. Non-JSON malformed cache file
     cache_file = tmp_path / "corrupt_cache.json"
     cache_file.write_text("Not valid JSON at all!!!", encoding="utf-8")
-    
+
     engine = BuildEngine(config, cache_file=cache_file)
     assert engine.cache_data == {"files": {}, "dependencies": {}}
     # The corrupted file should have been deleted/cleared
     assert not cache_file.exists() or cache_file.read_text().strip() == ""
-    
+
     # 2. Re-building should work perfectly and write a valid JSON cache
     engine.build_site()
     assert cache_file.exists()
@@ -326,7 +337,7 @@ def test_engine_cache_concurrency_lock(tmp_path):
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     acquired = []
-    
+
     def worker():
         with engine._cache_lock():
             acquired.append("A")
@@ -335,7 +346,7 @@ def test_engine_cache_concurrency_lock(tmp_path):
 
     t = threading.Thread(target=worker)
     t.start()
-    
+
     time.sleep(0.1)
 
     start_time = time.time()
@@ -344,7 +355,7 @@ def test_engine_cache_concurrency_lock(tmp_path):
     duration = time.time() - start_time
 
     t.join()
-    
+
     assert acquired == ["A", "A_done", "B"]
     assert duration >= 0.3
 
@@ -403,8 +414,228 @@ def test_engine_cache_lock_release_on_error(tmp_path):
         pass
 
 
+def test_navigation_auto_discovery_basic(tmp_path):
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "index.adoc").write_text(
+        "= Golem Docs\n\nWelcome page", encoding="utf-8"
+    )
+    (content / "01-getting-started.adoc").write_text(
+        "= Getting Started\n\nGetting started guide", encoding="utf-8"
+    )
+    (content / "02-architecture.adoc").write_text(
+        "Architecture content", encoding="utf-8"
+    )
+    (content / "03_advanced_features.adoc").write_text(
+        "Advanced features", encoding="utf-8"
+    )
+
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    nav = engine.discover_navigation()
+    assert len(nav) == 4
+    # Index pinned at top
+    assert nav[0]["title"] == "Golem Docs"
+    assert nav[0]["url"] == "index.html"
+
+    # Numeric sorting prefixes stripped for display titles
+    assert nav[1]["title"] == "Getting Started"
+    assert nav[1]["url"] == "01-getting-started.html"
+
+    assert nav[2]["title"] == "Architecture"
+    assert nav[2]["url"] == "02-architecture.html"
+
+    assert nav[3]["title"] == "Advanced Features"
+    assert nav[3]["url"] == "03_advanced_features.html"
 
 
+def test_navigation_auto_discovery_nested_hierarchy(tmp_path):
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "README.adoc").write_text("= Overview\n\nReadme", encoding="utf-8")
+    (content / "01-intro.adoc").write_text("= Introduction\n\nIntro", encoding="utf-8")
+
+    guides_dir = content / "02-guides"
+    guides_dir.mkdir()
+    (guides_dir / "index.adoc").write_text(
+        "= Guides Overview\n\nGuides index", encoding="utf-8"
+    )
+    (guides_dir / "01-config.adoc").write_text("Configuration", encoding="utf-8")
+    (guides_dir / "02-deploy.adoc").write_text("Deployment", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    nav = engine.discover_navigation()
+    assert len(nav) == 3
+    # Root README pinned at top
+    assert nav[0]["title"] == "Overview"
+    assert nav[0]["url"] == "README.html"
+
+    assert nav[1]["title"] == "Introduction"
+    assert nav[1]["url"] == "01-intro.html"
+
+    # Nested section
+    assert nav[2]["title"] == "Guides Overview"
+    assert nav[2]["url"] == "02-guides/index.html"
+    children = nav[2]["children"]
+    assert len(children) == 2
+    assert children[0]["title"] == "Config"
+    assert children[0]["url"] == "02-guides/01-config.html"
+    assert children[1]["title"] == "Deploy"
+    assert children[1]["url"] == "02-guides/02-deploy.html"
 
 
+def test_navigation_explicit_override_with_navigation_nav(tmp_path):
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "01-intro.adoc").write_text("Intro", encoding="utf-8")
+    (content / "02-architecture.adoc").write_text("Architecture", encoding="utf-8")
+    (content / "index.adoc").write_text("= Welcome\n\nWelcome", encoding="utf-8")
 
+    config = GolemConfig(
+        content_dir=str(content),
+        output_dir=str(tmp_path / "dist"),
+        navigation_nav=["02-architecture.adoc", "01-intro.adoc"],
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    nav = engine.discover_navigation()
+    assert len(nav) == 2
+    assert nav[0]["title"] == "Architecture"
+    assert nav[0]["url"] == "02-architecture.html"
+    assert nav[1]["title"] == "Intro"
+    assert nav[1]["url"] == "01-intro.html"
+
+
+def test_navigation_html_generation_and_relative_urls(tmp_path):
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "index.adoc").write_text("= Welcome\n\nRoot welcome", encoding="utf-8")
+
+    guides = content / "guides"
+    guides.mkdir()
+    (guides / "intro.adoc").write_text(
+        "= Guides Intro\n\nGuide intro", encoding="utf-8"
+    )
+
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    compiled = engine.build_site()
+    assert len(compiled) == 2
+
+    root_html = (tmp_path / "dist" / "index.html").read_text(encoding="utf-8")
+    assert 'href="index.html"' in root_html
+    assert 'href="guides/intro.html"' in root_html
+
+    nested_html = (tmp_path / "dist" / "guides" / "intro.html").read_text(
+        encoding="utf-8"
+    )
+    assert 'href="../index.html"' in nested_html
+    assert (
+        'href="../guides/intro.html"' in nested_html
+        or 'href="intro.html"' in nested_html
+    )
+
+
+def test_engine_error_interception_permissive_mode(tmp_path, monkeypatch):
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "valid.adoc").write_text("= Valid\n\nValid text", encoding="utf-8")
+    (content / "broken.adoc").write_text("= Broken\n\nBroken text", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content),
+        output_dir=str(tmp_path / "dist"),
+        strict=False,
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    import asciidoctrine
+
+    orig_parse = asciidoctrine.parse_to_ast
+
+    def mock_parse(text, base_dir=None):
+        if "Broken text" in text:
+            raise ValueError("AsciiDoc syntax parse error simulated")
+        return orig_parse(text, base_dir=base_dir)
+
+    monkeypatch.setattr(asciidoctrine, "parse_to_ast", mock_parse)
+
+    compiled = engine.build_site()
+    # In permissive mode, valid page is built and broken page error is intercepted
+    assert len(compiled) == 1
+    assert compiled[0] == tmp_path / "dist" / "valid.html"
+    assert len(engine.errors) == 1
+    assert "broken.adoc" in engine.errors[0]["file"]
+    assert "AsciiDoc syntax parse error simulated" in engine.errors[0]["message"]
+    assert engine.errors[0]["error_type"] == "ValueError"
+
+
+def test_engine_error_interception_strict_mode(tmp_path, monkeypatch):
+    import pytest
+
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "broken.adoc").write_text("= Broken\n\nBroken text", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content),
+        output_dir=str(tmp_path / "dist"),
+        strict=True,
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    import asciidoctrine
+
+    def mock_parse(text, base_dir=None):
+        raise ValueError("Fatal syntax error in strict mode")
+
+    monkeypatch.setattr(asciidoctrine, "parse_to_ast", mock_parse)
+
+    with pytest.raises(ValueError, match="Fatal syntax error in strict mode"):
+        engine.build_site()
+
+    assert len(engine.errors) >= 1
+    assert "broken.adoc" in engine.errors[0]["file"]
+
+
+def test_engine_passes_template_search_paths_to_render_body(tmp_path, monkeypatch):
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "index.adoc").write_text("= Test\n\nContent", encoding="utf-8")
+
+    custom_tpl = tmp_path / "my_templates"
+    custom_tpl.mkdir()
+
+    config = GolemConfig(
+        content_dir=str(content),
+        output_dir=str(tmp_path / "dist"),
+        templates_dir=str(custom_tpl),
+        theme="custom_theme",
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    captured_search_paths = []
+    import golem.engine
+
+    orig_render_body = golem.engine.render_body
+
+    def mock_render_body(asg, search_paths=None):
+        captured_search_paths.append(search_paths)
+        return orig_render_body(asg, search_paths=search_paths)
+
+    monkeypatch.setattr(golem.engine, "render_body", mock_render_body)
+
+    engine.build_site()
+
+    assert len(captured_search_paths) == 1
+    assert captured_search_paths[0] is not None
+    # Check that custom_tpl is in the search paths
+    search_path_strs = [str(p) for p in captured_search_paths[0]]
+    assert (
+        str(custom_tpl.resolve()) in search_path_strs
+        or str(custom_tpl) in search_path_strs
+    )

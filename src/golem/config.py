@@ -6,10 +6,17 @@ except ImportError:
 from dataclasses import dataclass
 from pathlib import Path
 
+
+from typing import Any
+
+
 @dataclass
 class GolemConfig:
     site_title: str = "Golem Docs"
     site_author: str = "Anonymous"
+    site_url: str | None = None
+    strict: bool = False
+    navigation_nav: list[str] | None = None
     content_dir: str = "content"
     output_dir: str = "dist"
     theme: str = "default"
@@ -35,6 +42,22 @@ def find_default_config_path() -> Path:
     return golem_toml
 
 
+def _parse_nav(raw_nav: Any) -> list[str] | None:
+    if raw_nav is None:
+        return None
+    if isinstance(raw_nav, list):
+        parsed = []
+        for item in raw_nav:
+            if isinstance(item, dict) and "path" in item:
+                parsed.append(str(item["path"]))
+            elif isinstance(item, str):
+                parsed.append(item)
+            else:
+                parsed.append(str(item))
+        return parsed
+    return None
+
+
 def load_config(config_path: Path) -> GolemConfig:
     if not config_path.exists():
         return GolemConfig()
@@ -49,28 +72,94 @@ def load_config(config_path: Path) -> GolemConfig:
         golem_data = data.get("tool", {}).get("golem", {})
         site_data = golem_data.get("site", {})
         build_data = golem_data.get("build", {})
-        
-        site_title = site_data.get("title") or golem_data.get("title") or golem_data.get("site_title") or "Golem Docs"
-        site_author = site_data.get("author") or golem_data.get("author") or golem_data.get("site_author") or "Anonymous"
-        content_dir = build_data.get("content_dir") or golem_data.get("content_dir") or "content"
-        output_dir = build_data.get("output_dir") or golem_data.get("output_dir") or "dist"
+        nav_data = golem_data.get("navigation", {})
+
+        site_title = (
+            site_data.get("title")
+            or site_data.get("name")
+            or golem_data.get("title")
+            or golem_data.get("site_title")
+            or "Golem Docs"
+        )
+        site_author = (
+            site_data.get("author")
+            or golem_data.get("author")
+            or golem_data.get("site_author")
+            or "Anonymous"
+        )
+        site_url = (
+            site_data.get("url")
+            or golem_data.get("url")
+            or golem_data.get("site_url")
+            or site_data.get("site_url")
+            or None
+        )
+        strict = bool(
+            build_data.get("strict")
+            if "strict" in build_data
+            else golem_data.get("strict", False)
+        )
+        content_dir = (
+            build_data.get("content_dir") or golem_data.get("content_dir") or "content"
+        )
+        output_dir = (
+            build_data.get("output_dir") or golem_data.get("output_dir") or "dist"
+        )
         theme = build_data.get("theme") or golem_data.get("theme") or "default"
-        
-        templates_dir = build_data.get("templates_dir") or golem_data.get("templates_dir") or "templates"
-        static_dir = build_data.get("static_dir") or golem_data.get("static_dir") or "static"
-        plugins_dir = build_data.get("plugins_dir") or golem_data.get("plugins_dir") or "plugins"
+
+        templates_dir = (
+            build_data.get("templates_dir")
+            or golem_data.get("templates_dir")
+            or "templates"
+        )
+        static_dir = (
+            build_data.get("static_dir") or golem_data.get("static_dir") or "static"
+        )
+        plugins_dir = (
+            build_data.get("plugins_dir") or golem_data.get("plugins_dir") or "plugins"
+        )
+        raw_nav = (
+            nav_data.get("nav")
+            if "nav" in nav_data
+            else (golem_data.get("navigation_nav") or golem_data.get("nav"))
+        )
+        navigation_nav = _parse_nav(raw_nav)
     else:
         site_data = data.get("site", {})
         build_data = data.get("build", {})
-        site_title = site_data.get("title", "Golem Docs")
+        nav_data = data.get("navigation", {})
+
+        site_title = site_data.get("title") or site_data.get("name") or "Golem Docs"
         site_author = site_data.get("author", "Anonymous")
+        site_url = (
+            site_data.get("url")
+            or data.get("site_url")
+            or site_data.get("site_url")
+            or data.get("url")
+            or None
+        )
+        strict = bool(
+            build_data.get("strict")
+            if "strict" in build_data
+            else data.get("strict", False)
+        )
         content_dir = build_data.get("content_dir", "content")
         output_dir = build_data.get("output_dir", "dist")
         theme = build_data.get("theme", "default")
-        
+
         templates_dir = build_data.get("templates_dir", "templates")
         static_dir = build_data.get("static_dir", "static")
         plugins_dir = build_data.get("plugins_dir", "plugins")
+        raw_nav = (
+            nav_data.get("nav")
+            if "nav" in nav_data
+            else (
+                data.get("navigation_nav")
+                if "navigation_nav" in data
+                else data.get("nav")
+            )
+        )
+        navigation_nav = _parse_nav(raw_nav)
 
     # Ensure resolved content_dir and output_dir do not overlap (identical or nested)
     try:
@@ -81,17 +170,26 @@ def load_config(config_path: Path) -> GolemConfig:
         output_abs = Path(output_dir).absolute()
 
     if content_abs == output_abs:
-        raise ValueError(f"Configuration conflict: content_dir '{content_dir}' and output_dir '{output_dir}' cannot be the same path (they overlap).")
+        raise ValueError(
+            f"Configuration conflict: content_dir '{content_dir}' and output_dir '{output_dir}' cannot be the same path (they overlap)."
+        )
 
     if content_abs in output_abs.parents:
-        raise ValueError(f"Configuration conflict: content_dir '{content_dir}' cannot be nested inside output_dir '{output_dir}' (they overlap).")
+        raise ValueError(
+            f"Configuration conflict: content_dir '{content_dir}' cannot be nested inside output_dir '{output_dir}' (they overlap)."
+        )
 
     if output_abs in content_abs.parents:
-        raise ValueError(f"Configuration conflict: output_dir '{output_dir}' cannot be nested inside content_dir '{content_dir}' (they overlap).")
+        raise ValueError(
+            f"Configuration conflict: output_dir '{output_dir}' cannot be nested inside content_dir '{content_dir}' (they overlap)."
+        )
 
     return GolemConfig(
         site_title=site_title,
         site_author=site_author,
+        site_url=site_url,
+        strict=strict,
+        navigation_nav=navigation_nav,
         content_dir=content_dir,
         output_dir=output_dir,
         theme=theme,
@@ -100,4 +198,3 @@ def load_config(config_path: Path) -> GolemConfig:
         plugins_dir=plugins_dir,
         config_path=str(config_path.resolve()),
     )
-
