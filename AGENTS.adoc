@@ -36,13 +36,9 @@ Every code modification and new component must respect Golem’s core architectu
 To maintain codebase health and consistency, comply with the following standards:
 
 === 2.1 Formatter and Linter
-*   **Formatting:** Use `black` for automatic code formatting (line length: 88).
-*   **Linting:** Use `flake8` or `ruff` to scan for style inconsistencies, syntax issues, and unused imports.
-*   **Verification:** Ensure no code is committed that breaks the automated matrix checks defined inside `.github/workflows/ci.yml`.
-
-=== 2.2 AST & ASG Manipulation
-*   When transforming document structures or adding macros, subclass `asciidoctrine.nodes.NodeTransformer` or implement hook callbacks using `pluggy` to mutate elements cleanly.
-*   Do not perform raw regex-based HTML translations. Always traverse nodes using structured class visitors.
+*   **Formatting & Linting:** Use `ruff` for all automatic code formatting, imports sorting, and linting (`ruff format src tests` and `ruff check --fix src tests`).
+*   **Type Safety:** Run `mypy src tests` to verify type safety across all files.
+*   **Pre-commit Hooks:** Ensure pre-commit hooks running `ruff` and `mypy` pass cleanly before committing code.
 
 ---
 
@@ -72,9 +68,73 @@ Golem’s UI design must feel premium, fast, responsive, and completely accessib
 
 ---
 
-== 5. Agent Communication & Hand-off Protocol
+== 5. Subagent-Driven Development (SDD) Model & Thinking Selection Guidelines
+
+When coordinating or executing tasks under Subagent-Driven Development (SDD), follow this calibrated model and thinking tier matrix:
+
+=== 5.1 Gemini Model Hierarchy & Roles
+
+[cols="2,1,1,3"]
+|===
+| Role | Target Model | Thinking Level | Rationale
+
+| **Trivial mechanical task**
+| `gemini-3.5-flash-lite`
+| `LOW`
+| Pure transcription, exact file write, minimal reasoning.
+
+| **Log triage / context scouting**
+| `gemini-3.5-flash-lite`
+| `LOW`
+| Ultra-high throughput (350–450 tps) and cheap ($0.30/1M) context ingest.
+
+| **Task Implementer (Standard)**
+| `gemini-3.7-flash`
+| `MEDIUM`
+| Premier coding workhorse (DeepSWE 65.3%), fast TDD execution, surgical diffs.
+
+| **Task Implementer (Complex/Refactor)**
+| `gemini-3.7-flash`
+| `HIGH`
+| Architectural redesign, concurrency, deep algorithmic proofs.
+
+| **Per-Task Reviewer (Standard diffs)**
+| `gemini-3.7-flash`
+| `LOW`
+| Fast, cost-efficient spec & quality verification for well-defined diffs.
+
+| **Per-Task Reviewer (Complex logic/API change)**
+| `gemini-3.7-flash`
+| `MEDIUM`
+| Deeper deliberation on semantic invariants, interface contracts, and edge cases.
+
+| **Orchestrator: Plan Formulation**
+| `gemini-3.7-flash`
+| `MEDIUM` or `HIGH`
+| System topology planning, task decomposition, and architectural design.
+
+| **Orchestrator: Execution Dispatch**
+| `gemini-3.7-flash`
+| `LOW` (rarely `MEDIUM`)
+| Dispatching subagents, tracking test checkpoints, updating progress ledgers.
+
+| **Final Whole-Branch Reviewer**
+| `gemini-3.7-flash`
+| `HIGH`
+| Holistic repo verification, anti-pattern audit, guardrail enforcement.
+
+| **Second Opinion Reviewer** (Dissenting/Concurring)
+| `gemini-3.1-pro-preview`
+| `HIGH`
+| Reserved for complex multi-domain ambiguity or high-stakes second opinions.
+|===
+
+---
+
+== 6. Agent Communication & Hand-off Protocol
 
 When handing off work to a subsequent agent or finishing a session:
 1.  **State Documentation:** Write a clear hand-off summary capturing the exact accomplishments, files modified, and issues resolved.
 2.  **Upstream Links:** Ensure any open or resolved upstream issues on `asciidoctrine`, `asciidocstring`, or `asciidoctest` are logged with their official GitHub issue URLs.
-3.  **Local Checks:** Run `pytest` and linter checks to ensure the working branch remains in a passing state.
+3.  **Local Checks:** Run `pytest`, `ruff`, and `mypy` checks to ensure the working branch remains in a passing state.
+
