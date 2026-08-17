@@ -17,7 +17,7 @@ def test_cli_version():
 
 def test_cli_subcommands_exist():
     runner = CliRunner()
-    for cmd in ["init", "new", "build", "serve"]:
+    for cmd in ["init", "new", "build", "serve", "plugins", "themes"]:
         result = runner.invoke(main, [cmd, "--help"])
         assert result.exit_code == 0
         assert cmd in result.output or "Show this message and exit" in result.output
@@ -37,4 +37,20 @@ def test_cli_serve_help_flags():
     result = runner.invoke(main, ["serve", "--help"])
     assert result.exit_code == 0
     assert "--strict" in result.output
+    assert "--directory" in result.output or "-C" in result.output
+
+
+def test_cli_plugins_help_flags():
+    runner = CliRunner()
+    result = runner.invoke(main, ["plugins", "--help"])
+    assert result.exit_code == 0
+    assert "--json" in result.output
+    assert "--directory" in result.output or "-C" in result.output
+
+
+def test_cli_themes_help_flags():
+    runner = CliRunner()
+    result = runner.invoke(main, ["themes", "--help"])
+    assert result.exit_code == 0
+    assert "--json" in result.output
     assert "--directory" in result.output or "-C" in result.output

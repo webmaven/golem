@@ -10,10 +10,14 @@ Golem static site generator.
 - `new`:: Create a new document skeleton.
 - `build`:: Run the incremental compiler.
 - `serve`:: Start the local development server.
+- `plugins`:: Inspect installed and configured plugins.
+- `themes`:: Inspect active and available themes.
 """
 
 from pathlib import Path
 from contextlib import contextmanager
+import importlib.metadata
+import json
 import os
 import shutil
 from typing import Any, Iterator
@@ -714,6 +718,276 @@ def serve(port, host, strict, directory=None, test_only=False):
             errors_func=lambda: engine.errors,
         )
         server.run()
+
+
+@main.command()
+@click.option("--json", "json_format", is_flag=True, help="Output structured JSON")
+@click.option(
+    "-C",
+    "--directory",
+    type=click.Path(file_okay=False, dir_okay=True),
+    help="Change working directory before executing",
+)
+def plugins(json_format: bool = False, directory: str | None = None) -> None:
+    """
+    = plugins
+
+    Inspect active, installed, and local Golem plugins.
+
+    === Examples
+
+    [source,python]
+    ----
+    >>> from click.testing import CliRunner
+    >>> from golem.cli import main
+    >>> runner = CliRunner()
+    >>> result = runner.invoke(main, ["plugins"])
+    >>> result.exit_code == 0
+    True
+    >>> "[ENABLED]" in result.output
+    True
+
+    ----
+    """
+    with change_working_dir(directory):
+        config_path = find_default_config_path()
+        try:
+            config = load_config(config_path) if config_path.exists() else GolemConfig()
+        except Exception:
+            config = GolemConfig()
+
+        builtin_plugin_names = ["golem.plugins.doctest", "golem.plugins.apidoc"]
+        configured_plugins = list(config.plugins) if config.plugins else []
+
+        plugins_list: list[dict[str, Any]] = []
+        seen_names: set[str] = set()
+
+        # 1. Built-in plugins
+        for name in builtin_plugin_names:
+            is_enabled = name in configured_plugins
+            plugins_list.append(
+                {
+                    "name": name,
+                    "enabled": is_enabled,
+                    "source": "built-in",
+                    "description": "(built-in)",
+                }
+            )
+            seen_names.add(name)
+
+        # 2. Entry points
+        eps: tuple[Any, ...] | list[Any]
+        try:
+            eps = list(importlib.metadata.entry_points(group="golem.plugins"))
+        except Exception:
+            eps = []
+
+        for ep in eps:
+            ep_name = getattr(ep, "name", str(ep))
+            if ep_name in seen_names:
+                continue
+            dist = getattr(ep, "dist", None)
+            if dist:
+                dist_name = getattr(dist, "name", ep_name)
+                dist_version = getattr(dist, "version", "")
+                dist_desc = (
+                    f"{dist_name} {dist_version}".strip()
+                    if dist_version
+                    else f"{dist_name}"
+                )
+            else:
+                dist_desc = ep_name
+            ep_value = getattr(ep, "value", "")
+            is_enabled = ep_name in configured_plugins or (
+                bool(ep_value) and ep_value in configured_plugins
+            )
+            plugins_list.append(
+                {
+                    "name": ep_name,
+                    "enabled": is_enabled,
+                    "source": "entry_point",
+                    "description": f"(entry_point: {dist_desc})",
+                }
+            )
+            seen_names.add(ep_name)
+
+        # 3. Local plugins in plugins_dir
+        plugins_dir_path = (
+            Path(config.plugins_dir)
+            if getattr(config, "plugins_dir", None)
+            else Path("plugins")
+        )
+        if plugins_dir_path.exists() and plugins_dir_path.is_dir():
+            for py_file in sorted(plugins_dir_path.glob("*.py")):
+                if py_file.name == "__init__.py":
+                    continue
+                stem = py_file.stem
+                rel_path = f"{plugins_dir_path.as_posix()}/{py_file.name}"
+                if stem in seen_names:
+                    continue
+                is_enabled = (
+                    stem in configured_plugins
+                    or py_file.name in configured_plugins
+                    or f"{plugins_dir_path.name}.{stem}" in configured_plugins
+                    or rel_path in configured_plugins
+                )
+                plugins_list.append(
+                    {
+                        "name": stem,
+                        "enabled": is_enabled,
+                        "source": "local",
+                        "description": f"(local: {rel_path})",
+                    }
+                )
+                seen_names.add(stem)
+
+        # 4. Any other custom configured plugins
+        for cfg_plugin in configured_plugins:
+            if cfg_plugin not in seen_names:
+                plugins_list.append(
+                    {
+                        "name": cfg_plugin,
+                        "enabled": True,
+                        "source": "custom",
+                        "description": f"(custom: {cfg_plugin})",
+                    }
+                )
+                seen_names.add(cfg_plugin)
+
+        if json_format:
+            click.echo(json.dumps(plugins_list, indent=2))
+        else:
+            for p in plugins_list:
+                status_str = "[ENABLED]" if p["enabled"] else "[DISABLED]"
+                click.echo(f"{status_str:<10} {p['name']} {p['description']}")
+
+
+@main.command()
+@click.option("--json", "json_format", is_flag=True, help="Output structured JSON")
+@click.option(
+    "-C",
+    "--directory",
+    type=click.Path(file_okay=False, dir_okay=True),
+    help="Change working directory before executing",
+)
+def themes(json_format: bool = False, directory: str | None = None) -> None:
+    """
+    = themes
+
+    Inspect active and available Golem themes.
+
+    === Examples
+
+    [source,python]
+    ----
+    >>> from click.testing import CliRunner
+    >>> from golem.cli import main
+    >>> runner = CliRunner()
+    >>> result = runner.invoke(main, ["themes"])
+    >>> result.exit_code == 0
+    True
+    >>> "Active Theme:" in result.output
+    True
+
+    ----
+    """
+    with change_working_dir(directory):
+        config_path = find_default_config_path()
+        try:
+            config = load_config(config_path) if config_path.exists() else GolemConfig()
+        except Exception:
+            config = GolemConfig()
+
+        active_theme = getattr(config, "theme", "default") or "default"
+        themes_list: list[dict[str, Any]] = []
+        seen_names: set[str] = set()
+
+        # 1. Built-in default theme
+        themes_list.append(
+            {
+                "name": "default",
+                "source": "built-in",
+                "description": "(built-in)",
+                "active": active_theme == "default",
+            }
+        )
+        seen_names.add("default")
+
+        # 2. Local themes directory
+        themes_dir = Path("themes")
+        if themes_dir.exists() and themes_dir.is_dir():
+            for sub_dir in sorted(themes_dir.iterdir()):
+                if sub_dir.is_dir() and not sub_dir.name.startswith("."):
+                    name = sub_dir.name
+                    if name not in seen_names:
+                        themes_list.append(
+                            {
+                                "name": name,
+                                "source": "local",
+                                "description": f"(local: themes/{name})",
+                                "active": active_theme == name,
+                            }
+                        )
+                        seen_names.add(name)
+
+        # 3. Entry points for golem.themes
+        eps: tuple[Any, ...] | list[Any]
+        try:
+            eps = list(importlib.metadata.entry_points(group="golem.themes"))
+        except Exception:
+            eps = []
+
+        for ep in eps:
+            ep_name = getattr(ep, "name", str(ep))
+            if ep_name not in seen_names:
+                dist = getattr(ep, "dist", None)
+                if dist:
+                    dist_name = getattr(dist, "name", ep_name)
+                    dist_version = getattr(dist, "version", "")
+                    dist_desc = (
+                        f"{dist_name} {dist_version}".strip()
+                        if dist_version
+                        else f"{dist_name}"
+                    )
+                else:
+                    dist_desc = ep_name
+                themes_list.append(
+                    {
+                        "name": ep_name,
+                        "source": "entry_point",
+                        "description": f"(entry_point: {dist_desc})",
+                        "active": active_theme == ep_name,
+                    }
+                )
+                seen_names.add(ep_name)
+
+        # Determine active theme description
+        active_entry = next((t for t in themes_list if t["name"] == active_theme), None)
+        if active_entry:
+            active_source = active_entry["description"]
+        else:
+            active_source = f"(custom: {active_theme})"
+            themes_list.append(
+                {
+                    "name": active_theme,
+                    "source": "custom",
+                    "description": active_source,
+                    "active": True,
+                }
+            )
+
+        if json_format:
+            theme_data = {
+                "active": active_theme,
+                "active_source": active_source,
+                "themes": themes_list,
+            }
+            click.echo(json.dumps(theme_data, indent=2))
+        else:
+            click.echo(f"Active Theme: '{active_theme}' {active_source}\n")
+            click.echo("Available Themes:")
+            for t in themes_list:
+                click.echo(f"  * {t['name']} {t['description']}")
 
 
 if __name__ == "__main__":
