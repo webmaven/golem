@@ -8,15 +8,16 @@ from typing import Callable, List
 import io
 
 
+logger = logging.getLogger("golem.server")
+
+
 class LiveReloadServer:
     """
     = LiveReloadServer
 
-    An independent, zero-dependency, multi-threaded static file development server
-    featuring standard Server-Sent Events (SSE) live hot-reloading.
-
-    This component is fully decoupled from any Golem-specific models and is
-    ready to be extracted as a standalone open-source library.
+    An independent, multi-threaded static file development server
+    featuring standard Server-Sent Events (SSE) live hot-reloading and
+    live build error notification overlays.
 
     === Examples
 
@@ -38,22 +39,26 @@ class LiveReloadServer:
 
     ----
     """
+
     def __init__(
         self,
         public_dir: Path,
         watch_dir: Path,
         change_detected_func: Callable[[], bool],
         rebuild_func: Callable[[], None],
-        port: int = 8000
+        port: int = 8000,
+        errors_func: Callable[[], list[dict]] | None = None,
     ):
         self.public_dir = Path(public_dir)
         self.watch_dir = Path(watch_dir)
         self.change_detected_func = change_detected_func
         self.rebuild_func = rebuild_func
         self.port = port
+        self.errors_func = errors_func
         self.reload_queues: List[queue.Queue] = []
         self.queues_lock = threading.Lock()
         self.is_running = False
+        self.last_error_message: str | None = None
 
     def run(self):
         """
@@ -61,46 +66,38 @@ class LiveReloadServer:
 
         Launch the server event loops, starting the file watcher thread and
         blocking on the HTTP request handler listener.
-
-        === Examples
-
-        [source,python]
-        ----
-        >>> # Setup a simple test host instance
-        >>> from pathlib import Path
-        >>> from golem.server import LiveReloadServer
-        >>> server = LiveReloadServer(
-        ...     public_dir=Path("dist"),
-        ...     watch_dir=Path("content"),
-        ...     change_detected_func=lambda: False,
-        ...     rebuild_func=lambda: None,
-        ...     port=18274
-        ... )
-        >>> # Instantiated successfully and configured
-        >>> server.port == 18274
-        True
-
-        ----
         """
         self.is_running = True
         dist_abs = str(self.public_dir.resolve())
-        server_instance = self  # Safe reference inside handler nested scopes
+        server_instance = self
 
         # 1. Start concurrent file system watcher thread
         def watch_loop():
-            logging.info("[LiveReload] Starting file system poll loop...")
+            logger.info("[LiveReload] Starting file system poll loop...")
             while self.is_running:
                 try:
                     time.sleep(1.0)
                     if self.change_detected_func():
-                        logging.info("[LiveReload] File modification detected. Triggering rebuild...")
-                        self.rebuild_func()
-                        logging.info("[LiveReload] Rebuild finished successfully. Notifying connected tabs.")
+                        logger.info(
+                            "[LiveReload] File modification detected. Triggering rebuild..."
+                        )
+                        try:
+                            self.rebuild_func()
+                            self.last_error_message = None
+                            logger.info(
+                                "[LiveReload] Rebuild finished successfully. Notifying connected tabs."
+                            )
+                        except Exception as e:
+                            self.last_error_message = str(e)
+                            logger.error(
+                                f"[LiveReload] Rebuild encountered compilation error: {e}"
+                            )
+
                         with server_instance.queues_lock:
                             for q in server_instance.reload_queues:
                                 q.put("reload")
                 except Exception as e:
-                    logging.error(f"[LiveReload] Error in watcher loop: {e}")
+                    logger.error(f"[LiveReload] Error in watcher loop: {e}")
 
         watcher_thread = threading.Thread(target=watch_loop, daemon=True)
         watcher_thread.start()
@@ -111,8 +108,18 @@ class LiveReloadServer:
                 super().__init__(*args, directory=dist_abs, **kwargs)
 
             def log_message(self, format, *args):
-                # Suppress noisy HTTP requests logs to keep terminal logs clean and pristine
-                pass
+                status_code = args[1] if len(args) > 1 else ""
+                method_path = args[0] if len(args) > 0 else ""
+                if status_code.startswith("2") or status_code.startswith("3"):
+                    color_code = "\033[32m"  # Green
+                elif status_code.startswith("4"):
+                    color_code = "\033[33m"  # Yellow
+                else:
+                    color_code = "\033[31m"  # Red
+                reset_code = "\033[0m"
+                logger.info(
+                    f"HTTP {color_code}{status_code}{reset_code} - {method_path}"
+                )
 
             def do_GET(self):
                 # Handle SSE subscription requests
@@ -128,7 +135,9 @@ class LiveReloadServer:
                     with server_instance.queues_lock:
                         server_instance.reload_queues.append(client_queue)
 
-                    logging.debug("[LiveReload] Browser tab established SSE hot-reload connection.")
+                    logger.debug(
+                        "[LiveReload] Browser tab established SSE hot-reload connection."
+                    )
                     try:
                         while server_instance.is_running:
                             try:
@@ -141,23 +150,22 @@ class LiveReloadServer:
                                 # Send keep-alive comments to prevent socket timeouts
                                 self.wfile.write(b": ping\n\n")
                                 self.wfile.flush()
-                    except (ConnectionResetError, BrokenPipeError):
+                    except ConnectionResetError, BrokenPipeError:
                         pass
                     except Exception as e:
-                        logging.debug(f"[LiveReload] SSE connection error: {e}")
+                        logger.debug(f"[LiveReload] SSE connection error: {e}")
                     finally:
                         with server_instance.queues_lock:
                             if client_queue in server_instance.reload_queues:
                                 server_instance.reload_queues.remove(client_queue)
-                        logging.debug("[LiveReload] Browser tab closed SSE connection.")
+                        logger.debug("[LiveReload] Browser tab closed SSE connection.")
                     return
 
                 return super().do_GET()
 
             def send_head(self):
                 """
-                Injects standard LiveReload client javascript listener on-the-fly 
-                into HTML streams to trigger automatic viewport refreshes.
+                Injects standard LiveReload client javascript listener and error overlays on-the-fly.
                 """
                 path = self.translate_path(self.path)
                 f_path = Path(path)
@@ -169,26 +177,53 @@ class LiveReloadServer:
                         with open(f_path, "r", encoding="utf-8") as f_in:
                             html_content = f_in.read()
 
+                        # Check for build errors to render overlay
+                        error_banner = ""
+                        err_msg = server_instance.last_error_message
+                        if not err_msg and server_instance.errors_func is not None:
+                            errs = server_instance.errors_func()
+                            if errs:
+                                err_msg = "\n".join(
+                                    f"[{e.get('file', 'unknown')}] {e.get('message', '')}"
+                                    for e in errs
+                                )
+
+                        if err_msg:
+                            escaped_err = (
+                                err_msg.replace("&", "&amp;")
+                                .replace("<", "&lt;")
+                                .replace(">", "&gt;")
+                            )
+                            error_banner = f"""
+                            <div id="golem-error-overlay" style="position:fixed;top:0;left:0;right:0;background:#ef4444;color:#ffffff;padding:12px 20px;font-family:monospace;font-size:14px;z-index:99999;box-shadow:0 4px 6px -1px rgba(0,0,0,0.2);">
+                                <strong>[Golem Build Warning/Error]</strong>
+                                <pre style="margin:6px 0 0 0;white-space:pre-wrap;">{escaped_err}</pre>
+                            </div>
+                            """
+
                         # Embedded lightweight SSE listener
-                        sse_snippet = """
+                        sse_snippet = f"""
                         <!-- Golem SSE Hot Reloader -->
+                        {error_banner}
                         <script>
-                        (function() {
+                        (function() {{
                           const sse = new EventSource('/golem-reload');
-                          sse.onmessage = function(e) {
-                            if (e.data === 'reload') {
+                          sse.onmessage = function(e) {{
+                            if (e.data === 'reload') {{
                               console.log('[Golem] Rebuild detected. Refreshing active viewport...');
                               window.location.reload();
-                            }
-                          };
-                          sse.onerror = function() {
+                            }}
+                          }};
+                          sse.onerror = function() {{
                             console.debug('[Golem] SSE connection lost. Attempting to reconnect...');
-                          };
-                        })();
+                          }};
+                        }})();
                         </script>
                         """
                         if "</head>" in html_content:
-                            html_content = html_content.replace("</head>", sse_snippet + "</head>", 1)
+                            html_content = html_content.replace(
+                                "</head>", sse_snippet + "</head>", 1
+                            )
                         else:
                             html_content += sse_snippet
 
@@ -200,20 +235,22 @@ class LiveReloadServer:
                         self.end_headers()
                         return f_mem
                     except Exception as e:
-                        logging.error(f"[LiveReload] Failed to inject hot-reloader into HTML: {e}")
+                        logger.error(
+                            f"[LiveReload] Failed to inject hot-reloader into HTML: {e}"
+                        )
 
                 return super().send_head()
 
         # ThreadingHTTPServer enables concurrent multi-client and SSE streaming
         self.httpd = http.server.ThreadingHTTPServer(("", self.port), CustomHTTPHandler)
-        logging.info(f"[LiveReload] DevServer active on http://127.0.0.1:{self.port}...")
+        logger.info(f"[LiveReload] DevServer active on http://127.0.0.1:{self.port}...")
         try:
             self.httpd.serve_forever()
-        except (KeyboardInterrupt, SystemExit):
+        except KeyboardInterrupt, SystemExit:
             pass
         finally:
             self.is_running = False
-            logging.info("[LiveReload] Shutting down DevServer...")
+            logger.info("[LiveReload] Shutting down DevServer...")
             self.httpd.server_close()
 
     def shutdown(self):
