@@ -30,20 +30,61 @@ def _title_from_filename(name: str) -> str:
     return " ".join(word.capitalize() for word in cleaned.split())
 
 
-def _extract_title_from_doc(path: Path) -> str:
-    """Extract first top-level header title from an AsciiDoc file, or fallback to cleaned filename."""
+def _extract_metadata_from_doc(path: Path) -> dict[str, Any]:
+    """Extract document metadata (title, nav_title, has_toc) from an AsciiDoc file."""
+    title = None
+    nav_title = None
+    has_toc = False
     if path.exists() and path.is_file():
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 for line in f:
                     line_s = line.strip()
-                    if line_s.startswith("= ") and not line_s.startswith("== "):
-                        title = line_s[2:].strip()
-                        if title:
-                            return title
+                    if (
+                        line_s.startswith("= ")
+                        and not line_s.startswith("== ")
+                        and title is None
+                    ):
+                        t = line_s[2:].strip()
+                        if t:
+                            title = t
+                    elif line_s.startswith(":nav_title:") or line_s.startswith(
+                        ":navtitle:"
+                    ):
+                        val = line_s.split(":", 2)[2].strip()
+                        if val:
+                            nav_title = val
+                    elif line_s.startswith(":title:") and title is None:
+                        val = line_s.split(":", 2)[2].strip()
+                        if val:
+                            title = val
+                    elif (
+                        line_s == ":toc:"
+                        or line_s.startswith(":toc:")
+                        or line_s.startswith(":toc: ")
+                    ):
+                        if line_s in (":!toc:", ":toc!:", ":toc: none", ":toc: false"):
+                            has_toc = False
+                        else:
+                            has_toc = True
+                    elif line_s in (":!toc:", ":toc!:"):
+                        has_toc = False
         except Exception:
             pass
-    return _title_from_filename(path.name)
+    if not title:
+        title = _title_from_filename(path.name)
+    if not nav_title:
+        nav_title = title
+    return {
+        "title": title,
+        "nav_title": nav_title,
+        "has_toc": has_toc,
+    }
+
+
+def _extract_title_from_doc(path: Path) -> str:
+    """Extract first top-level header title from an AsciiDoc file, or fallback to cleaned filename."""
+    return str(_extract_metadata_from_doc(path)["title"])
 
 
 class BuildEngine:
@@ -81,6 +122,7 @@ class BuildEngine:
         self.cache_file = (
             cache_file or Path(config.content_dir).parent / ".golem" / "cache.json"
         )
+        self._sha_cache: dict[str, tuple[float, int, str]] = {}
         self.cache_data = self._load_cache()
         self.compiler = PageCompiler(config)
         self.errors: list[dict[str, Any]] = []
@@ -91,7 +133,6 @@ class BuildEngine:
 
         plugins_dir = Path(getattr(config, "plugins_dir", "plugins"))
         self.pm = get_plugin_manager(plugins_dir=plugins_dir)
-        self._sha_cache: dict[str, tuple[float, int, str]] = {}
 
     def _load_cache(self) -> dict:
         """
@@ -103,13 +144,23 @@ class BuildEngine:
             if self.cache_file.exists():
                 try:
                     with open(self.cache_file, "r") as f:
-                        return json.load(f)
+                        data = json.load(f)
+                        data.setdefault("files", {})
+                        data.setdefault("dependencies", {})
+                        data.setdefault("metadata", {})
+                        if "mtimes" in data and isinstance(data["mtimes"], dict):
+                            self._sha_cache = {
+                                k: (v[0], v[1], v[2])
+                                for k, v in data["mtimes"].items()
+                                if isinstance(v, (list, tuple)) and len(v) == 3
+                            }
+                        return data
                 except Exception:
                     try:
                         self.cache_file.unlink()
                     except Exception:
                         pass
-            return {"files": {}, "dependencies": {}}
+            return {"files": {}, "dependencies": {}, "metadata": {}}
 
     def save_cache(self):
         """
@@ -121,6 +172,10 @@ class BuildEngine:
         import tempfile
 
         with self._cache_lock():
+            if hasattr(self, "_sha_cache") and self._sha_cache:
+                self.cache_data["mtimes"] = {
+                    k: list(v) for k, v in self._sha_cache.items()
+                }
             self.cache_file.parent.mkdir(parents=True, exist_ok=True)
             dir_path = self.cache_file.parent
             with tempfile.NamedTemporaryFile(
@@ -164,6 +219,44 @@ class BuildEngine:
                     lock_fd.close()
                 except Exception:
                     pass
+
+    def is_partial(self, path: Path) -> bool:
+        """
+        == is_partial
+
+        Check if a path is considered a partial file or is located inside a partial directory.
+        Files or directories starting with an underscore '_' are partials.
+        """
+        try:
+            rel = path.resolve().relative_to(self.content_dir.resolve())
+            return any(part.startswith("_") for part in rel.parts)
+        except ValueError:
+            return any(part.startswith("_") for part in path.parts)
+
+    def get_file_metadata(self, path: Path) -> dict[str, Any]:
+        """
+        == get_file_metadata
+
+        Retrieve metadata for a document, using DAG cache if file is unmodified.
+        Only reads and parses from disk if uncached or modified.
+        """
+        p_abs = str(path.resolve())
+        current_hash = self._get_sha256(path)
+        cached_hash = self.cache_data.get("files", {}).get(p_abs)
+        cached_meta = self.cache_data.get("metadata", {}).get(p_abs)
+
+        if (
+            cached_meta is not None
+            and cached_hash == current_hash
+            and current_hash != ""
+        ):
+            return cached_meta
+
+        meta = _extract_metadata_from_doc(path)
+        self.cache_data.setdefault("metadata", {})[p_abs] = meta
+        if current_hash:
+            self.cache_data.setdefault("files", {})[p_abs] = current_hash
+        return meta
 
     def _get_sha256(self, path: Path) -> str:
         """
@@ -230,11 +323,13 @@ class BuildEngine:
                 cached_hash = self.cache_data["files"].get(str(f_abs))
                 if cached_hash != h:
                     changed_directly.add(f_abs)
-                    outdated.add(f_abs)
+                    if not self.is_partial(f):
+                        outdated.add(f_abs)
             except Exception:
                 # If there's an issue reading a file, treat it as changed/outdated
                 changed_directly.add(f_abs)
-                outdated.add(f_abs)
+                if not self.is_partial(f):
+                    outdated.add(f_abs)
 
         # Check all non-adoc files listed in cached_files that are still on disk
         for f_abs_str in cached_files:
@@ -272,17 +367,18 @@ class BuildEngine:
                 if commit:
                     self.cache_data.setdefault("meta", {})["skeleton_pt"] = h_pt
 
-        # If a global layout or config changed, we must mark all existing .adoc documents as outdated!
+        # If a global layout or config changed, we must mark all existing non-partial .adoc documents as outdated!
         if global_changed:
             logging.info(
                 "[BuildEngine] Global configuration or template change detected. Invalidating all pages..."
             )
-            outdated.update(all_files)
+            outdated.update(f for f in all_files if not self.is_partial(f))
             # Short-circuit and return full re-build
             if commit and (deleted_files or global_changed):
                 for d in deleted_files:
                     self.cache_data["files"].pop(d, None)
                     self.cache_data["dependencies"].pop(d, None)
+                    self.cache_data.get("metadata", {}).pop(d, None)
                 self.save_cache()
             return outdated
 
@@ -302,7 +398,7 @@ class BuildEngine:
             for p in parents:
                 p_path = Path(p)
                 if p_path not in visited:
-                    if p_path.exists():
+                    if p_path.exists() and not self.is_partial(p_path):
                         outdated.add(p_path)
                     visited.add(p_path)
                     queue.append(p_path)
@@ -312,6 +408,7 @@ class BuildEngine:
             for d in deleted_files:
                 self.cache_data["files"].pop(d, None)
                 self.cache_data["dependencies"].pop(d, None)
+                self.cache_data.get("metadata", {}).pop(d, None)
             self.save_cache()
 
         return outdated
@@ -326,6 +423,9 @@ class BuildEngine:
         """
         p_abs = str(path.resolve())
         self.cache_data["files"][p_abs] = self._get_sha256(path)
+        self.cache_data.setdefault("metadata", {})[p_abs] = _extract_metadata_from_doc(
+            path
+        )
         if included_files is not None:
             unique_deps = list(
                 dict.fromkeys(str(Path(f).resolve()) for f in included_files)
@@ -399,10 +499,18 @@ class BuildEngine:
             nav_items: list[dict[str, Any]] = []
             for item in self.config.navigation_nav:
                 p = self.content_dir / item
-                title = (
-                    _extract_title_from_doc(p)
+                if self.is_partial(p):
+                    continue
+                meta = (
+                    self.get_file_metadata(p)
                     if p.exists()
-                    else _title_from_filename(item)
+                    else {
+                        "title": _title_from_filename(item),
+                        "nav_title": _title_from_filename(item),
+                    }
+                )
+                title = meta.get("nav_title") or meta.get(
+                    "title", _title_from_filename(item)
                 )
                 rel_url = Path(item).with_suffix(".html").as_posix()
                 nav_items.append(
@@ -431,7 +539,7 @@ class BuildEngine:
             valid_entries = [
                 e
                 for e in entries
-                if not e.name.startswith(".") and not e.name.startswith("__")
+                if not e.name.startswith(".") and not e.name.startswith("_")
             ]
 
             files = [e for e in valid_entries if e.is_file() and e.suffix == ".adoc"]
@@ -453,7 +561,8 @@ class BuildEngine:
                     .with_suffix(".html")
                     .as_posix()
                 )
-                title = _extract_title_from_doc(index_file)
+                meta = self.get_file_metadata(index_file)
+                title = meta.get("nav_title") or meta.get("title", "")
                 items.append(
                     {
                         "title": title,
@@ -470,7 +579,8 @@ class BuildEngine:
                     continue
                 rel_p = f.relative_to(self.content_dir).as_posix()
                 rel_u = f.relative_to(self.content_dir).with_suffix(".html").as_posix()
-                title = _extract_title_from_doc(f)
+                meta = self.get_file_metadata(f)
+                title = meta.get("nav_title") or meta.get("title", "")
                 items.append(
                     {
                         "title": title,
@@ -497,7 +607,8 @@ class BuildEngine:
                 sub_children = build_tree(d)
 
                 if sub_index is not None:
-                    sec_title = _extract_title_from_doc(sub_index)
+                    meta = self.get_file_metadata(sub_index)
+                    sec_title = meta.get("nav_title") or meta.get("title", "")
                     sec_url = (
                         sub_index.relative_to(self.content_dir)
                         .with_suffix(".html")
@@ -589,6 +700,60 @@ class BuildEngine:
 
         return paths
 
+    def sync_static_assets(self) -> None:
+        """
+        == sync_static_assets
+
+        Synchronize static assets from theme directories and user static directory
+        to output_dir / "static".
+        """
+        import shutil
+
+        output_static_dir = Path(self.config.output_dir) / "static"
+
+        # 1. Package default theme static assets (if any)
+        pkg_theme_static = (
+            Path(__file__).parent
+            / "templates"
+            / getattr(self.config, "theme", "default")
+            / "static"
+        )
+        if pkg_theme_static.exists() and pkg_theme_static.is_dir():
+            output_static_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(pkg_theme_static, output_static_dir, dirs_exist_ok=True)
+
+        # Also check package default static if theme != default
+        pkg_default_static = Path(__file__).parent / "templates" / "default" / "static"
+        if (
+            pkg_default_static != pkg_theme_static
+            and pkg_default_static.exists()
+            and pkg_default_static.is_dir()
+        ):
+            output_static_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(pkg_default_static, output_static_dir, dirs_exist_ok=True)
+
+        # 2. Configured theme directory static assets (themes/<theme>/static)
+        theme_name = getattr(self.config, "theme", "default")
+        if theme_name:
+            theme_static = Path("themes") / theme_name / "static"
+            if theme_static.exists() and theme_static.is_dir():
+                output_static_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(theme_static, output_static_dir, dirs_exist_ok=True)
+
+        # Custom templates_dir static (if configured)
+        if hasattr(self.config, "templates_dir") and self.config.templates_dir:
+            tpl_static = Path(self.config.templates_dir) / "static"
+            if tpl_static.exists() and tpl_static.is_dir():
+                output_static_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(tpl_static, output_static_dir, dirs_exist_ok=True)
+
+        # 3. User static_dir (e.g. static/)
+        if hasattr(self.config, "static_dir") and self.config.static_dir:
+            user_static = Path(self.config.static_dir)
+            if user_static.exists() and user_static.is_dir():
+                output_static_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(user_static, output_static_dir, dirs_exist_ok=True)
+
     def build_site(self) -> list[Path]:
         """
         == build_site
@@ -601,18 +766,26 @@ class BuildEngine:
         outdated = self.get_outdated_files()
 
         all_docs = (
-            list(self.content_dir.glob("**/*.adoc"))
+            [f for f in self.content_dir.glob("**/*.adoc") if not self.is_partial(f)]
             if self.content_dir.exists()
             else []
         )
-        to_build = outdated if (outdated or self.cache_data["files"]) else set(all_docs)
+        to_build = (
+            {f for f in outdated if not self.is_partial(f)}
+            if (outdated or self.cache_data["files"])
+            else set(all_docs)
+        )
 
         output_dir = Path(self.config.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        self.sync_static_assets()
+
         search_paths = self._get_template_search_paths()
 
         for doc_path in to_build:
+            if self.is_partial(doc_path):
+                continue
             try:
                 with open(doc_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()

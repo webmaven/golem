@@ -289,7 +289,7 @@ def test_engine_corrupt_cache_handling(tmp_path):
     cache_file.write_text("Not valid JSON at all!!!", encoding="utf-8")
 
     engine = BuildEngine(config, cache_file=cache_file)
-    assert engine.cache_data == {"files": {}, "dependencies": {}}
+    assert engine.cache_data == {"files": {}, "dependencies": {}, "metadata": {}}
     # The corrupted file should have been deleted/cleared
     assert not cache_file.exists() or cache_file.read_text().strip() == ""
 
@@ -639,3 +639,250 @@ def test_engine_passes_template_search_paths_to_render_body(tmp_path, monkeypatc
         str(custom_tpl.resolve()) in search_path_strs
         or str(custom_tpl) in search_path_strs
     )
+
+
+def test_partials_exclusion_and_dependency_propagation(tmp_path):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+
+    file_main = content_dir / "index.adoc"
+    file_main.write_text(
+        "= Home\ninclude::_sidebar.adoc[]\ninclude::_snippets/note.adoc[]\n",
+        encoding="utf-8",
+    )
+
+    file_partial = content_dir / "_sidebar.adoc"
+    file_partial.write_text("Sidebar partial content\n", encoding="utf-8")
+
+    snippets_dir = content_dir / "_snippets"
+    snippets_dir.mkdir()
+    file_snippet = snippets_dir / "note.adoc"
+    file_snippet.write_text("Snippet partial content\n", encoding="utf-8")
+
+    file_regular = content_dir / "regular.adoc"
+    file_regular.write_text("= Regular\nRegular page\n", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    # Initial site build
+    compiled = engine.build_site()
+
+    # Partials must NOT generate standalone .html output files
+    assert tmp_path / "dist" / "index.html" in compiled
+    assert tmp_path / "dist" / "regular.html" in compiled
+    assert (tmp_path / "dist" / "index.html").exists()
+    assert (tmp_path / "dist" / "regular.html").exists()
+    assert not (tmp_path / "dist" / "_sidebar.html").exists()
+    assert not (tmp_path / "dist" / "_snippets" / "note.html").exists()
+
+    # Partials MUST be tracked in cache dependencies and files
+    assert str(file_partial.resolve()) in engine.cache_data["dependencies"].get(
+        str(file_main.resolve()), []
+    )
+    assert str(file_snippet.resolve()) in engine.cache_data["dependencies"].get(
+        str(file_main.resolve()), []
+    )
+    assert str(file_partial.resolve()) in engine.cache_data["files"]
+    assert str(file_snippet.resolve()) in engine.cache_data["files"]
+
+    # Initial check (unmodified) should have no outdated files
+    assert len(engine.get_outdated_files()) == 0
+
+    # Modify the partial file _sidebar.adoc
+    file_partial.write_text("Modified sidebar partial content\n", encoding="utf-8")
+
+    # Modifying partial must flag parent index.adoc as outdated, but not partial itself as output
+    outdated = engine.get_outdated_files()
+    assert file_main.resolve() in outdated
+    assert file_partial.resolve() not in outdated
+
+    # Rebuild site
+    recompiled = engine.build_site()
+    assert tmp_path / "dist" / "index.html" in recompiled
+    assert not (tmp_path / "dist" / "_sidebar.html").exists()
+    assert len(engine.get_outdated_files()) == 0
+
+
+def test_partials_excluded_from_navigation(tmp_path):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+
+    (content_dir / "index.adoc").write_text("= Home\n", encoding="utf-8")
+    (content_dir / "01-guide.adoc").write_text("= Guide\n", encoding="utf-8")
+    (content_dir / "_sidebar.adoc").write_text("= Sidebar\n", encoding="utf-8")
+
+    snippets_dir = content_dir / "_snippets"
+    snippets_dir.mkdir()
+    (snippets_dir / "note.adoc").write_text("= Note\n", encoding="utf-8")
+
+    guides_dir = content_dir / "guides"
+    guides_dir.mkdir()
+    (guides_dir / "index.adoc").write_text("= Guides\n", encoding="utf-8")
+    (guides_dir / "_internal.adoc").write_text("= Internal\n", encoding="utf-8")
+    (guides_dir / "tutorial.adoc").write_text("= Tutorial\n", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    nav = engine.discover_navigation()
+
+    # Collect all titles and paths in nav recursively
+    def collect_nav(items):
+        res = []
+        for item in items:
+            res.append((item.get("title"), item.get("path")))
+            res.extend(collect_nav(item.get("children", [])))
+        return res
+
+    all_nav = collect_nav(nav)
+    titles = [t[0] for t in all_nav]
+    paths = [t[1] for t in all_nav]
+
+    assert "Home" in titles
+    assert "Guide" in titles
+    assert "Guides" in titles
+    assert "Tutorial" in titles
+
+    # Underscore partials and partial dirs must NOT appear
+    assert "Sidebar" not in titles
+    assert "Note" not in titles
+    assert "Internal" not in titles
+
+    for p in paths:
+        if p:
+            parts = Path(p).parts
+            assert not any(part.startswith("_") for part in parts)
+
+
+def test_sync_static_assets_user_and_theme(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Home\n", encoding="utf-8")
+
+    # Create user static dir
+    user_static = tmp_path / "static"
+    (user_static / "css").mkdir(parents=True)
+    (user_static / "css" / "style.css").write_text(
+        "body { color: red; }", encoding="utf-8"
+    )
+    (user_static / "app.js").write_text("console.log('app');", encoding="utf-8")
+
+    # Create theme static dir
+    theme_static = tmp_path / "themes" / "custom" / "static"
+    (theme_static / "css").mkdir(parents=True)
+    (theme_static / "css" / "style.css").write_text(
+        "body { color: blue; }", encoding="utf-8"
+    )
+    (theme_static / "theme.css").write_text("/* theme */", encoding="utf-8")
+
+    output_dir = tmp_path / "dist"
+
+    config = GolemConfig(
+        content_dir="content",
+        output_dir="dist",
+        static_dir=str(user_static),
+        theme="custom",
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    # Test sync_static_assets directly
+    engine.sync_static_assets()
+
+    dist_static = output_dir / "static"
+    assert (dist_static / "theme.css").exists()
+    assert (dist_static / "theme.css").read_text(encoding="utf-8") == "/* theme */"
+    assert (dist_static / "app.js").exists()
+    assert (dist_static / "app.js").read_text(encoding="utf-8") == "console.log('app');"
+    # User static asset overrides theme static asset
+    assert (dist_static / "css" / "style.css").read_text(
+        encoding="utf-8"
+    ) == "body { color: red; }"
+
+    # Test that build_site() automatically triggers sync_static_assets()
+    import shutil
+
+    shutil.rmtree(output_dir)
+    assert not output_dir.exists()
+
+    engine.build_site()
+    assert (dist_static / "css" / "style.css").exists()
+    assert (dist_static / "theme.css").exists()
+
+
+def test_metadata_caching_and_recovery(tmp_path):
+    from unittest.mock import patch
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+
+    doc1 = content_dir / "doc1.adoc"
+    doc1.write_text(
+        "= Custom Title\n:nav_title: Short Nav\n:toc:\n\nContent\n", encoding="utf-8"
+    )
+
+    doc2 = content_dir / "doc2.adoc"
+    doc2.write_text("= Other Doc\n:!toc:\n\nOther content\n", encoding="utf-8")
+
+    cache_file = tmp_path / "cache.json"
+
+    config = GolemConfig(
+        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
+    )
+    engine = BuildEngine(config, cache_file=cache_file)
+
+    # Calling discover_navigation populates cache_data["metadata"]
+    nav = engine.discover_navigation()
+    assert len(nav) == 2
+
+    assert "metadata" in engine.cache_data
+    meta1 = engine.cache_data["metadata"].get(str(doc1.resolve()))
+    assert meta1 is not None
+    assert meta1["title"] == "Custom Title"
+    assert meta1["nav_title"] == "Short Nav"
+    assert meta1["has_toc"] is True
+
+    meta2 = engine.cache_data["metadata"].get(str(doc2.resolve()))
+    assert meta2 is not None
+    assert meta2["title"] == "Other Doc"
+    assert meta2["has_toc"] is False
+
+    engine.save_cache()
+
+    # Re-instantiate engine with existing cache file
+    engine2 = BuildEngine(config, cache_file=cache_file)
+    assert "metadata" in engine2.cache_data
+    assert str(doc1.resolve()) in engine2.cache_data["metadata"]
+
+    # When files are unmodified, discover_navigation uses cached metadata without re-reading from disk
+    orig_open = open
+    open_calls = []
+
+    def tracking_open(file, *args, **kwargs):
+        open_calls.append(str(file))
+        return orig_open(file, *args, **kwargs)
+
+    with patch("builtins.open", side_effect=tracking_open):
+        nav2 = engine2.discover_navigation()
+        assert len(nav2) == 2
+        # Neither doc1.adoc nor doc2.adoc should have been opened for reading
+        assert not any(
+            str(doc1.resolve()) in call or "doc1.adoc" in call for call in open_calls
+        )
+        assert not any(
+            str(doc2.resolve()) in call or "doc2.adoc" in call for call in open_calls
+        )
+
+    # When a file is modified, discover_navigation refreshes the cached metadata
+    doc1.write_text("= Updated Title\n:nav_title: Updated Nav\n", encoding="utf-8")
+    nav3 = engine2.discover_navigation()
+    assert len(nav3) == 2
+    updated_meta1 = engine2.cache_data["metadata"].get(str(doc1.resolve()))
+    assert updated_meta1["title"] == "Updated Title"
+    assert updated_meta1["nav_title"] == "Updated Nav"
