@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${page_title} - ${site_title}</title>
+    <meta name="generator" content="${generator_version}" />
+    <meta tal:condition="site_author" name="author" content="${site_author}" />
+    <link rel="canonical" tal:condition="site_url" href="${site_url}" />
+    <tal:block tal:repeat="css_file custom_css">
+        <link rel="stylesheet" href="${css_file}" />
+    </tal:block>
+    <style>
+        :root {
+            --golem-bg: #0f0f11;
+            --golem-fg: #e2e8f0;
+            --golem-surface: #151518;
+            --golem-border: #222228;
+            --golem-primary: #818cf8;
+            --golem-accent: #a5b4fc;
+        }
+        body {
+            background-color: var(--golem-bg);
+            color: var(--golem-fg);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        #golem-header {
+            background: var(--golem-surface);
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--golem-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #golem-header h1 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: var(--golem-primary);
+        }
+        #golem-header a {
+            color: inherit;
+            text-decoration: none;
+        }
+        #golem-wrapper {
+            display: flex;
+            flex: 1;
+        }
+        #golem-sidebar-left {
+            width: 260px;
+            background: var(--golem-surface);
+            padding: 1.5rem 1rem;
+            border-right: 1px solid var(--golem-border);
+        }
+        #golem-sidebar-left h3 {
+            margin-top: 0;
+            color: #94a3b8;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        #golem-sidebar-left ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #golem-sidebar-left li {
+            margin-bottom: 0.5rem;
+        }
+        #golem-sidebar-left a {
+            color: var(--golem-fg);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s ease, padding-left 0.2s ease;
+        }
+        #golem-sidebar-left a:hover {
+            color: var(--golem-accent);
+            padding-left: 4px;
+        }
+        #golem-content {
+            flex: 1;
+            padding: 2.5rem;
+            max-width: 860px;
+            line-height: 1.7;
+        }
+        #golem-sidebar-right {
+            width: 220px;
+            padding: 1.5rem 1rem;
+            border-left: 1px solid var(--golem-border);
+        }
+        #golem-sidebar-right h4 {
+            margin-top: 0;
+            color: #94a3b8;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        #golem-footer {
+            background: var(--golem-surface);
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--golem-border);
+            text-align: center;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+        @media (max-width: 900px) {
+            #golem-sidebar-right { display: none; }
+            #golem-wrapper { flex-direction: column; }
+            #golem-sidebar-left { width: auto; border-right: none; border-bottom: 1px solid var(--golem-border); }
+        }
+    </style>
+</head>
+<body>
+    <header id="golem-header" class="golem-header">
+        <h1><a href="/" tal:attributes="href site_url or '/'">${site_title}</a></h1>
+        <span tal:condition="site_author" class="golem-author">${site_author}</span>
+    </header>
+    <div id="golem-wrapper">
+        <aside id="golem-sidebar-left" class="golem-sidebar-left">
+            <h3>Navigation</h3>
+            <div tal:condition="nav_html" tal:replace="structure nav_html" />
+            <ul tal:condition="not:nav_html and nav_tree">
+                <li tal:repeat="item nav_tree">
+                    <a href="${item.url}" tal:attributes="href item.url">${item.title}</a>
+                </li>
+            </ul>
+        </aside>
+        <main id="golem-content" class="golem-content">
+            <h1 tal:condition="page_title">${page_title}</h1>
+            <div tal:content="structure body_html" />
+        </main>
+        <aside id="golem-sidebar-right" class="golem-sidebar-right golem-toc">
+            <h4>On This Page</h4>
+            <div tal:content="structure toc_html" />
+        </aside>
+    </div>
+    <footer id="golem-footer" class="golem-footer">
+        <p>Generated by Golem ${generator_version}</p>
+    </footer>
+    <tal:block tal:repeat="js_file custom_js">
+        <script src="${js_file}"></script>
+    </tal:block>
+</body>
+</html>

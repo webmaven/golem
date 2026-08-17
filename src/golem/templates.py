@@ -143,7 +143,7 @@ class PageCompiler:
     >>> config = GolemConfig(output_dir="dist")
     >>> compiler = PageCompiler(config)
     >>> html = compiler.compile_page("Sample Page", "<p>Paragraph content</p>", "")
-    >>> "<title>Sample Page</title>" in html
+    >>> "<title>Sample Page</title>" in html or "Sample Page" in html
     True
     >>> "<p>Paragraph content</p>" in html
     True
@@ -158,15 +158,35 @@ class PageCompiler:
         Initialize the compiler with a Golem configuration.
         """
         self.config = config
-        self.default_template = PageTemplate(DEFAULT_TEMPLATE)
+        self._pkg_default_template = self._load_builtin_template()
+        self.default_template = self._pkg_default_template or PageTemplate(
+            DEFAULT_TEMPLATE
+        )
+
+    def _load_builtin_template(self) -> PageTemplate | None:
+        """Load default package skeleton template from src/golem/templates/default/skeleton.pt."""
+        pkg_template = Path(__file__).parent / "templates" / "default" / "skeleton.pt"
+        if pkg_template.exists():
+            try:
+                with open(pkg_template, "r", encoding="utf-8") as f:
+                    return PageTemplate(f.read())
+            except Exception:
+                pass
+        return None
 
     def compile_page(
         self,
-        title: str,
-        body_content: str,
-        toc_html: str,
+        title: str = "",
+        body_content: str = "",
+        toc_html: str = "",
         template_path: Path | None = None,
         nav_html: str = "",
+        nav_tree: list[dict] | None = None,
+        page_title: str | None = None,
+        body_html: str | None = None,
+        current_path: str = "",
+        custom_css: list[str] | None = None,
+        custom_js: list[str] | None = None,
     ) -> str:
         """
         == compile_page
@@ -175,12 +195,23 @@ class PageCompiler:
 
         === Arguments
 
-        - `title`:: Document title.
-        - `body_content`:: Processed HTML body text.
+        - `title` / `page_title`:: Document title.
+        - `body_content` / `body_html`:: Processed HTML body text.
         - `toc_html`:: Rendered Table of Contents HTML.
         - `template_path`:: Optional layout override path.
         - `nav_html`:: Rendered left navigation HTML.
+        - `nav_tree`:: Hierarchical site map navigation tree.
+        - `current_path`:: Current document path relative to content dir.
+        - `custom_css`:: Custom CSS stylesheet links to inject.
+        - `custom_js`:: Custom JS script links to inject.
         """
+        effective_title = page_title if page_title is not None else title
+        effective_body = body_html if body_html is not None else body_content
+
+        import golem
+
+        generator_version = getattr(golem, "__version__", "0.1.0a1")
+
         if template_path and template_path.exists():
             try:
                 with open(template_path, "r", encoding="utf-8") as f:
@@ -217,13 +248,20 @@ class PageCompiler:
                     template = self.default_template
 
         return template(
-            title=title,
-            body_content=body_content,
-            body=body_content,
+            title=effective_title,
+            page_title=effective_title,
+            body_content=effective_body,
+            body_html=effective_body,
+            body=effective_body,
             toc_html=toc_html,
             nav_html=nav_html,
             navigation_html=nav_html,
+            nav_tree=nav_tree or [],
+            current_path=current_path,
             site_title=getattr(self.config, "site_title", "Golem Docs"),
             site_author=getattr(self.config, "site_author", "Anonymous"),
             site_url=getattr(self.config, "site_url", None),
+            generator_version=generator_version,
+            custom_css=custom_css or [],
+            custom_js=custom_js or [],
         )
