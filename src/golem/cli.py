@@ -18,8 +18,9 @@ import os
 import shutil
 from typing import Any, Iterator
 import click
-from golem.config import load_config, find_default_config_path
+from golem.config import GolemConfig, load_config, find_default_config_path
 from golem.engine import BuildEngine
+from golem.plugins import get_plugin_manager
 
 
 @contextmanager
@@ -166,7 +167,31 @@ def format_diagnostic(
     return header
 
 
-@click.group(invoke_without_command=True)
+class GolemGroup(click.Group):
+    """Click Group that dynamically loads plugins for subcommands."""
+
+    def _load_plugin_subcommands(self) -> None:
+        config_path = find_default_config_path()
+        try:
+            config = load_config(config_path) if config_path.exists() else GolemConfig()
+        except Exception:
+            config = GolemConfig()
+        pm = get_plugin_manager(config)
+        pm.hook.golem_add_subcommands(cli=self)
+
+    def list_commands(self, ctx: click.Context) -> list[str]:
+        self._load_plugin_subcommands()
+        return super().list_commands(ctx)
+
+    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
+        cmd = super().get_command(ctx, cmd_name)
+        if cmd is not None:
+            return cmd
+        self._load_plugin_subcommands()
+        return super().get_command(ctx, cmd_name)
+
+
+@click.group(cls=GolemGroup, invoke_without_command=True)
 @click.option("--version", is_flag=True, help="Print version details")
 @click.option(
     "-C",
@@ -174,7 +199,7 @@ def format_diagnostic(
     type=click.Path(file_okay=False, dir_okay=True),
     help="Change working directory before executing",
 )
-def main(version, directory=None):
+def main(version: bool = False, directory: str | None = None) -> None:
     """
     = main
 
@@ -196,6 +221,14 @@ def main(version, directory=None):
     ----
     """
     with change_working_dir(directory):
+        config_path = find_default_config_path()
+        try:
+            config = load_config(config_path) if config_path.exists() else GolemConfig()
+        except Exception:
+            config = GolemConfig()
+        pm = get_plugin_manager(config)
+        pm.hook.golem_add_subcommands(cli=main)
+
         if version:
             click.echo("Golem static site generator v0.1.0")
 

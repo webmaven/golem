@@ -132,7 +132,7 @@ class BuildEngine:
         from golem.plugins import get_plugin_manager
 
         plugins_dir = Path(getattr(config, "plugins_dir", "plugins"))
-        self.pm = get_plugin_manager(plugins_dir=plugins_dir)
+        self.pm = get_plugin_manager(config=config, plugins_dir=plugins_dir)
 
     def _load_cache(self) -> dict:
         """
