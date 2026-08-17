@@ -38,6 +38,27 @@ def render_body(
         raise TypeError(f"Expected Node or dict, got {type(asg_root).__name__}")
 
     renderer = asciidoctype.AsciiDoctypeRenderer(search_paths=search_paths)
+    if node_dict.get("name") == "document":
+        blocks = node_dict.get("blocks", [])
+        rendered_blocks = [renderer.render(block) for block in blocks]
+        footnotes = node_dict.get("footnotes", [])
+        if footnotes:
+            fn_parts = ['<div id="footnotes">\n  <hr />']
+            for fn in footnotes:
+                fn_num = fn.get("index", fn.get("number", ""))
+                fn_id = fn.get("id") or fn_num
+                if fn.get("inlines"):
+                    fn_content = "".join(renderer.render(inl) for inl in fn["inlines"])
+                else:
+                    fn_content = str(fn.get("text", fn.get("value", "")))
+                fn_parts.append(
+                    f'  <div class="footnote" id="_footnotedef_{fn_num}">\n'
+                    f'    <a href="#_footnote_{fn_id}">{fn_num}</a>. {fn_content}\n'
+                    f"  </div>"
+                )
+            fn_parts.append("</div>")
+            rendered_blocks.append("\n".join(fn_parts))
+        return "\n".join(rendered_blocks)
     return renderer.render(node_dict)
 
 
