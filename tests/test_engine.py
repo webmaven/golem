@@ -886,3 +886,140 @@ def test_metadata_caching_and_recovery(tmp_path):
     updated_meta1 = engine2.cache_data["metadata"].get(str(doc1.resolve()))
     assert updated_meta1["title"] == "Updated Title"
     assert updated_meta1["nav_title"] == "Updated Nav"
+
+
+def test_navigation_empty_and_non_adoc_directory_pruning(tmp_path):
+    """Verify that empty dirs or dirs without valid .adoc files are omitted from navigation."""
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+
+    # Valid root doc
+    (content_dir / "index.adoc").write_text("= Home\n\nHome content", encoding="utf-8")
+
+    # Valid section with adoc
+    valid_sec = content_dir / "01-guide"
+    valid_sec.mkdir()
+    (valid_sec / "index.adoc").write_text("= Guide\n\nGuide content", encoding="utf-8")
+    (valid_sec / "page.adoc").write_text("= Page\n\nPage content", encoding="utf-8")
+
+    # Empty directory
+    empty_dir = content_dir / "dist"
+    empty_dir.mkdir()
+
+    # Another empty directory
+    scratch_dir = content_dir / "scratch_dist"
+    scratch_dir.mkdir()
+
+    # Directory with only non-adoc files (e.g. assets, markdown, images, text)
+    assets_dir = content_dir / "assets"
+    assets_dir.mkdir()
+    (assets_dir / "logo.svg").write_text("<svg></svg>", encoding="utf-8")
+    (assets_dir / "style.css").write_text("body {}", encoding="utf-8")
+
+    # Directory with only markdown plans
+    plans_dir = content_dir / "plans"
+    plans_dir.mkdir()
+    (plans_dir / "roadmap.md").write_text("# Roadmap", encoding="utf-8")
+
+    # Directory containing only partial adoc files
+    partials_dir = content_dir / "partials_only"
+    partials_dir.mkdir()
+    (partials_dir / "_snippet.adoc").write_text("Snippet", encoding="utf-8")
+    (partials_dir / "_sidebar.adoc").write_text("Sidebar", encoding="utf-8")
+
+    # Nested directory where branch has no adoc files
+    nested_empty = content_dir / "nested" / "empty_sub"
+    nested_empty.mkdir(parents=True)
+    (nested_empty / "notes.txt").write_text("notes", encoding="utf-8")
+
+    # Nested directory where one branch has adoc files and another does not
+    mixed_dir = content_dir / "mixed"
+    mixed_dir.mkdir()
+    mixed_valid = mixed_dir / "sub_valid"
+    mixed_valid.mkdir()
+    (mixed_valid / "doc.adoc").write_text("= Mixed Doc", encoding="utf-8")
+    mixed_empty = mixed_dir / "sub_empty"
+    mixed_empty.mkdir()
+    (mixed_empty / "data.json").write_text("{}", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    nav = engine.discover_navigation()
+
+    def get_all_paths_and_titles(items):
+        res = []
+        for item in items:
+            res.append((item.get("title"), item.get("path")))
+            res.extend(get_all_paths_and_titles(item.get("children", [])))
+        return res
+
+    all_items = get_all_paths_and_titles(nav)
+    titles = [t[0] for t in all_items]
+    paths = [t[1] for t in all_items]
+
+    # Valid sections and files must be present
+    assert "Home" in titles
+    assert "Guide" in titles
+    assert "Page" in titles
+    assert "Mixed Doc" in titles
+
+    # Empty dirs and non-adoc dirs MUST be completely excluded
+    assert "Dist" not in titles
+    assert "dist" not in paths
+    assert "Scratch Dist" not in titles
+    assert "scratch_dist" not in paths
+    assert "Assets" not in titles
+    assert "assets" not in paths
+    assert "Plans" not in titles
+    assert "plans" not in paths
+    assert "Partials Only" not in titles
+    assert "partials_only" not in paths
+    assert "Nested" not in titles
+    assert "nested" not in paths
+    assert "sub_empty" not in paths
+    assert "Sub Empty" not in titles
+
+
+def test_dir_has_adoc_content_helper(tmp_path):
+    from golem.engine import _dir_has_adoc_content
+
+    # Nonexistent path
+    assert _dir_has_adoc_content(tmp_path / "does_not_exist") is False
+
+    # Empty dir
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    assert _dir_has_adoc_content(empty) is False
+
+    # Dir with non-adoc files only
+    non_adoc = tmp_path / "non_adoc"
+    non_adoc.mkdir()
+    (non_adoc / "readme.txt").write_text("hi")
+    (non_adoc / "image.png").write_bytes(b"123")
+    assert _dir_has_adoc_content(non_adoc) is False
+
+    # Dir with partial adoc files only
+    partial_dir = tmp_path / "partial"
+    partial_dir.mkdir()
+    (partial_dir / "_partial.adoc").write_text("partial")
+    assert _dir_has_adoc_content(partial_dir) is False
+
+    # Dir with adoc file inside hidden/partial subdir
+    hidden_sub = tmp_path / "hidden_sub"
+    (hidden_sub / "_sub").mkdir(parents=True)
+    (hidden_sub / "_sub" / "valid.adoc").write_text("valid")
+    assert _dir_has_adoc_content(hidden_sub) is False
+
+    # Dir with valid adoc file directly inside
+    valid_dir = tmp_path / "valid"
+    valid_dir.mkdir()
+    (valid_dir / "index.adoc").write_text("= Index")
+    assert _dir_has_adoc_content(valid_dir) is True
+
+    # Dir with valid adoc file nested inside
+    nested_valid = tmp_path / "nested_valid"
+    (nested_valid / "sub1" / "sub2").mkdir(parents=True)
+    (nested_valid / "sub1" / "sub2" / "doc.adoc").write_text("= Doc")
+    assert _dir_has_adoc_content(nested_valid) is True
+

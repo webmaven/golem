@@ -21,9 +21,7 @@ class GolemConfig:
     templates_dir: str = "templates"
     static_dir: str = "static"
     plugins_dir: str = "plugins"
-    plugins: list[str] = field(
-        default_factory=lambda: ["golem.plugins.doctest", "golem.plugins.apidoc"]
-    )
+    plugins: list[str] = field(default_factory=list)
     config_path: str | None = None
 
 
@@ -147,11 +145,7 @@ def load_config(config_path: Path) -> GolemConfig:
         else:
             raw_plugins = plugins_data
         parsed_plugins = _parse_plugins(raw_plugins)
-        plugins = (
-            parsed_plugins
-            if parsed_plugins is not None
-            else ["golem.plugins.doctest", "golem.plugins.apidoc"]
-        )
+        plugins = parsed_plugins if parsed_plugins is not None else []
         raw_nav = (
             nav_data.get("nav")
             if "nav" in nav_data
@@ -194,11 +188,7 @@ def load_config(config_path: Path) -> GolemConfig:
         else:
             raw_plugins = plugins_data
         parsed_plugins = _parse_plugins(raw_plugins)
-        plugins = (
-            parsed_plugins
-            if parsed_plugins is not None
-            else ["golem.plugins.doctest", "golem.plugins.apidoc"]
-        )
+        plugins = parsed_plugins if parsed_plugins is not None else []
         raw_nav = (
             nav_data.get("nav")
             if "nav" in nav_data

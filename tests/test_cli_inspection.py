@@ -45,7 +45,7 @@ def test_cli_plugins_default(tmp_path):
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(main, ["plugins"])
         assert result.exit_code == 0
-        assert "[ENABLED]" in result.output
+        assert "[DISABLED]" in result.output
         assert "golem.plugins.doctest" in result.output
         assert "golem.plugins.apidoc" in result.output
         assert "(built-in)" in result.output
@@ -63,7 +63,7 @@ def test_cli_plugins_json_default(tmp_path):
         assert "golem.plugins.apidoc" in names
         for p in data:
             if p["name"] in ("golem.plugins.doctest", "golem.plugins.apidoc"):
-                assert p["enabled"] is True
+                assert p["enabled"] is False
                 assert p["source"] == "built-in"
 
 

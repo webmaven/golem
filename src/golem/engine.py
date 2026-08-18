@@ -87,6 +87,22 @@ def _extract_title_from_doc(path: Path) -> str:
     return str(_extract_metadata_from_doc(path)["title"])
 
 
+def _dir_has_adoc_content(dir_path: Path) -> bool:
+    """Check if a directory or any of its subdirectories contains at least one non-partial .adoc file."""
+    if not dir_path.exists() or not dir_path.is_dir():
+        return False
+    try:
+        for p in dir_path.rglob("*.adoc"):
+            if p.is_file() and not any(
+                part.startswith(".") or part.startswith("_")
+                for part in p.relative_to(dir_path).parts
+            ):
+                return True
+    except Exception:
+        pass
+    return False
+
+
 class BuildEngine:
     """
     = BuildEngine
@@ -591,6 +607,8 @@ class BuildEngine:
                 )
 
             for d in dirs:
+                if not _dir_has_adoc_content(d):
+                    continue
                 sub_index: Path | None = None
                 try:
                     for sub_f in d.iterdir():

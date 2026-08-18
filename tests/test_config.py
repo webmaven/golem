@@ -200,7 +200,7 @@ nav = [
 
 def test_config_plugins_and_static_defaults():
     config = GolemConfig()
-    assert config.plugins == ["golem.plugins.doctest", "golem.plugins.apidoc"]
+    assert config.plugins == []
     assert config.static_dir == "static"
 
 
@@ -211,7 +211,7 @@ def test_config_plugins_unspecified_in_file(tmp_path):
 title = "Default Plugins Docs"
 """)
     config = load_config(config_file)
-    assert config.plugins == ["golem.plugins.doctest", "golem.plugins.apidoc"]
+    assert config.plugins == []
     assert config.static_dir == "static"
 
 

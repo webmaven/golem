@@ -26,6 +26,8 @@ from golem.config import GolemConfig, load_config, find_default_config_path
 from golem.engine import BuildEngine
 from golem.plugins import get_plugin_manager
 
+BUILTIN_PLUGINS: list[str] = ["golem.plugins.doctest", "golem.plugins.apidoc"]
+
 
 @contextmanager
 def change_working_dir(directory: Path | str | None) -> Iterator[None]:
@@ -756,7 +758,7 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
         except Exception:
             config = GolemConfig()
 
-        builtin_plugin_names = ["golem.plugins.doctest", "golem.plugins.apidoc"]
+        builtin_plugin_names = BUILTIN_PLUGINS
         configured_plugins = list(config.plugins) if config.plugins else []
 
         plugins_list: list[dict[str, Any]] = []
