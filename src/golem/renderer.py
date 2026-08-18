@@ -6,6 +6,7 @@ document and node translation directly to `asciidoctype.AsciiDoctypeRenderer`
 and generating clean Table of Contents navigation trees.
 """
 
+import re
 from pathlib import Path
 from typing import Any, List, Optional, Union
 import asciidoctype  # type: ignore[import-untyped]
@@ -37,6 +38,7 @@ def render_body(
     else:
         raise TypeError(f"Expected Node or dict, got {type(asg_root).__name__}")
 
+    _ensure_section_ids(node_dict)
     renderer = asciidoctype.AsciiDoctypeRenderer(search_paths=search_paths)
     if node_dict.get("name") == "document":
         blocks = node_dict.get("blocks", [])
@@ -62,8 +64,56 @@ def render_body(
     return renderer.render(node_dict)
 
 
+def _slugify(text: str) -> str:
+    """Generate a clean URL-friendly and HTML id-friendly slug from text."""
+    s = text.lower().strip()
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    return s.strip("-")
+
+
+def _ensure_section_ids(node: Any) -> None:
+    """Recursively ensure every section node has an id attribute based on its title."""
+    if not node:
+        return
+    if isinstance(node, list):
+        for item in node:
+            _ensure_section_ids(item)
+        return
+    if isinstance(node, dict):
+        if node.get("name") == "section":
+            attrs = node.setdefault("attributes", {})
+            if isinstance(attrs, dict) and not attrs.get("id"):
+                title_nodes = node.get("title", [])
+                title_str = _extract_plain_text(title_nodes)
+                if title_str:
+                    attrs["id"] = _slugify(title_str)
+        for key in ("blocks", "children", "items"):
+            if key in node and isinstance(node[key], list):
+                for child in node[key]:
+                    _ensure_section_ids(child)
+        return
+
+    name = getattr(node, "name", "") or node.__class__.__name__.lower()
+    if name == "section":
+        attrs = getattr(node, "attributes", None)
+        if isinstance(attrs, dict) and not attrs.get("id"):
+            title_nodes = getattr(node, "title", [])
+            title_str = _extract_plain_text(title_nodes)
+            if title_str:
+                attrs["id"] = _slugify(title_str)
+    if hasattr(node, "blocks") and node.blocks:
+        for child in node.blocks:
+            _ensure_section_ids(child)
+    elif hasattr(node, "children") and node.children:
+        for child in node.children:
+            _ensure_section_ids(child)
+    elif hasattr(node, "items") and node.items:
+        for child in node.items:
+            _ensure_section_ids(child)
+
+
 def _extract_plain_text(node: Any) -> str:
-    """Extract recursively concatenated plain text from inlines, nodes, or dictionaries."""
+    """Recursively extract plain string representations from nested inlines or AST nodes."""
     if not node:
         return ""
     if isinstance(node, str):
@@ -150,6 +200,7 @@ def generate_toc_html(asg_root: Union[Node, dict[str, Any]]) -> str:
 
     Rendered HTML5 Table of Contents or empty string if no sections exist.
     """
+    _ensure_section_ids(asg_root)
     sections: list[Any] = []
     _collect_sections(asg_root, sections)
     if not sections:
@@ -178,7 +229,7 @@ def generate_toc_html(asg_root: Union[Node, dict[str, Any]]) -> str:
 
         title_str = _extract_plain_text(title_nodes)
         if not anchor_id:
-            anchor_id = title_str.lower().replace(" ", "-").replace("_", "-")
+            anchor_id = _slugify(title_str)
 
         if level < base_level:
             level = base_level
