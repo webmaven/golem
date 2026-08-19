@@ -6,7 +6,7 @@ v0.1.0
 :sectanchors:
 :source-highlighter: highlight.js
 
-This document establishes the official development standards, architectural invariants, code styles, and operational protocols for any AI agent or human contributor working on Golem (`golem-pub`).
+This document establishes the official development standards, architectural invariants, code styles, and operational protocols for any AI agent or human contributor working on Golem (`golem-docs`).
 
 ---
 

@@ -1,4 +1,4 @@
-= Technical Specification: Golem (`golem-pub`) Static Site Generator
+= Technical Specification: Golem (`golem-docs`) Static Site Generator
 Michael Bernstein <zopemaven@gmail.com>
 v0.1.0
 :toc: left
@@ -87,7 +87,7 @@ enabled = [
 [api]
 # Python packages to automatically scan and build /api/ reference guides for
 packages = [
-    "golem_pub"
+    "golem"
 ]
 ----
 

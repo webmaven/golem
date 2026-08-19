@@ -68,10 +68,7 @@ Another paragraph in the subsection.
     html = render_body(asg)
     assert "<h2>First Heading</h2>" in html
     assert "<h3>Sub Heading</h3>" in html
-    assert (
-        "<p>This is a paragraph with <strong>bold</strong>, <em>italic</em>, and normal text.</p>"
-        in html
-    )
+    assert "<p>This is a paragraph with <strong>bold</strong>, <em>italic</em>, and normal text.</p>" in html
     assert "<p>Another paragraph in the subsection.</p>" in html
 
 

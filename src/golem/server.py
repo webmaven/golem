@@ -77,20 +77,14 @@ class LiveReloadServer:
                 try:
                     time.sleep(1.0)
                     if self.change_detected_func():
-                        logger.info(
-                            "[LiveReload] File modification detected. Triggering rebuild..."
-                        )
+                        logger.info("[LiveReload] File modification detected. Triggering rebuild...")
                         try:
                             self.rebuild_func()
                             self.last_error_message = None
-                            logger.info(
-                                "[LiveReload] Rebuild finished successfully. Notifying connected tabs."
-                            )
+                            logger.info("[LiveReload] Rebuild finished successfully. Notifying connected tabs.")
                         except Exception as e:
                             self.last_error_message = str(e)
-                            logger.error(
-                                f"[LiveReload] Rebuild encountered compilation error: {e}"
-                            )
+                            logger.error(f"[LiveReload] Rebuild encountered compilation error: {e}")
 
                         with server_instance.queues_lock:
                             for q in server_instance.reload_queues:
@@ -116,9 +110,7 @@ class LiveReloadServer:
                 else:
                     color_code = "\033[31m"  # Red
                 reset_code = "\033[0m"
-                logger.info(
-                    f"HTTP {color_code}{status_code}{reset_code} - {method_path}"
-                )
+                logger.info(f"HTTP {color_code}{status_code}{reset_code} - {method_path}")
 
             def do_GET(self):
                 # Handle SSE subscription requests
@@ -134,9 +126,7 @@ class LiveReloadServer:
                     with server_instance.queues_lock:
                         server_instance.reload_queues.append(client_queue)
 
-                    logger.debug(
-                        "[LiveReload] Browser tab established SSE hot-reload connection."
-                    )
+                    logger.debug("[LiveReload] Browser tab established SSE hot-reload connection.")
                     try:
                         while server_instance.is_running:
                             try:
@@ -182,17 +172,10 @@ class LiveReloadServer:
                         if not err_msg and server_instance.errors_func is not None:
                             errs = server_instance.errors_func()
                             if errs:
-                                err_msg = "\n".join(
-                                    f"[{e.get('file', 'unknown')}] {e.get('message', '')}"
-                                    for e in errs
-                                )
+                                err_msg = "\n".join(f"[{e.get('file', 'unknown')}] {e.get('message', '')}" for e in errs)
 
                         if err_msg:
-                            escaped_err = (
-                                err_msg.replace("&", "&amp;")
-                                .replace("<", "&lt;")
-                                .replace(">", "&gt;")
-                            )
+                            escaped_err = err_msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                             error_banner = f"""
                             <div id="golem-error-overlay" style="position:fixed;top:0;left:0;right:0;background:#ef4444;color:#ffffff;padding:12px 20px;font-family:monospace;font-size:14px;z-index:99999;box-shadow:0 4px 6px -1px rgba(0,0,0,0.2);">
                                 <strong>[Golem Build Warning/Error]</strong>
@@ -220,9 +203,7 @@ class LiveReloadServer:
                         </script>
                         """
                         if "</head>" in html_content:
-                            html_content = html_content.replace(
-                                "</head>", sse_snippet + "</head>", 1
-                            )
+                            html_content = html_content.replace("</head>", sse_snippet + "</head>", 1)
                         else:
                             html_content += sse_snippet
 
@@ -234,9 +215,7 @@ class LiveReloadServer:
                         self.end_headers()
                         return f_mem
                     except Exception as e:
-                        logger.error(
-                            f"[LiveReload] Failed to inject hot-reloader into HTML: {e}"
-                        )
+                        logger.error(f"[LiveReload] Failed to inject hot-reloader into HTML: {e}")
 
                 return super().send_head()
 

@@ -153,13 +153,8 @@ def test_rich_structured_context_passed_to_template(tmp_path):
     assert '<span id="current-path">arch/overview.adoc</span>' in html
     assert '<nav id="nav-html"><ul class="nav"><li>Link</li></ul></nav>' in html
     assert '<aside id="toc-html"><ul class="toc"><li>Overview</li></ul></aside>' in html
-    assert (
-        '<main id="body-html"><article>Deep architectural content</article></main>'
-        in html
-    )
-    assert (
-        "Introduction -&gt; intro.html" in html or "Introduction -> intro.html" in html
-    )
+    assert '<main id="body-html"><article>Deep architectural content</article></main>' in html
+    assert "Introduction -&gt; intro.html" in html or "Introduction -> intro.html" in html
     assert "Guide -&gt; guide.html" in html or "Guide -> guide.html" in html
 
 
@@ -182,14 +177,10 @@ def test_builtin_default_skeleton_template(tmp_path):
 
     # Modern semantic HTML structure
     assert "<!DOCTYPE html>" in html
-    assert (
-        '<meta name="viewport" content="width=device-width, initial-scale=1.0">' in html
-    )
+    assert '<meta name="viewport" content="width=device-width, initial-scale=1.0">' in html
     assert "<header" in html and 'id="golem-header"' in html
     assert 'class="golem-header"' in html or 'id="golem-header"' in html
-    assert (
-        '<aside id="golem-sidebar-left"' in html or 'class="golem-sidebar-left"' in html
-    )
+    assert '<aside id="golem-sidebar-left"' in html or 'class="golem-sidebar-left"' in html
     assert '<main id="golem-content"' in html or 'class="golem-content"' in html
     assert '<aside id="golem-sidebar-right"' in html or 'class="golem-toc"' in html
     assert "<footer" in html and 'id="golem-footer"' in html

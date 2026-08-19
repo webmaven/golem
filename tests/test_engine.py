@@ -19,9 +19,7 @@ def test_incremental_rebuild_logic(tmp_path):
     file_b = content_dir / "sidebar.adoc"
     file_b.write_text("Sidebar content")
 
-    config = GolemConfig(
-        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
-    )
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config)
 
     # First compilation
@@ -51,9 +49,7 @@ def test_engine_build_site_unit(tmp_path):
     doc = content_dir / "test.adoc"
     doc.write_text("= Test Document\nSimple content.", encoding="utf-8")
 
-    config = GolemConfig(
-        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
-    )
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     compiled = engine.build_site()
@@ -71,18 +67,14 @@ def test_cache_file_deletion_propagation(tmp_path):
     file_b = content_dir / "sidebar.adoc"
     file_b.write_text("Sidebar content\n", encoding="utf-8")
 
-    config = GolemConfig(
-        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
-    )
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     # Initial build and cache update
     engine.build_site()
 
     # Verify that the cache maps file_b as a dependency of file_a
-    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(
-        str(file_a.resolve()), []
-    )
+    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(str(file_a.resolve()), [])
 
     # Second check (unmodified) should be empty
     assert len(engine.get_outdated_files()) == 0
@@ -139,9 +131,7 @@ def test_cache_global_template_edit_propagation(tmp_path, monkeypatch):
     theme_dir = tmp_path / "themes" / "default"
     theme_dir.mkdir(parents=True)
     skeleton_pt = theme_dir / "skeleton.pt"
-    skeleton_pt.write_text(
-        "<html><body>${body_content}</body></html>", encoding="utf-8"
-    )
+    skeleton_pt.write_text("<html><body>${body_content}</body></html>", encoding="utf-8")
 
     config = GolemConfig(
         content_dir="content",
@@ -157,9 +147,7 @@ def test_cache_global_template_edit_propagation(tmp_path, monkeypatch):
     assert len(engine.get_outdated_files()) == 0
 
     # Modify the template skeleton
-    skeleton_pt.write_text(
-        "<html><body>NEW ${body_content}</body></html>", encoding="utf-8"
-    )
+    skeleton_pt.write_text("<html><body>NEW ${body_content}</body></html>", encoding="utf-8")
 
     # The engine must detect the global template edit and invalidate index.adoc
     outdated = engine.get_outdated_files()
@@ -176,18 +164,14 @@ def test_cache_non_adoc_edit_propagation(tmp_path):
     file_b = content_dir / "code.py"
     file_b.write_text("print('hello')\n", encoding="utf-8")
 
-    config = GolemConfig(
-        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
-    )
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     # Initial build and cache update
     engine.build_site()
 
     # Verify that the cache maps file_b as a dependency of file_a
-    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(
-        str(file_a.resolve()), []
-    )
+    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(str(file_a.resolve()), [])
 
     # Second check (unmodified) should be empty
     assert len(engine.get_outdated_files()) == 0
@@ -207,9 +191,7 @@ def test_cache_file_addition(tmp_path):
     file_a = content_dir / "index.adoc"
     file_a.write_text("= Welcome\n\nContent here\n", encoding="utf-8")
 
-    config = GolemConfig(
-        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
-    )
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     # Initial build
@@ -239,9 +221,7 @@ def test_get_outdated_files_with_commit_false_does_not_mutate_cache(tmp_path):
 
     content = tmp_path / "content"
     content.mkdir()
-    (content / "index.adoc").write_text(
-        "= Home\ninclude::sub.adoc[]\n", encoding="utf-8"
-    )
+    (content / "index.adoc").write_text("= Home\ninclude::sub.adoc[]\n", encoding="utf-8")
     (content / "sub.adoc").write_text("Subcontent\n", encoding="utf-8")
 
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
@@ -417,18 +397,10 @@ def test_engine_cache_lock_release_on_error(tmp_path):
 def test_navigation_auto_discovery_basic(tmp_path):
     content = tmp_path / "content"
     content.mkdir()
-    (content / "index.adoc").write_text(
-        "= Golem Docs\n\nWelcome page", encoding="utf-8"
-    )
-    (content / "01-getting-started.adoc").write_text(
-        "= Getting Started\n\nGetting started guide", encoding="utf-8"
-    )
-    (content / "02-architecture.adoc").write_text(
-        "Architecture content", encoding="utf-8"
-    )
-    (content / "03_advanced_features.adoc").write_text(
-        "Advanced features", encoding="utf-8"
-    )
+    (content / "index.adoc").write_text("= Golem Docs\n\nWelcome page", encoding="utf-8")
+    (content / "01-getting-started.adoc").write_text("= Getting Started\n\nGetting started guide", encoding="utf-8")
+    (content / "02-architecture.adoc").write_text("Architecture content", encoding="utf-8")
+    (content / "03_advanced_features.adoc").write_text("Advanced features", encoding="utf-8")
 
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
@@ -458,9 +430,7 @@ def test_navigation_auto_discovery_nested_hierarchy(tmp_path):
 
     guides_dir = content / "02-guides"
     guides_dir.mkdir()
-    (guides_dir / "index.adoc").write_text(
-        "= Guides Overview\n\nGuides index", encoding="utf-8"
-    )
+    (guides_dir / "index.adoc").write_text("= Guides Overview\n\nGuides index", encoding="utf-8")
     (guides_dir / "01-config.adoc").write_text("Configuration", encoding="utf-8")
     (guides_dir / "02-deploy.adoc").write_text("Deployment", encoding="utf-8")
 
@@ -516,9 +486,7 @@ def test_navigation_html_generation_and_relative_urls(tmp_path):
 
     guides = content / "guides"
     guides.mkdir()
-    (guides / "intro.adoc").write_text(
-        "= Guides Intro\n\nGuide intro", encoding="utf-8"
-    )
+    (guides / "intro.adoc").write_text("= Guides Intro\n\nGuide intro", encoding="utf-8")
 
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
@@ -530,14 +498,9 @@ def test_navigation_html_generation_and_relative_urls(tmp_path):
     assert 'href="index.html"' in root_html
     assert 'href="guides/intro.html"' in root_html
 
-    nested_html = (tmp_path / "dist" / "guides" / "intro.html").read_text(
-        encoding="utf-8"
-    )
+    nested_html = (tmp_path / "dist" / "guides" / "intro.html").read_text(encoding="utf-8")
     assert 'href="../index.html"' in nested_html
-    assert (
-        'href="../guides/intro.html"' in nested_html
-        or 'href="intro.html"' in nested_html
-    )
+    assert 'href="../guides/intro.html"' in nested_html or 'href="intro.html"' in nested_html
 
 
 def test_engine_error_interception_permissive_mode(tmp_path, monkeypatch):
@@ -635,10 +598,7 @@ def test_engine_passes_template_search_paths_to_render_body(tmp_path, monkeypatc
     assert captured_search_paths[0] is not None
     # Check that custom_tpl is in the search paths
     search_path_strs = [str(p) for p in captured_search_paths[0]]
-    assert (
-        str(custom_tpl.resolve()) in search_path_strs
-        or str(custom_tpl) in search_path_strs
-    )
+    assert str(custom_tpl.resolve()) in search_path_strs or str(custom_tpl) in search_path_strs
 
 
 def test_partials_exclusion_and_dependency_propagation(tmp_path):
@@ -662,9 +622,7 @@ def test_partials_exclusion_and_dependency_propagation(tmp_path):
     file_regular = content_dir / "regular.adoc"
     file_regular.write_text("= Regular\nRegular page\n", encoding="utf-8")
 
-    config = GolemConfig(
-        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
-    )
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     # Initial site build
@@ -679,12 +637,8 @@ def test_partials_exclusion_and_dependency_propagation(tmp_path):
     assert not (tmp_path / "dist" / "_snippets" / "note.html").exists()
 
     # Partials MUST be tracked in cache dependencies and files
-    assert str(file_partial.resolve()) in engine.cache_data["dependencies"].get(
-        str(file_main.resolve()), []
-    )
-    assert str(file_snippet.resolve()) in engine.cache_data["dependencies"].get(
-        str(file_main.resolve()), []
-    )
+    assert str(file_partial.resolve()) in engine.cache_data["dependencies"].get(str(file_main.resolve()), [])
+    assert str(file_snippet.resolve()) in engine.cache_data["dependencies"].get(str(file_main.resolve()), [])
     assert str(file_partial.resolve()) in engine.cache_data["files"]
     assert str(file_snippet.resolve()) in engine.cache_data["files"]
 
@@ -724,9 +678,7 @@ def test_partials_excluded_from_navigation(tmp_path):
     (guides_dir / "_internal.adoc").write_text("= Internal\n", encoding="utf-8")
     (guides_dir / "tutorial.adoc").write_text("= Tutorial\n", encoding="utf-8")
 
-    config = GolemConfig(
-        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
-    )
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     nav = engine.discover_navigation()
@@ -769,17 +721,13 @@ def test_sync_static_assets_user_and_theme(tmp_path, monkeypatch):
     # Create user static dir
     user_static = tmp_path / "static"
     (user_static / "css").mkdir(parents=True)
-    (user_static / "css" / "style.css").write_text(
-        "body { color: red; }", encoding="utf-8"
-    )
+    (user_static / "css" / "style.css").write_text("body { color: red; }", encoding="utf-8")
     (user_static / "app.js").write_text("console.log('app');", encoding="utf-8")
 
     # Create theme static dir
     theme_static = tmp_path / "themes" / "custom" / "static"
     (theme_static / "css").mkdir(parents=True)
-    (theme_static / "css" / "style.css").write_text(
-        "body { color: blue; }", encoding="utf-8"
-    )
+    (theme_static / "css" / "style.css").write_text("body { color: blue; }", encoding="utf-8")
     (theme_static / "theme.css").write_text("/* theme */", encoding="utf-8")
 
     output_dir = tmp_path / "dist"
@@ -801,9 +749,7 @@ def test_sync_static_assets_user_and_theme(tmp_path, monkeypatch):
     assert (dist_static / "app.js").exists()
     assert (dist_static / "app.js").read_text(encoding="utf-8") == "console.log('app');"
     # User static asset overrides theme static asset
-    assert (dist_static / "css" / "style.css").read_text(
-        encoding="utf-8"
-    ) == "body { color: red; }"
+    assert (dist_static / "css" / "style.css").read_text(encoding="utf-8") == "body { color: red; }"
 
     # Test that build_site() automatically triggers sync_static_assets()
     import shutil
@@ -823,18 +769,14 @@ def test_metadata_caching_and_recovery(tmp_path):
     content_dir.mkdir()
 
     doc1 = content_dir / "doc1.adoc"
-    doc1.write_text(
-        "= Custom Title\n:nav_title: Short Nav\n:toc:\n\nContent\n", encoding="utf-8"
-    )
+    doc1.write_text("= Custom Title\n:nav_title: Short Nav\n:toc:\n\nContent\n", encoding="utf-8")
 
     doc2 = content_dir / "doc2.adoc"
     doc2.write_text("= Other Doc\n:!toc:\n\nOther content\n", encoding="utf-8")
 
     cache_file = tmp_path / "cache.json"
 
-    config = GolemConfig(
-        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
-    )
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=cache_file)
 
     # Calling discover_navigation populates cache_data["metadata"]
@@ -872,12 +814,8 @@ def test_metadata_caching_and_recovery(tmp_path):
         nav2 = engine2.discover_navigation()
         assert len(nav2) == 2
         # Neither doc1.adoc nor doc2.adoc should have been opened for reading
-        assert not any(
-            str(doc1.resolve()) in call or "doc1.adoc" in call for call in open_calls
-        )
-        assert not any(
-            str(doc2.resolve()) in call or "doc2.adoc" in call for call in open_calls
-        )
+        assert not any(str(doc1.resolve()) in call or "doc1.adoc" in call for call in open_calls)
+        assert not any(str(doc2.resolve()) in call or "doc2.adoc" in call for call in open_calls)
 
     # When a file is modified, discover_navigation refreshes the cached metadata
     doc1.write_text("= Updated Title\n:nav_title: Updated Nav\n", encoding="utf-8")
@@ -942,9 +880,7 @@ def test_navigation_empty_and_non_adoc_directory_pruning(tmp_path):
     mixed_empty.mkdir()
     (mixed_empty / "data.json").write_text("{}", encoding="utf-8")
 
-    config = GolemConfig(
-        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
-    )
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     nav = engine.discover_navigation()

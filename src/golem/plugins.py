@@ -47,9 +47,7 @@ class GolemSpecs:
         pass
 
 
-def get_plugin_manager(
-    config: GolemConfig | None = None, plugins_dir: Path | None = None
-) -> pluggy.PluginManager:
+def get_plugin_manager(config: GolemConfig | None = None, plugins_dir: Path | None = None) -> pluggy.PluginManager:
     pm = pluggy.PluginManager(HOOK_NAMESPACE)
     pm.hookimpl = hookimpl  # type: ignore[attr-defined]
     pm.add_hookspecs(GolemSpecs)
@@ -65,11 +63,7 @@ def get_plugin_manager(
         if default_dir.exists() and default_dir.is_dir():
             target_plugins_dir = default_dir
 
-    if (
-        target_plugins_dir
-        and target_plugins_dir.exists()
-        and target_plugins_dir.is_dir()
-    ):
+    if target_plugins_dir and target_plugins_dir.exists() and target_plugins_dir.is_dir():
         resolved_path = str(target_plugins_dir.resolve())
         if resolved_path not in sys.path:
             sys.path.insert(0, resolved_path)
@@ -89,11 +83,7 @@ def get_plugin_manager(
                 logging.warning("Failed to load plugin %s: %s", mod_name, e)
 
     # 3. Local plugins folder discovery
-    if (
-        target_plugins_dir
-        and target_plugins_dir.exists()
-        and target_plugins_dir.is_dir()
-    ):
+    if target_plugins_dir and target_plugins_dir.exists() and target_plugins_dir.is_dir():
         for file in target_plugins_dir.glob("*.py"):
             if file.name == "__init__.py":
                 continue

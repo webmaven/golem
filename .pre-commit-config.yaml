@@ -8,9 +8,9 @@ repos:
         types: [python]
         require_serial: true
 
-      - id: black
-        name: black
-        entry: .venv/bin/black --check
+      - id: ruff-format
+        name: ruff-format
+        entry: .venv/bin/ruff format --check
         language: system
         types: [python]
         require_serial: true

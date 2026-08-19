@@ -159,9 +159,7 @@ class PageCompiler:
         """
         self.config = config
         self._pkg_default_template = self._load_builtin_template()
-        self.default_template = self._pkg_default_template or PageTemplate(
-            DEFAULT_TEMPLATE
-        )
+        self.default_template = self._pkg_default_template or PageTemplate(DEFAULT_TEMPLATE)
 
     def _load_builtin_template(self) -> PageTemplate | None:
         """Load default package skeleton template from src/golem/templates/default/skeleton.pt."""
@@ -221,11 +219,7 @@ class PageCompiler:
                 template = self.default_template
         else:
             # Check for user's scaffolded custom templates directory first
-            user_pt = (
-                Path(self.config.templates_dir) / "page.pt"
-                if hasattr(self.config, "templates_dir")
-                else None
-            )
+            user_pt = Path(self.config.templates_dir) / "page.pt" if hasattr(self.config, "templates_dir") else None
             if user_pt and user_pt.exists():
                 try:
                     with open(user_pt, "r", encoding="utf-8") as f:

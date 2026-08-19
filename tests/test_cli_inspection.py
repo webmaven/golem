@@ -116,16 +116,12 @@ plugins = ["golem.plugins.doctest", "golem.plugins.apidoc", "my_custom_macro"]
         json_result = runner.invoke(main, ["plugins", "--json"])
         assert json_result.exit_code == 0
         json_data = json.loads(json_result.output)
-        macro_entry = next(
-            (p for p in json_data if p["name"] == "my_custom_macro"), None
-        )
+        macro_entry = next((p for p in json_data if p["name"] == "my_custom_macro"), None)
         assert macro_entry is not None
         assert macro_entry["enabled"] is True
         assert macro_entry["source"] == "local"
 
-        disabled_entry = next(
-            (p for p in json_data if p["name"] == "disabled_macro"), None
-        )
+        disabled_entry = next((p for p in json_data if p["name"] == "disabled_macro"), None)
         assert disabled_entry is not None
         assert disabled_entry["enabled"] is False
         assert disabled_entry["source"] == "local"
@@ -195,9 +191,7 @@ plugins = ["golem.plugins.doctest", "extra_helper"]
     assert "(local: plugins/extra_helper.py)" in result.output
 
     # Using --directory
-    result2 = runner.invoke(
-        main, ["plugins", "--directory", str(project_dir), "--json"]
-    )
+    result2 = runner.invoke(main, ["plugins", "--directory", str(project_dir), "--json"])
     assert result2.exit_code == 0
     data = json.loads(result2.output)
     entry = next((p for p in data if p["name"] == "extra_helper"), None)
@@ -224,9 +218,7 @@ def test_cli_themes_json_default(tmp_path):
         assert data["active"] == "default"
         assert data["active_source"] == "(built-in)"
         assert isinstance(data["themes"], list)
-        default_theme = next(
-            (t for t in data["themes"] if t["name"] == "default"), None
-        )
+        default_theme = next((t for t in data["themes"] if t["name"] == "default"), None)
         assert default_theme is not None
         assert default_theme["source"] == "built-in"
         assert default_theme["active"] is True
@@ -267,9 +259,7 @@ theme = "nord"
         assert nord_theme["active"] is True
         assert nord_theme["source"] == "local"
 
-        dracula_theme = next(
-            (t for t in data["themes"] if t["name"] == "dracula"), None
-        )
+        dracula_theme = next((t for t in data["themes"] if t["name"] == "dracula"), None)
         assert dracula_theme is not None
         assert dracula_theme["active"] is False
         assert dracula_theme["source"] == "local"
@@ -312,10 +302,7 @@ theme = "ocean"
         )
         result2 = runner.invoke(main, ["themes"])
         assert result2.exit_code == 0
-        assert (
-            "Active Theme: 'ocean' (entry_point: golem-theme-ocean 0.3.0)"
-            in result2.output
-        )
+        assert "Active Theme: 'ocean' (entry_point: golem-theme-ocean 0.3.0)" in result2.output
 
         json_result = runner.invoke(main, ["themes", "--json"])
         assert json_result.exit_code == 0

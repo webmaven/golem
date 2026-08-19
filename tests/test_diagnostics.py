@@ -101,23 +101,17 @@ def test_format_diagnostic_from_exception():
     assert "Unexpected token" in formatted
 
 
-def test_cli_build_permissive_mode_emits_diagnostics_and_continues(
-    tmp_path, monkeypatch
-):
+def test_cli_build_permissive_mode_emits_diagnostics_and_continues(tmp_path, monkeypatch):
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):
         runner.invoke(main, ["init"])
 
         # Valid page
         content_dir = Path("content")
-        (content_dir / "valid.adoc").write_text(
-            "= Valid Page\n\nAll good here.", encoding="utf-8"
-        )
+        (content_dir / "valid.adoc").write_text("= Valid Page\n\nAll good here.", encoding="utf-8")
 
         # Broken page
-        (content_dir / "broken.adoc").write_text(
-            "= Broken Page\n\n[broken_syntax", encoding="utf-8"
-        )
+        (content_dir / "broken.adoc").write_text("= Broken Page\n\n[broken_syntax", encoding="utf-8")
 
         orig_parse = asciidoctrine.parse_to_ast
 
@@ -149,9 +143,7 @@ def test_cli_build_strict_flag_fails_on_error(tmp_path, monkeypatch):
         runner.invoke(main, ["init"])
 
         content_dir = Path("content")
-        (content_dir / "broken.adoc").write_text(
-            "= Broken Page\n\n[broken_syntax", encoding="utf-8"
-        )
+        (content_dir / "broken.adoc").write_text("= Broken Page\n\n[broken_syntax", encoding="utf-8")
 
         orig_parse = asciidoctrine.parse_to_ast
 
@@ -192,9 +184,7 @@ strict = true
         )
 
         content_dir = Path("content")
-        (content_dir / "broken.adoc").write_text(
-            "= Broken Page\n\n[broken_syntax", encoding="utf-8"
-        )
+        (content_dir / "broken.adoc").write_text("= Broken Page\n\n[broken_syntax", encoding="utf-8")
 
         def mock_parse(text, base_dir=None):
             if "[broken_syntax" in text:
@@ -240,9 +230,7 @@ def test_cli_directory_flag_build(tmp_path):
         assert (proj_dir / "dist" / "index.html").exists()
 
         # Build using --directory
-        res_build_dir = runner.invoke(
-            main, ["build", "--directory", "my_project", "--clean"]
-        )
+        res_build_dir = runner.invoke(main, ["build", "--directory", "my_project", "--clean"])
         assert res_build_dir.exit_code == 0
         assert (proj_dir / "dist" / "index.html").exists()
 
@@ -283,9 +271,7 @@ def test_cli_serve_strict_fails_on_compilation_error(tmp_path, monkeypatch):
     with runner.isolated_filesystem(temp_dir=tmp_path):
         runner.invoke(main, ["init"])
         content_dir = Path("content")
-        (content_dir / "broken.adoc").write_text(
-            "= Broken\n\n[broken", encoding="utf-8"
-        )
+        (content_dir / "broken.adoc").write_text("= Broken\n\n[broken", encoding="utf-8")
 
         def mock_parse(text, base_dir=None):
             if "[broken" in text:
@@ -304,9 +290,7 @@ def test_cli_serve_permissive_emits_diagnostics_and_runs(tmp_path, monkeypatch):
     with runner.isolated_filesystem(temp_dir=tmp_path):
         runner.invoke(main, ["init"])
         content_dir = Path("content")
-        (content_dir / "broken.adoc").write_text(
-            "= Broken\n\n[broken", encoding="utf-8"
-        )
+        (content_dir / "broken.adoc").write_text("= Broken\n\n[broken", encoding="utf-8")
 
         def mock_parse(text, base_dir=None):
             if "[broken" in text:

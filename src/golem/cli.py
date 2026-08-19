@@ -45,9 +45,7 @@ def change_working_dir(directory: Path | str | None) -> Iterator[None]:
         os.chdir(old_cwd)
 
 
-def format_diagnostic(
-    error: dict[str, Any] | Exception, content_dir: Path | str | None = None
-) -> str:
+def format_diagnostic(error: dict[str, Any] | Exception, content_dir: Path | str | None = None) -> str:
     """
     = format_diagnostic
 
@@ -68,18 +66,12 @@ def format_diagnostic(
         message = str(exc)
         file_path_raw = getattr(exc, "filename", getattr(exc, "file", None))
         line = getattr(exc, "lineno", getattr(exc, "line", None))
-        column = getattr(
-            exc, "offset", getattr(exc, "column", getattr(exc, "col_offset", None))
-        )
+        column = getattr(exc, "offset", getattr(exc, "column", getattr(exc, "col_offset", None)))
     else:
         exc = error.get("exception")
         message = str(error.get("message", ""))
-        file_path_raw = error.get("file") or (
-            getattr(exc, "filename", getattr(exc, "file", None)) if exc else None
-        )
-        line = error.get("line") or (
-            getattr(exc, "lineno", getattr(exc, "line", None)) if exc else None
-        )
+        file_path_raw = error.get("file") or (getattr(exc, "filename", getattr(exc, "file", None)) if exc else None)
+        line = error.get("line") or (getattr(exc, "lineno", getattr(exc, "line", None)) if exc else None)
         column = (
             error.get("column")
             or error.get("col")
@@ -98,9 +90,7 @@ def format_diagnostic(
     if (line is None or column is None) and message:
         import re
 
-        m_coord = re.search(
-            r"(?:line\s*|:)(\d+)(?:,\s*col(?:umn)?\s*|:)(\d+)", message, re.IGNORECASE
-        )
+        m_coord = re.search(r"(?:line\s*|:)(\d+)(?:,\s*col(?:umn)?\s*|:)(\d+)", message, re.IGNORECASE)
         if m_coord:
             if line is None:
                 line = int(m_coord.group(1))
@@ -287,9 +277,7 @@ def init(template, output_dir, directory=None):
         click.echo(f"Initializing golem project using template '{template}'...")
 
         pyproject_toml = Path("pyproject.toml")
-        is_site_layout = (
-            template in ("site", "book", "simple") or not pyproject_toml.exists()
-        )
+        is_site_layout = template in ("site", "book", "simple") or not pyproject_toml.exists()
 
         if pyproject_toml.exists():
             click.echo("Found pyproject.toml! Configuring Golem under [tool.golem]...")
@@ -440,10 +428,7 @@ body {
                 pass
 
         scaffold_docs = True
-        if any(
-            f.name not in ("static", "templates", ".DS_Store")
-            for f in content_dir.iterdir()
-        ):
+        if any(f.name not in ("static", "templates", ".DS_Store") for f in content_dir.iterdir()):
             try:
                 scaffold_docs = click.confirm(
                     f"The directory '{content_dir}' is not empty. Scaffold default documentation files?",
@@ -511,9 +496,7 @@ def new(doc_type, name, directory=None):
         # Convert to lowercase kebab-case slug for the filename
         slug = re.sub(r"[^a-zA-Z0-9]+", "-", name).lower().strip("-")
         if not slug:
-            raise click.ClickException(
-                f"Invalid document name: '{name}' resulting in an empty slug."
-            )
+            raise click.ClickException(f"Invalid document name: '{name}' resulting in an empty slug.")
 
         content_dir = Path(config.content_dir)
         target_file = content_dir / f"{slug}.adoc"
@@ -650,9 +633,7 @@ def build(config, clean, strict, verbose, directory=None):
     type=click.Path(file_okay=False, dir_okay=True),
     help="Change working directory before executing",
 )
-@click.option(
-    "--test-only", is_flag=True, hidden=True, help="Exit immediately for testing"
-)
+@click.option("--test-only", is_flag=True, hidden=True, help="Exit immediately for testing")
 def serve(port, host, strict, directory=None, test_only=False):
     """
     = serve
@@ -792,17 +773,11 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
             if dist:
                 dist_name = getattr(dist, "name", ep_name)
                 dist_version = getattr(dist, "version", "")
-                dist_desc = (
-                    f"{dist_name} {dist_version}".strip()
-                    if dist_version
-                    else f"{dist_name}"
-                )
+                dist_desc = f"{dist_name} {dist_version}".strip() if dist_version else f"{dist_name}"
             else:
                 dist_desc = ep_name
             ep_value = getattr(ep, "value", "")
-            is_enabled = ep_name in configured_plugins or (
-                bool(ep_value) and ep_value in configured_plugins
-            )
+            is_enabled = ep_name in configured_plugins or (bool(ep_value) and ep_value in configured_plugins)
             plugins_list.append(
                 {
                     "name": ep_name,
@@ -814,11 +789,7 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
             seen_names.add(ep_name)
 
         # 3. Local plugins in plugins_dir
-        plugins_dir_path = (
-            Path(config.plugins_dir)
-            if getattr(config, "plugins_dir", None)
-            else Path("plugins")
-        )
+        plugins_dir_path = Path(config.plugins_dir) if getattr(config, "plugins_dir", None) else Path("plugins")
         if plugins_dir_path.exists() and plugins_dir_path.is_dir():
             for py_file in sorted(plugins_dir_path.glob("*.py")):
                 if py_file.name == "__init__.py":
@@ -946,11 +917,7 @@ def themes(json_format: bool = False, directory: str | None = None) -> None:
                 if dist:
                     dist_name = getattr(dist, "name", ep_name)
                     dist_version = getattr(dist, "version", "")
-                    dist_desc = (
-                        f"{dist_name} {dist_version}".strip()
-                        if dist_version
-                        else f"{dist_name}"
-                    )
+                    dist_desc = f"{dist_name} {dist_version}".strip() if dist_version else f"{dist_name}"
                 else:
                     dist_desc = ep_name
                 themes_list.append(

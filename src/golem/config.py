@@ -83,9 +83,7 @@ def load_config(config_path: Path) -> GolemConfig:
         raise ValueError(f"Failed to parse configuration file '{config_path}': {e}")
 
     # Check if this is a pyproject.toml file
-    if config_path.name == "pyproject.toml" or (
-        "tool" in data and "golem" in data.get("tool", {})
-    ):
+    if config_path.name == "pyproject.toml" or ("tool" in data and "golem" in data.get("tool", {})):
         golem_data = data.get("tool", {}).get("golem", {})
         site_data = golem_data.get("site", {})
         build_data = golem_data.get("build", {})
@@ -98,59 +96,26 @@ def load_config(config_path: Path) -> GolemConfig:
             or golem_data.get("site_title")
             or "Golem Docs"
         )
-        site_author = (
-            site_data.get("author")
-            or golem_data.get("author")
-            or golem_data.get("site_author")
-            or "Anonymous"
-        )
+        site_author = site_data.get("author") or golem_data.get("author") or golem_data.get("site_author") or "Anonymous"
         site_url = (
-            site_data.get("url")
-            or golem_data.get("url")
-            or golem_data.get("site_url")
-            or site_data.get("site_url")
-            or None
+            site_data.get("url") or golem_data.get("url") or golem_data.get("site_url") or site_data.get("site_url") or None
         )
-        strict = bool(
-            build_data.get("strict")
-            if "strict" in build_data
-            else golem_data.get("strict", False)
-        )
-        content_dir = (
-            build_data.get("content_dir") or golem_data.get("content_dir") or "content"
-        )
-        output_dir = (
-            build_data.get("output_dir") or golem_data.get("output_dir") or "dist"
-        )
+        strict = bool(build_data.get("strict") if "strict" in build_data else golem_data.get("strict", False))
+        content_dir = build_data.get("content_dir") or golem_data.get("content_dir") or "content"
+        output_dir = build_data.get("output_dir") or golem_data.get("output_dir") or "dist"
         theme = build_data.get("theme") or golem_data.get("theme") or "default"
 
-        templates_dir = (
-            build_data.get("templates_dir")
-            or golem_data.get("templates_dir")
-            or "templates"
-        )
-        static_dir = (
-            build_data.get("static_dir") or golem_data.get("static_dir") or "static"
-        )
-        plugins_dir = (
-            build_data.get("plugins_dir") or golem_data.get("plugins_dir") or "plugins"
-        )
+        templates_dir = build_data.get("templates_dir") or golem_data.get("templates_dir") or "templates"
+        static_dir = build_data.get("static_dir") or golem_data.get("static_dir") or "static"
+        plugins_dir = build_data.get("plugins_dir") or golem_data.get("plugins_dir") or "plugins"
         plugins_data = golem_data.get("plugins")
         if isinstance(plugins_data, dict):
-            raw_plugins = (
-                plugins_data.get("plugins")
-                if "plugins" in plugins_data
-                else plugins_data.get("enabled")
-            )
+            raw_plugins = plugins_data.get("plugins") if "plugins" in plugins_data else plugins_data.get("enabled")
         else:
             raw_plugins = plugins_data
         parsed_plugins = _parse_plugins(raw_plugins)
         plugins = parsed_plugins if parsed_plugins is not None else []
-        raw_nav = (
-            nav_data.get("nav")
-            if "nav" in nav_data
-            else (golem_data.get("navigation_nav") or golem_data.get("nav"))
-        )
+        raw_nav = nav_data.get("nav") if "nav" in nav_data else (golem_data.get("navigation_nav") or golem_data.get("nav"))
         navigation_nav = _parse_nav(raw_nav)
     else:
         site_data = data.get("site", {})
@@ -159,18 +124,8 @@ def load_config(config_path: Path) -> GolemConfig:
 
         site_title = site_data.get("title") or site_data.get("name") or "Golem Docs"
         site_author = site_data.get("author", "Anonymous")
-        site_url = (
-            site_data.get("url")
-            or data.get("site_url")
-            or site_data.get("site_url")
-            or data.get("url")
-            or None
-        )
-        strict = bool(
-            build_data.get("strict")
-            if "strict" in build_data
-            else data.get("strict", False)
-        )
+        site_url = site_data.get("url") or data.get("site_url") or site_data.get("site_url") or data.get("url") or None
+        strict = bool(build_data.get("strict") if "strict" in build_data else data.get("strict", False))
         content_dir = build_data.get("content_dir", "content")
         output_dir = build_data.get("output_dir", "dist")
         theme = build_data.get("theme", "default")
@@ -180,11 +135,7 @@ def load_config(config_path: Path) -> GolemConfig:
         plugins_dir = build_data.get("plugins_dir", "plugins")
         plugins_data = data.get("plugins")
         if isinstance(plugins_data, dict):
-            raw_plugins = (
-                plugins_data.get("plugins")
-                if "plugins" in plugins_data
-                else plugins_data.get("enabled")
-            )
+            raw_plugins = plugins_data.get("plugins") if "plugins" in plugins_data else plugins_data.get("enabled")
         else:
             raw_plugins = plugins_data
         parsed_plugins = _parse_plugins(raw_plugins)
@@ -192,11 +143,7 @@ def load_config(config_path: Path) -> GolemConfig:
         raw_nav = (
             nav_data.get("nav")
             if "nav" in nav_data
-            else (
-                data.get("navigation_nav")
-                if "navigation_nav" in data
-                else data.get("nav")
-            )
+            else (data.get("navigation_nav") if "navigation_nav" in data else data.get("nav"))
         )
         navigation_nav = _parse_nav(raw_nav)
 

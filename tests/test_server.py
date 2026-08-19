@@ -46,9 +46,7 @@ def test_dev_server_html_injection(tmp_path):
     dist_dir = tmp_path / "dist"
     dist_dir.mkdir()
     index_file = dist_dir / "index.html"
-    index_file.write_text(
-        "<html><head><title>Test</title></head><body>Hello</body></html>"
-    )
+    index_file.write_text("<html><head><title>Test</title></head><body>Hello</body></html>")
 
     port = get_free_port()
     server = LiveReloadServer(
@@ -113,9 +111,7 @@ def test_dev_server_sse_live_reload(tmp_path):
         def sse_client():
             try:
                 # stream=True keeps the chunked event stream open
-                with requests.get(
-                    f"http://127.0.0.1:{port}/golem-reload", stream=True, timeout=5
-                ) as r:
+                with requests.get(f"http://127.0.0.1:{port}/golem-reload", stream=True, timeout=5) as r:
                     line = r.raw.readline()
                     if line:
                         sse_events.append(line.decode("utf-8"))
@@ -143,9 +139,7 @@ def test_dev_server_error_overlay_injection(tmp_path):
     dist_dir = tmp_path / "dist"
     dist_dir.mkdir()
     index_file = dist_dir / "index.html"
-    index_file.write_text(
-        "<html><head><title>Test</title></head><body>Hello</body></html>"
-    )
+    index_file.write_text("<html><head><title>Test</title></head><body>Hello</body></html>")
 
     port = get_free_port()
     server = LiveReloadServer(

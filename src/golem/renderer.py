@@ -206,11 +206,7 @@ def generate_toc_html(asg_root: Union[Node, dict[str, Any]]) -> str:
     if not sections:
         return ""
 
-    base_level = (
-        sections[0].get("level", 1)
-        if isinstance(sections[0], dict)
-        else getattr(sections[0], "level", 1)
-    )
+    base_level = sections[0].get("level", 1) if isinstance(sections[0], dict) else getattr(sections[0], "level", 1)
     toc_parts: list[str] = ['<nav class="toc">\n<ul class="toc-list">\n']
     current_level = base_level
     first = True
@@ -235,31 +231,21 @@ def generate_toc_html(asg_root: Union[Node, dict[str, Any]]) -> str:
             level = base_level
 
         if first:
-            toc_parts.append(
-                f'  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>'
-            )
+            toc_parts.append(f'  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>')
             first = False
         else:
             if level > current_level:
                 while current_level < level:
-                    toc_parts.append(
-                        f'\n  <ul class="toc-level-{current_level + 1}">\n'
-                    )
+                    toc_parts.append(f'\n  <ul class="toc-level-{current_level + 1}">\n')
                     current_level += 1
-                toc_parts.append(
-                    f'  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>'
-                )
+                toc_parts.append(f'  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>')
             elif level < current_level:
                 while current_level > level:
                     toc_parts.append("</li>\n  </ul>\n")
                     current_level -= 1
-                toc_parts.append(
-                    f'</li>\n  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>'
-                )
+                toc_parts.append(f'</li>\n  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>')
             else:
-                toc_parts.append(
-                    f'</li>\n  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>'
-                )
+                toc_parts.append(f'</li>\n  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>')
 
     while current_level > base_level:
         toc_parts.append("</li>\n  </ul>\n")

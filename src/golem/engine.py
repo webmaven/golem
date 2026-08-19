@@ -40,17 +40,11 @@ def _extract_metadata_from_doc(path: Path) -> dict[str, Any]:
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 for line in f:
                     line_s = line.strip()
-                    if (
-                        line_s.startswith("= ")
-                        and not line_s.startswith("== ")
-                        and title is None
-                    ):
+                    if line_s.startswith("= ") and not line_s.startswith("== ") and title is None:
                         t = line_s[2:].strip()
                         if t:
                             title = t
-                    elif line_s.startswith(":nav_title:") or line_s.startswith(
-                        ":navtitle:"
-                    ):
+                    elif line_s.startswith(":nav_title:") or line_s.startswith(":navtitle:"):
                         val = line_s.split(":", 2)[2].strip()
                         if val:
                             nav_title = val
@@ -58,11 +52,7 @@ def _extract_metadata_from_doc(path: Path) -> dict[str, Any]:
                         val = line_s.split(":", 2)[2].strip()
                         if val:
                             title = val
-                    elif (
-                        line_s == ":toc:"
-                        or line_s.startswith(":toc:")
-                        or line_s.startswith(":toc: ")
-                    ):
+                    elif line_s == ":toc:" or line_s.startswith(":toc:") or line_s.startswith(":toc: "):
                         if line_s in (":!toc:", ":toc!:", ":toc: none", ":toc: false"):
                             has_toc = False
                         else:
@@ -93,10 +83,7 @@ def _dir_has_adoc_content(dir_path: Path) -> bool:
         return False
     try:
         for p in dir_path.rglob("*.adoc"):
-            if p.is_file() and not any(
-                part.startswith(".") or part.startswith("_")
-                for part in p.relative_to(dir_path).parts
-            ):
+            if p.is_file() and not any(part.startswith(".") or part.startswith("_") for part in p.relative_to(dir_path).parts):
                 return True
     except Exception:
         pass
@@ -132,12 +119,8 @@ class BuildEngine:
         """
         self.config = config
         self.content_dir = Path(config.content_dir).resolve()
-        self.config_path = (
-            Path(config.config_path) if config.config_path else Path("golem.toml")
-        )
-        self.cache_file = (
-            cache_file or Path(config.content_dir).parent / ".golem" / "cache.json"
-        )
+        self.config_path = Path(config.config_path) if config.config_path else Path("golem.toml")
+        self.cache_file = cache_file or Path(config.content_dir).parent / ".golem" / "cache.json"
         self._sha_cache: dict[str, tuple[float, int, str]] = {}
         self.cache_data = self._load_cache()
         self.compiler = PageCompiler(config)
@@ -189,14 +172,10 @@ class BuildEngine:
 
         with self._cache_lock():
             if hasattr(self, "_sha_cache") and self._sha_cache:
-                self.cache_data["mtimes"] = {
-                    k: list(v) for k, v in self._sha_cache.items()
-                }
+                self.cache_data["mtimes"] = {k: list(v) for k, v in self._sha_cache.items()}
             self.cache_file.parent.mkdir(parents=True, exist_ok=True)
             dir_path = self.cache_file.parent
-            with tempfile.NamedTemporaryFile(
-                "w", dir=dir_path, delete=False, encoding="utf-8"
-            ) as tf:
+            with tempfile.NamedTemporaryFile("w", dir=dir_path, delete=False, encoding="utf-8") as tf:
                 json.dump(self.cache_data, tf, indent=2)
                 temp_name = tf.name
 
@@ -261,11 +240,7 @@ class BuildEngine:
         cached_hash = self.cache_data.get("files", {}).get(p_abs)
         cached_meta = self.cache_data.get("metadata", {}).get(p_abs)
 
-        if (
-            cached_meta is not None
-            and cached_hash == current_hash
-            and current_hash != ""
-        ):
+        if cached_meta is not None and cached_hash == current_hash and current_hash != "":
             return cached_meta
 
         meta = _extract_metadata_from_doc(path)
@@ -385,9 +360,7 @@ class BuildEngine:
 
         # If a global layout or config changed, we must mark all existing non-partial .adoc documents as outdated!
         if global_changed:
-            logging.info(
-                "[BuildEngine] Global configuration or template change detected. Invalidating all pages..."
-            )
+            logging.info("[BuildEngine] Global configuration or template change detected. Invalidating all pages...")
             outdated.update(f for f in all_files if not self.is_partial(f))
             # Short-circuit and return full re-build
             if commit and (deleted_files or global_changed):
@@ -429,9 +402,7 @@ class BuildEngine:
 
         return outdated
 
-    def update_cache_for_file(
-        self, path: Path, included_files: list[str] | None = None
-    ):
+    def update_cache_for_file(self, path: Path, included_files: list[str] | None = None):
         """
         == update_cache_for_file
 
@@ -439,13 +410,9 @@ class BuildEngine:
         """
         p_abs = str(path.resolve())
         self.cache_data["files"][p_abs] = self._get_sha256(path)
-        self.cache_data.setdefault("metadata", {})[p_abs] = _extract_metadata_from_doc(
-            path
-        )
+        self.cache_data.setdefault("metadata", {})[p_abs] = _extract_metadata_from_doc(path)
         if included_files is not None:
-            unique_deps = list(
-                dict.fromkeys(str(Path(f).resolve()) for f in included_files)
-            )
+            unique_deps = list(dict.fromkeys(str(Path(f).resolve()) for f in included_files))
             self.cache_data["dependencies"][p_abs] = unique_deps
         else:
             deps = []
@@ -469,9 +436,7 @@ class BuildEngine:
                     if not f_path.exists():
                         return
                     try:
-                        with open(
-                            f_path, "r", encoding="utf-8", errors="replace"
-                        ) as f_in:
+                        with open(f_path, "r", encoding="utf-8", errors="replace") as f_in:
                             for line in f_in:
                                 m = include_regex.match(line.strip())
                                 if m:
@@ -508,10 +473,7 @@ class BuildEngine:
         and numeric prefix stripping.
         """
         # If navigation_nav is explicitly configured, use it as manual override order
-        if (
-            self.config.navigation_nav is not None
-            and len(self.config.navigation_nav) > 0
-        ):
+        if self.config.navigation_nav is not None and len(self.config.navigation_nav) > 0:
             nav_items: list[dict[str, Any]] = []
             for item in self.config.navigation_nav:
                 p = self.content_dir / item
@@ -525,9 +487,7 @@ class BuildEngine:
                         "nav_title": _title_from_filename(item),
                     }
                 )
-                title = meta.get("nav_title") or meta.get(
-                    "title", _title_from_filename(item)
-                )
+                title = meta.get("nav_title") or meta.get("title", _title_from_filename(item))
                 rel_url = Path(item).with_suffix(".html").as_posix()
                 nav_items.append(
                     {
@@ -552,11 +512,7 @@ class BuildEngine:
             except Exception:
                 return items
 
-            valid_entries = [
-                e
-                for e in entries
-                if not e.name.startswith(".") and not e.name.startswith("_")
-            ]
+            valid_entries = [e for e in entries if not e.name.startswith(".") and not e.name.startswith("_")]
 
             files = [e for e in valid_entries if e.is_file() and e.suffix == ".adoc"]
             dirs = [e for e in valid_entries if e.is_dir()]
@@ -572,11 +528,7 @@ class BuildEngine:
 
             if current_dir == self.content_dir and index_file is not None:
                 rel_p = index_file.relative_to(self.content_dir).as_posix()
-                rel_u = (
-                    index_file.relative_to(self.content_dir)
-                    .with_suffix(".html")
-                    .as_posix()
-                )
+                rel_u = index_file.relative_to(self.content_dir).with_suffix(".html").as_posix()
                 meta = self.get_file_metadata(index_file)
                 title = meta.get("nav_title") or meta.get("title", "")
                 items.append(
@@ -612,11 +564,7 @@ class BuildEngine:
                 sub_index: Path | None = None
                 try:
                     for sub_f in d.iterdir():
-                        if (
-                            sub_f.is_file()
-                            and sub_f.suffix == ".adoc"
-                            and sub_f.stem.lower() in ("index", "readme")
-                        ):
+                        if sub_f.is_file() and sub_f.suffix == ".adoc" and sub_f.stem.lower() in ("index", "readme"):
                             sub_index = sub_f
                             break
                 except Exception:
@@ -627,11 +575,7 @@ class BuildEngine:
                 if sub_index is not None:
                     meta = self.get_file_metadata(sub_index)
                     sec_title = meta.get("nav_title") or meta.get("title", "")
-                    sec_url = (
-                        sub_index.relative_to(self.content_dir)
-                        .with_suffix(".html")
-                        .as_posix()
-                    )
+                    sec_url = sub_index.relative_to(self.content_dir).with_suffix(".html").as_posix()
                     sec_path = sub_index.relative_to(self.content_dir).as_posix()
                 else:
                     sec_title = _title_from_filename(d.name)
@@ -667,9 +611,7 @@ class BuildEngine:
             if depth > 0:
                 prefix = "../" * depth
 
-        def render_list(
-            items: list[dict[str, Any]], is_nested: bool = False
-        ) -> list[str]:
+        def render_list(items: list[dict[str, Any]], is_nested: bool = False) -> list[str]:
             ul_class = "golem-nav-sublist" if is_nested else "golem-nav-list"
             out = [f'<ul class="{ul_class}">\n']
             for item in items:
@@ -681,13 +623,9 @@ class BuildEngine:
                 if children:
                     out.append('  <li class="golem-nav-section">\n')
                     if href:
-                        out.append(
-                            f'    <span class="golem-nav-section-title"><a href="{href}">{title}</a></span>\n'
-                        )
+                        out.append(f'    <span class="golem-nav-section-title"><a href="{href}">{title}</a></span>\n')
                     else:
-                        out.append(
-                            f'    <span class="golem-nav-section-title">{title}</span>\n'
-                        )
+                        out.append(f'    <span class="golem-nav-section-title">{title}</span>\n')
                     out.extend(render_list(children, is_nested=True))
                     out.append("  </li>\n")
                 else:
@@ -730,23 +668,14 @@ class BuildEngine:
         output_static_dir = Path(self.config.output_dir) / "static"
 
         # 1. Package default theme static assets (if any)
-        pkg_theme_static = (
-            Path(__file__).parent
-            / "templates"
-            / getattr(self.config, "theme", "default")
-            / "static"
-        )
+        pkg_theme_static = Path(__file__).parent / "templates" / getattr(self.config, "theme", "default") / "static"
         if pkg_theme_static.exists() and pkg_theme_static.is_dir():
             output_static_dir.mkdir(parents=True, exist_ok=True)
             shutil.copytree(pkg_theme_static, output_static_dir, dirs_exist_ok=True)
 
         # Also check package default static if theme != default
         pkg_default_static = Path(__file__).parent / "templates" / "default" / "static"
-        if (
-            pkg_default_static != pkg_theme_static
-            and pkg_default_static.exists()
-            and pkg_default_static.is_dir()
-        ):
+        if pkg_default_static != pkg_theme_static and pkg_default_static.exists() and pkg_default_static.is_dir():
             output_static_dir.mkdir(parents=True, exist_ok=True)
             shutil.copytree(pkg_default_static, output_static_dir, dirs_exist_ok=True)
 
@@ -784,15 +713,9 @@ class BuildEngine:
         outdated = self.get_outdated_files()
 
         all_docs = (
-            [f for f in self.content_dir.glob("**/*.adoc") if not self.is_partial(f)]
-            if self.content_dir.exists()
-            else []
+            [f for f in self.content_dir.glob("**/*.adoc") if not self.is_partial(f)] if self.content_dir.exists() else []
         )
-        to_build = (
-            {f for f in outdated if not self.is_partial(f)}
-            if (outdated or self.cache_data["files"])
-            else set(all_docs)
-        )
+        to_build = {f for f in outdated if not self.is_partial(f)} if (outdated or self.cache_data["files"]) else set(all_docs)
 
         output_dir = Path(self.config.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -886,19 +809,11 @@ class BuildEngine:
                 try:
                     rel_doc = doc_path.relative_to(Path.cwd())
                 except ValueError:
-                    rel_doc = (
-                        doc_path.relative_to(self.content_dir)
-                        if self.content_dir in doc_path.parents
-                        else doc_path
-                    )
+                    rel_doc = doc_path.relative_to(self.content_dir) if self.content_dir in doc_path.parents else doc_path
                 try:
                     rel_out = out_path.relative_to(Path.cwd())
                 except ValueError:
-                    rel_out = (
-                        out_path.relative_to(output_dir)
-                        if output_dir in out_path.parents
-                        else out_path
-                    )
+                    rel_out = out_path.relative_to(output_dir) if output_dir in out_path.parents else out_path
                 import click
 
                 click.echo(f"  [COMPILE] {rel_doc} -> {rel_out}")
