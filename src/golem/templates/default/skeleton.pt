@@ -7,60 +7,139 @@
     <meta name="generator" content="${generator_version}" />
     <meta tal:condition="site_author" name="author" content="${site_author}" />
     <link rel="canonical" tal:condition="site_url" href="${site_url}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:ital,wght@0,300..900;1,300..900&family=Source+Sans+3:ital,wght@0,200..900;1,200..900&family=Source+Serif+4:ital,opsz,wght@0,8..60,300..900;1,8..60,300..900&display=swap" rel="stylesheet">
     <tal:block tal:repeat="css_file custom_css">
         <link rel="stylesheet" href="${css_file}" />
     </tal:block>
     <style>
         :root {
-            --golem-bg: #0f0f11;
-            --golem-fg: #e2e8f0;
-            --golem-surface: #151518;
-            --golem-border: #222228;
-            --golem-primary: #818cf8;
-            --golem-accent: #a5b4fc;
+            /* Light Mode Default (Fired Clay / Workbench) */
+            --golem-bg: #f7f4ef;
+            --golem-surface: #f2ede8;
+            --golem-code-bg: #ece7de;
+            --golem-text: #1e1a16;
+            --golem-text-muted: #6b5d52;
+            --golem-primary: #8b3a12;
+            --golem-primary-hover: #6b2a08;
+            --golem-border: #cec8bf;
+            --golem-link: #8b3a12;
+            --golem-link-visited: #3e2518;
+            --golem-link-hover: #6b2a08;
+
+            /* Admonitions */
+            --golem-note: #2d6a5a;
+            --golem-tip: #6e7818;
+            --golem-important: #8b3a12;
+            --golem-warning: #b58a00;
+            --golem-caution: #a31818;
+
+            /* Typography */
+            --golem-font-display: 'Source Serif 4', Georgia, serif;
+            --golem-font-body: 'Source Serif 4', Georgia, serif;
+            --golem-font-ui: 'Source Sans 3', system-ui, -apple-system, sans-serif;
+            --golem-font-mono: 'Source Code Pro', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+            /* Sub-perceptible paper grain texture */
+            --golem-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
         }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --golem-bg: #170f0b;
+                --golem-surface: #1e1410;
+                --golem-code-bg: #2a1e17;
+                --golem-text: #f0e4d8;
+                --golem-text-muted: #9a7a68;
+                --golem-primary: #d4692a;
+                --golem-primary-hover: #e07a3a;
+                --golem-border: #3d2a20;
+                --golem-link: #d4692a;
+                --golem-link-visited: #8a4c32;
+                --golem-link-hover: #e07a3a;
+
+                --golem-note: #4a9a8a;
+                --golem-tip: #7aaa3a;
+                --golem-important: #d4692a;
+                --golem-warning: #d4a020;
+                --golem-caution: #c04040;
+
+                --golem-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+            }
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
         body {
             background-color: var(--golem-bg);
-            color: var(--golem-fg);
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-image: var(--golem-texture);
+            color: var(--golem-text);
+            font-family: var(--golem-font-body);
+            font-optical-sizing: auto;
+            font-variation-settings: "opsz" 12;
             margin: 0;
             display: flex;
             flex-direction: column;
             min-height: 100vh;
+            line-height: 1.75;
         }
+
+        /* ── Header ────────────────────────────────────────── */
         #golem-header {
             background: var(--golem-surface);
-            padding: 1rem 1.5rem;
+            padding: 1rem 1.75rem;
             border-bottom: 1px solid var(--golem-border);
             display: flex;
             align-items: center;
             justify-content: space-between;
+            font-family: var(--golem-font-ui);
         }
         #golem-header h1 {
             margin: 0;
-            font-size: 1.25rem;
-            color: var(--golem-primary);
+            font-size: 1.35rem;
+            font-weight: 700;
+            font-family: var(--golem-font-display);
+            font-variation-settings: "opsz" 36;
+            letter-spacing: -0.01em;
         }
         #golem-header a {
-            color: inherit;
+            color: var(--golem-text);
             text-decoration: none;
         }
+        #golem-header a:hover {
+            color: var(--golem-primary);
+        }
+        .golem-author {
+            color: var(--golem-text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* ── Layout Grid / Columns ─────────────────────────── */
         #golem-wrapper {
             display: flex;
             flex: 1;
         }
+
+        /* ── Left Sidebar (Navigation) ─────────────────────── */
         #golem-sidebar-left {
-            width: 260px;
+            width: 270px;
             background: var(--golem-surface);
-            padding: 1.5rem 1rem;
+            padding: 1.5rem 1.25rem;
             border-right: 1px solid var(--golem-border);
+            font-family: var(--golem-font-ui);
+            flex-shrink: 0;
         }
         #golem-sidebar-left h3 {
             margin-top: 0;
-            color: #94a3b8;
-            font-size: 0.75rem;
+            margin-bottom: 0.75rem;
+            color: var(--golem-text-muted);
+            font-size: 0.7rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.08em;
         }
         #golem-sidebar-left ul {
             list-style: none;
@@ -68,48 +147,209 @@
             margin: 0;
         }
         #golem-sidebar-left li {
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.4rem;
         }
         #golem-sidebar-left a {
-            color: var(--golem-fg);
+            color: var(--golem-text);
             text-decoration: none;
-            font-size: 0.95rem;
-            transition: color 0.2s ease, padding-left 0.2s ease;
+            font-size: 0.9rem;
+            display: block;
+            padding: 0.2rem 0;
+            transition: color 0.15s ease, padding-left 0.15s ease;
         }
         #golem-sidebar-left a:hover {
-            color: var(--golem-accent);
+            color: var(--golem-primary);
             padding-left: 4px;
         }
+
+        /* ── Main Content Area ─────────────────────────────── */
         #golem-content {
             flex: 1;
-            padding: 2.5rem;
+            padding: 2.5rem 3.5rem;
             max-width: 860px;
-            line-height: 1.7;
         }
+        #golem-content h1 {
+            font-family: var(--golem-font-display);
+            font-size: 2.1rem;
+            font-weight: 700;
+            font-variation-settings: "opsz" 36;
+            line-height: 1.2;
+            margin-top: 0;
+            margin-bottom: 1.25rem;
+            color: var(--golem-text);
+            letter-spacing: -0.01em;
+        }
+        #golem-content h2 {
+            font-family: var(--golem-font-display);
+            font-size: 1.55rem;
+            font-weight: 600;
+            font-variation-settings: "opsz" 24;
+            line-height: 1.3;
+            margin-top: 2rem;
+            margin-bottom: 0.85rem;
+            color: var(--golem-text);
+            border-bottom: 1px solid var(--golem-border);
+            padding-bottom: 0.35rem;
+        }
+        #golem-content h3 {
+            font-family: var(--golem-font-display);
+            font-size: 1.25rem;
+            font-weight: 600;
+            font-variation-settings: "opsz" 18;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--golem-text);
+        }
+        #golem-content p {
+            margin-top: 0;
+            margin-bottom: 1.25rem;
+        }
+        #golem-content a {
+            color: var(--golem-link);
+            text-decoration-color: color-mix(in srgb, var(--golem-link) 45%, transparent);
+            text-underline-offset: 3px;
+            text-decoration-thickness: 1px;
+            transition: color 0.15s ease;
+        }
+        #golem-content a:hover {
+            color: var(--golem-link-hover);
+            text-decoration-color: var(--golem-link-hover);
+        }
+        #golem-content a:visited {
+            color: var(--golem-link-visited);
+        }
+
+        /* ── Code & Listings ───────────────────────────────── */
+        code, kbd, samp {
+            font-family: var(--golem-font-mono);
+            font-size: 0.875em;
+        }
+        p code, li code, td code {
+            background: var(--golem-code-bg);
+            padding: 0.1em 0.35em;
+            border-radius: 3px;
+            border: 1px solid var(--golem-border);
+        }
+        pre, .listingblock pre {
+            background: var(--golem-code-bg);
+            border: 1px solid var(--golem-border);
+            border-radius: 4px;
+            padding: 1rem 1.25rem;
+            overflow-x: auto;
+            line-height: 1.55;
+            margin: 1.25rem 0;
+        }
+        pre code {
+            background: transparent;
+            padding: 0;
+            border: none;
+            font-size: 0.875rem;
+        }
+
+        /* ── Admonitions ───────────────────────────────────── */
+        .admonitionblock, aside.golem-admonition, .admonition {
+            margin: 1.5rem 0;
+            padding: 0.85rem 1.15rem;
+            background: var(--golem-surface);
+            border-left: 4px solid var(--golem-note);
+            border-top: 1px solid var(--golem-border);
+            border-right: 1px solid var(--golem-border);
+            border-bottom: 1px solid var(--golem-border);
+            border-radius: 0 4px 4px 0;
+        }
+        .admonitionblock.note, aside.golem-admonition.note, .admonition.note { border-left-color: var(--golem-note); }
+        .admonitionblock.tip, aside.golem-admonition.tip, .admonition.tip { border-left-color: var(--golem-tip); }
+        .admonitionblock.important, aside.golem-admonition.important, .admonition.important { border-left-color: var(--golem-important); }
+        .admonitionblock.warning, aside.golem-admonition.warning, .admonition.warning { border-left-color: var(--golem-warning); }
+        .admonitionblock.caution, aside.golem-admonition.caution, .admonition.caution { border-left-color: var(--golem-caution); }
+
+        /* ── Tables ────────────────────────────────────────── */
+        table, table.golem-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-size: 0.925rem;
+        }
+        th {
+            font-family: var(--golem-font-ui);
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            text-align: left;
+            padding: 0.6rem 0.85rem;
+            border-bottom: 2px solid var(--golem-border);
+            color: var(--golem-text-muted);
+        }
+        td {
+            padding: 0.6rem 0.85rem;
+            border-bottom: 1px solid var(--golem-border);
+        }
+
+        /* ── Right Sidebar (TOC) ───────────────────────────── */
         #golem-sidebar-right {
-            width: 220px;
+            width: 230px;
             padding: 1.5rem 1rem;
             border-left: 1px solid var(--golem-border);
+            font-family: var(--golem-font-ui);
+            flex-shrink: 0;
         }
         #golem-sidebar-right h4 {
             margin-top: 0;
-            color: #94a3b8;
-            font-size: 0.75rem;
+            margin-bottom: 0.75rem;
+            color: var(--golem-text-muted);
+            font-size: 0.7rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.08em;
         }
+        #golem-sidebar-right ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #golem-sidebar-right li {
+            margin-bottom: 0.35rem;
+        }
+        #golem-sidebar-right a {
+            color: var(--golem-text-muted);
+            text-decoration: none;
+            font-size: 0.825rem;
+            line-height: 1.4;
+            display: block;
+            transition: color 0.15s ease;
+        }
+        #golem-sidebar-right a:hover {
+            color: var(--golem-primary);
+        }
+
+        /* ── Footer ────────────────────────────────────────── */
         #golem-footer {
             background: var(--golem-surface);
-            padding: 1rem 1.5rem;
+            padding: 1.25rem 1.75rem;
             border-top: 1px solid var(--golem-border);
             text-align: center;
-            font-size: 0.85rem;
-            color: #64748b;
+            font-family: var(--golem-font-ui);
+            font-size: 0.825rem;
+            color: var(--golem-text-muted);
         }
-        @media (max-width: 900px) {
+        #golem-footer p {
+            margin: 0;
+        }
+
+        /* ── Responsive Breakdown ──────────────────────────── */
+        @media (max-width: 1100px) {
             #golem-sidebar-right { display: none; }
+            #golem-content { padding: 2rem 2.5rem; }
+        }
+        @media (max-width: 800px) {
             #golem-wrapper { flex-direction: column; }
-            #golem-sidebar-left { width: auto; border-right: none; border-bottom: 1px solid var(--golem-border); }
+            #golem-sidebar-left {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid var(--golem-border);
+            }
+            #golem-content { padding: 1.5rem 1.25rem; }
         }
     </style>
 </head>

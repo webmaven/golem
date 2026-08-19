@@ -61,10 +61,13 @@ def test_cli_init_with_existing_pyproject_toml(tmp_path):
     with runner.isolated_filesystem(temp_dir=tmp_path):
         # 1. Create a mock pre-existing pyproject.toml
         pyproject = Path("pyproject.toml")
-        pyproject.write_text("""[tool.poetry]
+        pyproject.write_text(
+            """[tool.poetry]
 name = "my_package"
 version = "0.1.0"
-""", encoding="utf-8")
+""",
+            encoding="utf-8",
+        )
 
         # 2. Run golem init
         result = runner.invoke(main, ["init"])
@@ -75,7 +78,7 @@ version = "0.1.0"
         content = pyproject.read_text(encoding="utf-8")
         assert "[tool.golem.site]" in content
         assert "[tool.golem.build]" in content
-        assert "content_dir = \"docs\"" in content
+        assert 'content_dir = "docs"' in content
 
         # 4. Assert package docs/ folder is scaffolded instead of content/
         assert not Path("content").exists()
@@ -106,9 +109,12 @@ def test_cli_init_idempotency(tmp_path):
     with runner.isolated_filesystem(temp_dir=tmp_path):
         # --- Pyproject Mode Idempotency ---
         pyproject = Path("pyproject.toml")
-        pyproject.write_text("""[tool.poetry]
+        pyproject.write_text(
+            """[tool.poetry]
 name = "package"
-""", encoding="utf-8")
+""",
+            encoding="utf-8",
+        )
 
         # 1st execution
         res_py1 = runner.invoke(main, ["init"])
@@ -142,7 +148,7 @@ def test_cli_init_non_empty_docs_decline(tmp_path):
         # 2. Run golem init and decline the scaffolding prompt
         result = runner.invoke(main, ["init"], input="n\n")
         assert result.exit_code == 0
-        
+
         # Verify the custom file exists, but standard index.adoc was NOT scaffolded
         assert other_file.exists()
         assert not Path("docs/index.adoc").exists()
@@ -156,14 +162,14 @@ def test_cli_init_non_empty_docs_accept_never_overwrite(tmp_path):
         content_dir.mkdir(exist_ok=True)
         custom_index = content_dir / "index.adoc"
         custom_index.write_text("My Sacred Content", encoding="utf-8")
-        
+
         other_file = content_dir / "other.adoc"
         other_file.write_text("Other content", encoding="utf-8")
 
         # 2. Run golem init and accept the scaffolding prompt
         result = runner.invoke(main, ["init"], input="y\n")
         assert result.exit_code == 0
-        
+
         # Verify custom files exist and the existing index.adoc was absolutely NOT overwritten!
         assert custom_index.read_text(encoding="utf-8") == "My Sacred Content"
         assert other_file.read_text(encoding="utf-8") == "Other content"
@@ -174,19 +180,20 @@ def test_cli_init_standalone_scaffolds_full_site(tmp_path):
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(main, ["init"])
         assert result.exit_code == 0
-        
+
         # Verify standalone configuration and content folder
         assert Path("golem.toml").exists()
         assert Path("content/index.adoc").exists()
-        
+
         # Verify static and templates directories were scaffolded
         assert Path("static/css/custom.css").exists()
         assert Path("templates/page.pt").exists()
-        
+
         # Verify golem.toml contains static_dir and templates_dir settings
         golem_toml_content = Path("golem.toml").read_text(encoding="utf-8")
         assert 'static_dir = "static"' in golem_toml_content
         assert 'templates_dir = "templates"' in golem_toml_content
+
 
 def test_cli_init_package_scaffolds_full_site_nested(tmp_path):
     runner = CliRunner()
@@ -194,17 +201,17 @@ def test_cli_init_package_scaffolds_full_site_nested(tmp_path):
         # Create mock pyproject.toml to signal package setup
         pyproject = Path("pyproject.toml")
         pyproject.write_text("[tool.poetry]\nname='my-lib'\n", encoding="utf-8")
-        
+
         result = runner.invoke(main, ["init", "--template", "site"])
         assert result.exit_code == 0
-        
+
         # Verify docs/ folder and nested docs/index.adoc exist
         assert Path("docs/index.adoc").exists()
-        
+
         # Verify static and templates directories were scaffolded INSIDE docs/
         assert Path("docs/static/css/custom.css").exists()
         assert Path("docs/templates/page.pt").exists()
-        
+
         # Verify pyproject.toml was configured with nested paths
         pyproject_content = pyproject.read_text(encoding="utf-8")
         assert 'static_dir = "docs/static"' in pyproject_content
@@ -215,20 +222,20 @@ def test_cli_new_scaffolding_e2e(tmp_path):
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):
         runner.invoke(main, ["init"])
-        
+
         # 1. Scaffolding a new file
         res = runner.invoke(main, ["new", "chapter", "Advanced Compilation"])
         assert res.exit_code == 0
         assert "Created" in res.output
-        
+
         scaffold_file = Path("content/advanced-compilation.adoc")
         assert scaffold_file.exists()
-        
+
         content = scaffold_file.read_text(encoding="utf-8")
         assert "= Advanced Compilation" in content
         assert ":golem-type: chapter" in content
         assert "Welcome to your newly scaffolded chapter" in content
-        
+
         # 2. Prevent accidental overwrites
         res_fail = runner.invoke(main, ["new", "chapter", "Advanced Compilation"])
         assert res_fail.exit_code != 0
@@ -239,17 +246,19 @@ def test_cli_suppresses_tracebacks(tmp_path):
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):
         runner.invoke(main, ["init"])
-        
+
         # Write a syntactically invalid golem.toml
         golem_toml = Path("golem.toml")
-        golem_toml.write_text("""
+        golem_toml.write_text(
+            """
 [site
 title = "Malformed
-""", encoding="utf-8")
-        
+""",
+            encoding="utf-8",
+        )
+
         # Run golem build and verify clean traceback suppression
         res = runner.invoke(main, ["build"])
         assert res.exit_code != 0
         assert "Configuration Error" in res.output
         assert "Traceback (most recent call" not in res.output
-

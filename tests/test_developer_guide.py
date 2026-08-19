@@ -61,7 +61,11 @@ def test_developer_guide_compiles_and_covers_all_specifications(tmp_path):
 
     # 5. Verify Plugin Development Guide & Pluggy Hook Specs coverage
     assert "plugins/" in content
-    assert 'golem.plugins' in content or "entry-points" in content or "entry_points" in content
+    assert (
+        "golem.plugins" in content
+        or "entry-points" in content
+        or "entry_points" in content
+    )
     assert "pluggy" in content.lower() or "hookimpl" in content
     assert "golem_add_subcommands" in content
     assert "on_pre_parse" in content
@@ -78,4 +82,8 @@ def test_developer_guide_compiles_and_covers_all_specifications(tmp_path):
     # Recipe 3: AsciiDoctype Node Template Overrides
     assert "asciidoctype" in content.lower() or "template" in content.lower()
     # Recipe 4: Build Lifecycle Hooks
-    assert "sitemap" in content.lower() or "search" in content.lower() or "index" in content.lower()
+    assert (
+        "sitemap" in content.lower()
+        or "search" in content.lower()
+        or "index" in content.lower()
+    )

@@ -942,7 +942,9 @@ def test_navigation_empty_and_non_adoc_directory_pruning(tmp_path):
     mixed_empty.mkdir()
     (mixed_empty / "data.json").write_text("{}", encoding="utf-8")
 
-    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    config = GolemConfig(
+        content_dir=str(content_dir), output_dir=str(tmp_path / "dist")
+    )
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     nav = engine.discover_navigation()
@@ -1022,4 +1024,3 @@ def test_dir_has_adoc_content_helper(tmp_path):
     (nested_valid / "sub1" / "sub2").mkdir(parents=True)
     (nested_valid / "sub1" / "sub2" / "doc.adoc").write_text("= Doc")
     assert _dir_has_adoc_content(nested_valid) is True
-

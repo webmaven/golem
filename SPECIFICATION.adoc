@@ -443,30 +443,61 @@ The standard premium skeleton template (`golem/templates/skeleton.pt`) exposes t
 ----
 
 === 9.2 CSS Theme Variables
-Golem enforces a premium aesthetic standard out of the box through curated HSL themes configured with CSS Custom Properties:
+Golem enforces a premium aesthetic standard out of the box through curated HSL/hex themes configured with CSS Custom Properties, featuring a warm, handcrafted "Fired Clay / Workbench" baseline with automatic light/dark mode support (`prefers-color-scheme`):
 
 [source,css]
 ----
 :root {
-  /* Color Palette - Elegant Dark Slate Theme */
-  --golem-color-bg: #0f172a;
-  --golem-color-bg-sidebar: #1e293b;
-  --golem-color-text: #f8fafc;
-  --golem-color-text-muted: #94a3b8;
-  --golem-color-primary: #38bdf8;
-  --golem-color-primary-hover: #0ea5e9;
-  --golem-color-border: #334155;
-  --golem-color-admonition-note: #0284c7;
+  /* Light Mode Default (Fired Clay / Workbench) */
+  --golem-bg: #f7f4ef;
+  --golem-surface: #f2ede8;
+  --golem-code-bg: #ece7de;
+  --golem-text: #1e1a16;
+  --golem-text-muted: #6b5d52;
+  --golem-primary: #8b3a12;
+  --golem-primary-hover: #6b2a08;
+  --golem-border: #cec8bf;
+  --golem-link: #8b3a12;
+  --golem-link-visited: #3e2518;
+  --golem-link-hover: #6b2a08;
 
-  /* Typography */
-  --golem-font-primary: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --golem-font-mono: 'Fira Code', 'SF Mono', Monaco, Consolas, monospace;
+  /* Admonitions */
+  --golem-note: #2d6a5a;
+  --golem-tip: #6e7818;
+  --golem-important: #8b3a12;
+  --golem-warning: #b58a00;
+  --golem-caution: #a31818;
 
-  /* Layout Sizing */
-  --golem-sidebar-width: 280px;
-  --golem-toc-width: 240px;
-  --golem-content-max-width: 860px;
-  --golem-border-radius: 8px;
+  /* Typography (Source Family) */
+  --golem-font-display: 'Source Serif 4', Georgia, serif;
+  --golem-font-body: 'Source Serif 4', Georgia, serif;
+  --golem-font-ui: 'Source Sans 3', system-ui, -apple-system, sans-serif;
+  --golem-font-mono: 'Source Code Pro', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Sub-perceptible paper grain texture (SVG feTurbulence data URI) */
+  --golem-texture: url("data:image/svg+xml,...");
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --golem-bg: #170f0b;
+    --golem-surface: #1e1410;
+    --golem-code-bg: #2a1e17;
+    --golem-text: #f0e4d8;
+    --golem-text-muted: #9a7a68;
+    --golem-primary: #d4692a;
+    --golem-primary-hover: #e07a3a;
+    --golem-border: #3d2a20;
+    --golem-link: #d4692a;
+    --golem-link-visited: #8a4c32;
+    --golem-link-hover: #e07a3a;
+
+    --golem-note: #4a9a8a;
+    --golem-tip: #7aaa3a;
+    --golem-important: #d4692a;
+    --golem-warning: #d4a020;
+    --golem-caution: #c04040;
+  }
 }
 ----
 

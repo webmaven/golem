@@ -73,4 +73,8 @@ def test_user_manual_compiles_and_covers_all_specifications(tmp_path):
     assert "golem serve" in content
     assert "golem plugins" in content
     assert "golem themes" in content
-    assert "file:line:col" in content or ":line:column" in content or "coordinate" in content.lower()
+    assert (
+        "file:line:col" in content
+        or ":line:column" in content
+        or "coordinate" in content.lower()
+    )
