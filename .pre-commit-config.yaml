@@ -8,6 +8,13 @@ repos:
         types: [python]
         require_serial: true
 
+      - id: black
+        name: black
+        entry: .venv/bin/black --check
+        language: system
+        types: [python]
+        require_serial: true
+
       - id: mypy
         name: mypy
         entry: .venv/bin/mypy

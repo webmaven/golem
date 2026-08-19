@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Callable, List
 import io
 
-
 logger = logging.getLogger("golem.server")
 
 
