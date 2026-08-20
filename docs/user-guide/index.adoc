@@ -1,0 +1,14 @@
+= User Guide
+:idprefix:
+:idseparator: -
+:sectanchors:
+
+The User Guide provides in-depth documentation for configuring Golem, authoring rich AsciiDoc content, managing navigation, and leveraging dev tools.
+
+== Topics in this Section
+
+* link:configuration.html[Configuration Reference (`golem.toml` & `pyproject.toml`)]
+* link:authoring.html[AsciiDoc Authoring & Partial Files Protocol]
+* link:navigation.html[Hierarchical Navigation & Auto-Discovery]
+* link:dev-server.html[Live-Reload Server & Error Overlays]
+* link:static-assets.html[Static Assets & Theme Customization]

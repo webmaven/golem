@@ -1,0 +1,136 @@
+= Golem (`golem-docs`)
+Michael Bernstein <zopemaven@gmail.com>
+v0.1.0a1
+:toc: macro
+:icons: font
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+image:https://img.shields.io/badge/python-3.14+-blue.svg[Python 3.14+,link=https://www.python.org/downloads/]
+image:https://img.shields.io/badge/License-Apache%202.0-blue.svg[License: Apache-2.0,link=LICENSE]
+image:https://img.shields.io/badge/release-v0.1.0a1-green.svg[Release: Alpha MVP,link=https://pypi.org/project/golem-docs/]
+
+Golem is an extensible, Python-native static site generator and publishing workbench built from the ground up for technical, interactive documentation using *AsciiDoc* as its primary source format.
+
+toc::[]
+
+---
+
+== Key Features
+
+* *AsciiDoc Ecosystem Native:* Powered by `asciidoctrine` for standards-compliant Lark AST parsing and `asciidoctype` for Chameleon ZPT template rendering supporting 39 standard node types (admonitions, callouts, stem math, tables, footnotes, description lists).
+* *Fired Clay / Workbench Default Theme:* Handcrafted warm-paper aesthetic with automatic dark mode (`prefers-color-scheme`), Google Fonts Source family typography (`Source Serif 4`, `Source Sans 3`, `Source Code Pro`), and sub-perceptible SVG paper-grain texture.
+* *Intelligent Navigation Auto-Discovery:* Traverses documentation hierarchies, strips numeric sorting prefixes (`01-intro.adoc` -> `Intro`), pins overview root pages, and supports explicit TOML overrides.
+* *Incremental DAG Build Engine:* Tracks file inclusion trees and SHA-256 hashes in `.golem/cache.json`, rebuilding only modified files and their inclusion dependents.
+* *Modern Dev Server with Live Reloading:* Zero-dependency multi-threaded dev server with Server-Sent Events (SSE) live browser reloading and non-crashing interactive error overlays.
+* *Compiler-Grade Diagnostics:* Pinpoint file coordinates, line numbers, contextual source snippets, and caret pointers for AsciiDoc syntax errors.
+* *Pluggy Plugin Architecture:* Lifecycle hooks for pre-parse, AST creation, ASG resolution, and post-render stages.
+* *Doctest & API Integration:* Verifies Python listing blocks directly using `asciidoctest` and extracts docstrings with `asciidocstring`.
+
+---
+
+== Quick Start
+
+=== 1. Installation
+
+[source,bash]
+----
+# In your virtual environment (Python >= 3.14)
+pip install golem-docs
+----
+
+Or install locally for development:
+
+[source,bash]
+----
+git clone https://github.com/webmaven/golem.git
+cd golem
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+----
+
+=== 2. Initialize a Project
+
+[source,bash]
+----
+golem init my-docs
+cd my-docs
+----
+
+This creates a standard project layout:
+
+[source,text]
+----
+my-docs/
+├── golem.toml          # Site & build configuration
+└── content/            # AsciiDoc source files
+    └── index.adoc      # Homepage entry point
+----
+
+=== 3. Build & Serve
+
+[source,bash]
+----
+# Incremental build
+golem build
+
+# Strict mode for CI/CD pipelines
+golem build --strict
+
+# Launch live dev server with SSE hot-reloading
+golem serve --port 8000
+----
+
+---
+
+== Configuration (`golem.toml` / `pyproject.toml`)
+
+Golem supports configuration via `golem.toml` or directly inside `pyproject.toml` under `[tool.golem]`:
+
+[source,toml]
+----
+[site]
+title = "Golem Documentation"
+author = "Michael Bernstein"
+site_url = "https://webmaven.github.io/golem/"
+
+[build]
+content_dir = "content"
+output_dir = "dist"
+theme = "default"
+strict = false
+
+[navigation]
+# Optional explicit sidebar order override (defaults to auto-discovery)
+nav = [
+    "index.adoc",
+    "getting-started/installation.adoc",
+    "getting-started/quickstart.adoc",
+]
+----
+
+---
+
+== CLI Reference
+
+[cols="1,1,2"]
+|===
+| Command | Options | Description
+
+| `golem init` | `[--template=<type>] [-C <dir>]` | Initialize documentation scaffold (`site`, `package`, `book`).
+| `golem new` | `<type> <name> [-C <dir>]` | Generate a new `.adoc` document skeleton.
+| `golem build` | `[--clean] [--strict] [-v] [-C <dir>]` | Run DAG compiler to render HTML pages into output directory.
+| `golem serve` | `[--port=<port>] [--host=<host>] [--strict] [-C <dir>]` | Run live-reload HTTP server watching source directories.
+| `golem doctest` | `[--mode=<mode>] [-C <dir>]` | Extract and verify executable code examples with pytest.
+| `golem plugins` | `[-v] [-C <dir>]` | Inspect active and installed Pluggy plugins.
+| `golem themes` | `[-v] [-C <dir>]` | Inspect active and installed Chameleon theme templates.
+|===
+
+---
+
+== License
+
+Licensed under the link:LICENSE[Apache License, Version 2.0].

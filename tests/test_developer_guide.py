@@ -1,7 +1,7 @@
 """
 = Tests for Developer & Plugin/Theme Author Guide Documentation
 
-This module verifies that docs/developer_guide.adoc compiles cleanly and comprehensively
+This module verifies that docs/developer-guide/ compiles cleanly and comprehensively
 covers Golem architecture, pipeline lifecycle, theme development & design philosophy,
 Pluggy plugin system, hook specifications, and concrete real-world plugin recipes.
 """
@@ -13,14 +13,22 @@ from golem.engine import BuildEngine
 
 
 def test_developer_guide_compiles_and_covers_all_specifications(tmp_path):
-    guide_path = Path("docs/developer_guide.adoc")
-    assert guide_path.exists(), "docs/developer_guide.adoc must exist"
+    dev_guide_dir = Path("docs/developer-guide")
+    assert dev_guide_dir.exists(), "docs/developer-guide must exist"
 
-    content = guide_path.read_text(encoding="utf-8")
+    # Concatenate all developer-guide pages to verify complete topic coverage
+    adoc_files = list(dev_guide_dir.glob("*.adoc"))
+    assert len(adoc_files) >= 4, "Must have at least index, pipeline, plugin-system, and recipes"
 
-    # 1. Verify AsciiDoc syntax parseability
-    ast = asciidoctrine.parse_to_ast(content)
-    assert ast is not None
+    all_content = []
+    for doc in adoc_files:
+        c = doc.read_text(encoding="utf-8")
+        # 1. Verify AsciiDoc syntax parseability
+        ast = asciidoctrine.parse_to_ast(c)
+        assert ast is not None, f"Failed to parse {doc}"
+        all_content.append(c)
+
+    content = "\n\n".join(all_content)
 
     # 2. Test compilation via BuildEngine in isolated output
     docs_dir = Path("docs").resolve()
@@ -33,7 +41,7 @@ def test_developer_guide_compiles_and_covers_all_specifications(tmp_path):
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
     compiled = engine.build_site()
     assert len(engine.errors) == 0, f"Compilation errors: {engine.errors}"
-    assert any("developer_guide.html" in str(p) for p in compiled)
+    assert any("developer-guide/index.html" in str(p) or "developer-guide/pipeline.html" in str(p) for p in compiled)
 
     # 3. Verify Architecture & Pipeline Lifecycle coverage
     assert "asciidoctrine" in content
@@ -60,7 +68,7 @@ def test_developer_guide_compiles_and_covers_all_specifications(tmp_path):
     assert "pyproject.toml" in content
 
     # 5. Verify Plugin Development Guide & Pluggy Hook Specs coverage
-    assert "plugins/" in content
+    assert "plugins/" in content or "plugins" in content
     assert "golem.plugins" in content or "entry-points" in content or "entry_points" in content
     assert "pluggy" in content.lower() or "hookimpl" in content
     assert "golem_add_subcommands" in content
@@ -75,7 +83,7 @@ def test_developer_guide_compiles_and_covers_all_specifications(tmp_path):
     assert "Macro" in content or "alert" in content or "badge" in content
     # Recipe 2: CLI Subcommand Injection
     assert "click" in content or "subcommand" in content.lower()
-    # Recipe 3: AsciiDoctype Node Template Overrides
+    # Recipe 3: AsciiDoctype Node Template Overrides / Themes
     assert "asciidoctype" in content.lower() or "template" in content.lower()
     # Recipe 4: Build Lifecycle Hooks
     assert "sitemap" in content.lower() or "search" in content.lower() or "index" in content.lower()

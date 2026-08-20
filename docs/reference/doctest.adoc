@@ -1,0 +1,33 @@
+= Doctest & Code Example Verification
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+== Verifying Executable Code Examples
+
+Technical documentation easily becomes stale when APIs change. Golem integrates with `asciidoctest` to parse and execute Python code blocks embedded within AsciiDoc documents.
+
+Run doctest verification across your documentation:
+
+[source,bash]
+----
+golem doctest
+----
+
+== Authoring Executable Doctest Blocks
+
+In your AsciiDoc source:
+
+[source,asciidoc]
+----
+[source,python]
+....
+>>> from golem.config import GolemConfig
+>>> config = GolemConfig(content_dir="docs")
+>>> config.content_dir
+'docs'
+....
+----
+
+Running `golem doctest` extracts these blocks and executes them using pytest.

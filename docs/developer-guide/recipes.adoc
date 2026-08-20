@@ -1,0 +1,47 @@
+= Plugin & Macro Recipes
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+== Recipe 1: AST Macro Transformer
+
+Transform custom AsciiDoc roles (like `[.alert]`) into styled admonition containers:
+
+[source,python]
+----
+import pluggy
+
+hookimpl = pluggy.HookimplMarker("golem")
+
+class AlertBadgePlugin:
+    @hookimpl
+    def on_asg_created(self, asg: dict, file_path: str) -> dict:
+        for block in asg.get("blocks", []):
+            if block.get("role") == "alert":
+                block["attributes"]["class"] = "golem-custom-alert"
+        return asg
+----
+
+== Recipe 2: CLI Subcommand Injection
+
+Inject custom commands (like `golem sitemap` or `golem search-index`) into Golem's CLI:
+
+[source,python]
+----
+import click
+import pluggy
+
+hookimpl = pluggy.HookimplMarker("golem")
+
+@click.command()
+@click.option("--format", default="xml")
+def sitemap(format: str):
+    '''Generate search-engine sitemap index.'''
+    click.echo(f"Building search sitemap in {format} format...")
+
+class SitemapPlugin:
+    @hookimpl
+    def golem_add_subcommands(self, cli_group):
+        cli_group.add_command(sitemap)
+----

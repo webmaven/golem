@@ -1,0 +1,13 @@
+= Developer & Architecture Guide
+:idprefix:
+:idseparator: -
+:sectanchors:
+
+This guide explains Golem's internals, AST/ASG compilation pipeline, plugin system, and theme template engine for developers, plugin creators, and theme authors.
+
+== Topics in this Section
+
+* link:pipeline.html[AST/ASG Compilation Pipeline]
+* link:plugin-system.html[Pluggy Plugin Hook Specifications]
+* link:theme-development.html[Theme Development & Chameleon TAL]
+* link:recipes.html[Plugin & Macro Recipes]

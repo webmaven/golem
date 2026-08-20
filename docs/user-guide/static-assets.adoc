@@ -1,0 +1,34 @@
+= Static Assets & Theme Customization
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+== Static Assets Directory
+
+Static assets (images, fonts, stylesheets, scripts) placed in your configured `static_dir` (default: `static/` or `docs/static/`) are copied to `dist/static/` during build.
+
+== Asset Precedence & Overrides
+
+When copying static files, Golem applies strict precedence:
+
+1. *Project Static Directory* (`<project_root>/static/`)
+2. *Custom Theme Static Directory* (`<theme>/static/`)
+3. *Golem Built-in Default Theme Assets*
+
+Project-level static files always override theme files of the same name.
+
+== Injecting Custom CSS and JS
+
+Inject custom stylesheets or scripts across all pages in `golem.toml`:
+
+[source,toml]
+----
+[site]
+custom_css = [
+    "/static/css/overrides.css",
+]
+custom_js = [
+    "/static/js/app.js",
+]
+----

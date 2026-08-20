@@ -1,0 +1,11 @@
+= Getting Started
+:idprefix:
+:idseparator: -
+:sectanchors:
+
+Welcome to Golem. This guide walks you through setting up Python 3.14+, installing `golem-docs`, and creating your first documentation project.
+
+== Topics in this Section
+
+* link:installation.html[Installation & Environment Setup]
+* link:quickstart.html[Creating Your First Site]

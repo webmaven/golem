@@ -1,0 +1,68 @@
+= Configuration Reference
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+Golem configuration can be defined either in a dedicated `golem.toml` file in the project root or embedded within `pyproject.toml` under `[tool.golem.*]`.
+
+== Configuration Precedence
+
+When resolving settings, Golem merges configurations in the following order (highest precedence first):
+
+1. *CLI Flag Arguments* (e.g. `--output-dir dist/`, `--strict`)
+2. *`golem.toml`* file in working directory
+3. *`pyproject.toml`* (`[tool.golem.*]` tables)
+4. *Internal Package Defaults*
+
+== `golem.toml` Schema
+
+[source,toml]
+----
+[site]
+title = "Golem Documentation"
+author = "Michael Bernstein"
+site_url = "https://webmaven.github.io/golem/"
+
+[build]
+content_dir = "content"
+output_dir = "dist"
+theme = "default"
+static_dir = "static"
+templates_dir = "templates"
+strict = false
+
+[navigation]
+# Optional explicit sidebar ordering (defaults to automatic directory discovery)
+nav = [
+    "index.adoc",
+    "getting-started/installation.adoc",
+    "getting-started/quickstart.adoc",
+]
+
+[plugins]
+# List of installed Pluggy plugin package entry-points
+plugins = [
+    "golem.plugins.doctest",
+    "golem.plugins.apidoc",
+]
+----
+
+== Embedding in `pyproject.toml`
+
+For Python package repositories documenting their library within `docs/`:
+
+[source,toml]
+----
+[tool.golem.site]
+title = "My Library Documentation"
+author = "Your Name"
+
+[tool.golem.build]
+content_dir = "docs"
+output_dir = "dist"
+theme = "default"
+
+[tool.golem.plugins]
+plugins = []
+----

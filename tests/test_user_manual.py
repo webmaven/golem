@@ -1,8 +1,8 @@
 """
-= Tests for User Manual Documentation
+= Tests for User Guide & Reference Documentation
 
-This module verifies that docs/user_manual.adoc compiles cleanly and comprehensively
-covers all required Golem features, configuration schemas, CLI commands,
+This module verifies that docs/user-guide/ and docs/reference/ compile cleanly and comprehensively
+cover all required Golem features, configuration schemas, CLI commands,
 partial files protocol, static asset pipeline, and error overlay mechanisms.
 """
 
@@ -13,14 +13,23 @@ from golem.engine import BuildEngine
 
 
 def test_user_manual_compiles_and_covers_all_specifications(tmp_path):
-    user_manual_path = Path("docs/user_manual.adoc")
-    assert user_manual_path.exists(), "docs/user_manual.adoc must exist"
+    user_guide_dir = Path("docs/user-guide")
+    ref_dir = Path("docs/reference")
+    assert user_guide_dir.exists(), "docs/user-guide must exist"
+    assert ref_dir.exists(), "docs/reference must exist"
 
-    content = user_manual_path.read_text(encoding="utf-8")
+    adoc_files = list(user_guide_dir.glob("*.adoc")) + list(ref_dir.glob("*.adoc"))
+    assert len(adoc_files) >= 5, "Must have comprehensive user-guide and reference pages"
 
-    # 1. Verify AsciiDoc syntax parseability
-    ast = asciidoctrine.parse_to_ast(content)
-    assert ast is not None
+    all_content = []
+    for doc in adoc_files:
+        c = doc.read_text(encoding="utf-8")
+        # 1. Verify AsciiDoc syntax parseability
+        ast = asciidoctrine.parse_to_ast(c)
+        assert ast is not None, f"Failed to parse {doc}"
+        all_content.append(c)
+
+    content = "\n\n".join(all_content)
 
     # 2. Test compilation via BuildEngine in isolated output
     docs_dir = Path("docs").resolve()
@@ -33,7 +42,7 @@ def test_user_manual_compiles_and_covers_all_specifications(tmp_path):
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
     compiled = engine.build_site()
     assert len(engine.errors) == 0, f"Compilation errors: {engine.errors}"
-    assert any("user_manual.html" in str(p) for p in compiled)
+    assert any("user-guide/index.html" in str(p) or "user-guide/configuration.html" in str(p) for p in compiled)
 
     # 3. Check for Project Configuration documentation
     assert "[site]" in content or "golem.toml" in content

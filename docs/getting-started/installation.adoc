@@ -1,0 +1,68 @@
+= Installation & Environment Setup
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+Golem requires *Python >= 3.14* and operates with zero Node.js, npm, or external binary dependencies.
+
+== Standard Installation
+
+Install Golem directly into your project virtual environment via `pip`:
+
+[source,bash]
+----
+# Create and activate an isolated virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install golem-docs
+pip install golem-docs
+----
+
+Verify your installation:
+
+[source,bash]
+----
+golem --version
+----
+
+== Installing from Source
+
+To contribute or develop plugins against the latest bleeding-edge commits:
+
+[source,bash]
+----
+git clone https://github.com/webmaven/golem.git
+cd golem
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+----
+
+== Core Dependencies
+
+Golem is assembled from focused, independently testable Python libraries:
+
+[cols="1,2"]
+|===
+| Library | Role
+
+| `asciidoctrine`
+| Standards-compliant Lark AST parser and semantic ASG resolver.
+
+| `asciidoctype`
+| Template translation engine powered by Chameleon ZPT templates.
+
+| `asciidoctest`
+| Python test runner extracting and executing inline doctests from AsciiDoc blocks.
+
+| `chameleon`
+| Fast, compiled Zope Page Templates (ZPT) engine.
+
+| `pluggy`
+| Standard Python hook and plugin management system (same engine powering pytest).
+
+| `click`
+| Composable command-line interface toolkit.
+|===

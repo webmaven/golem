@@ -1,0 +1,70 @@
+= CLI Command Reference
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+== `golem init`
+
+Initialize a new Golem documentation project scaffold.
+
+[source,bash]
+----
+golem init [NAME] [--template=<site|package|book>] [-C <dir>]
+----
+
+* `NAME`: Name of the directory to create (default: current directory).
+* `--template`: Scaffolding template preset (default: `site`).
+* `-C, --directory`: Working directory context.
+
+== `golem new`
+
+Generate a new `.adoc` document skeleton.
+
+[source,bash]
+----
+golem new <chapter|article|section> <TITLE> [-C <dir>]
+----
+
+== `golem build`
+
+Compile AsciiDoc source files into static HTML.
+
+[source,bash]
+----
+golem build [--clean] [--strict] [-v] [-C <dir>]
+----
+
+* `--clean`: Purge `.golem/cache.json` and output directory prior to building.
+* `--strict`: Treat warnings as fatal errors (exit code 1) for CI pipelines.
+* `-v, --verbose`: Output detailed compilation steps.
+
+== `golem serve`
+
+Start the multi-threaded live-reload dev server with Server-Sent Events (SSE).
+
+[source,bash]
+----
+golem serve [--port=<port>] [--host=<host>] [--strict] [-C <dir>]
+----
+
+* `--port`: TCP port to listen on (default: `8000`).
+* `--host`: Host interface address (default: `127.0.0.1`).
+
+== `golem plugins`
+
+List and inspect active and installed Pluggy plugin extensions.
+
+[source,bash]
+----
+golem plugins [-v] [-C <dir>]
+----
+
+== `golem themes`
+
+List active and discovered Chameleon theme templates.
+
+[source,bash]
+----
+golem themes [-v] [-C <dir>]
+----

@@ -1,0 +1,28 @@
+= Hierarchical Navigation & Auto-Discovery
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+Golem features an intelligent navigation discovery engine that builds sidebar navigation trees directly from your filesystem hierarchy.
+
+== Navigation Auto-Discovery Rules
+
+1. *Root Page Pinning:* `index.adoc` in `content_dir` is always treated as the home/overview entry point.
+2. *Numeric Prefix Sorting:* Files and directories prefixed with numbers (e.g. `01-introduction.adoc`, `02-architecture.adoc`) are sorted numerically, and the numeric prefix is automatically stripped in the UI menu title (`Introduction`, `Architecture`).
+3. *Title Resolution:* Golem extracts document titles from the top-level AsciiDoc header (`= Document Title`) rather than raw filenames.
+4. *Empty Directory Pruning:* Directories that contain no `.adoc` source files are pruned from the navigation tree.
+
+== Explicit Navigation Overrides
+
+If you prefer to define navigation order manually, specify `nav` in `[navigation]`:
+
+[source,toml]
+----
+[navigation]
+nav = [
+    "index.adoc",
+    "guides/first-steps.adoc",
+    "guides/advanced.adoc",
+]
+----

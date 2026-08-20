@@ -1,21 +1,42 @@
-= Welcome to Golem
-:golem-version: 1.0.0
+= Golem Documentation
+Michael Bernstein <zopemaven@gmail.com>
+v0.1.0a1
+:toc: macro
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
 
-Golem is a next-generation, high-performance static site generator powered by native AsciiDoc parsing and robust Chameleon cascading templates.
+Golem is an extensible, Python-native static site generator and publishing workbench built for technical, interactive documentation using *AsciiDoc* as its primary source format.
 
-== Features
+toc::[]
 
-Blazing Fast Incremental Builds::
-Native cache DAG tracking means only modified files and their inclusion ancestors are re-compiled.
+== The Workbench Philosophy
 
-Cascading Themes::
-Custom HTML5 template layouts with seamless fallbacks.
+In folklore, a golem is an unadorned creature shaped from common earth and brought to life through the animating power of the inscribed word. 
 
-Embedded Python Doctests::
-Programmatic API testing integrated directly inside standard docstrings.
+Golem approaches static publishing with the same ethos:
 
-== Navigation
+* *Unadorned & Heavy-Duty:* A sturdy maple workbench with cast-iron vises. No fragile web framework graphs or opaque build magic.
+* *AsciiDoc Native:* Moving beyond the semantic poverty of Markdown and the brittle syntax traps of reStructuredText into an industrial-strength document format.
+* *Pure HTML/CSS Baseline:* Zero JavaScript required for default layouts, mode switching (`prefers-color-scheme`), or navigation.
+* *Fellow Craftsman Respect:* Transparent ASTs, clean `pluggy` hooks, and compiler-grade diagnostic coordinates (`path:line:col`) for every syntax issue.
 
-* Read the detailed instructions in the link:user_manual.html[User Manual].
-* Learn the programmatic Python API in the link:developer_guide.html[Developer Guide].
+== Documentation Sections
 
+[cols="1,2"]
+|===
+| Section | Description
+
+| link:getting-started/[Getting Started]
+| Installation instructions, environment setup, and your first compiled site in minutes.
+
+| link:user-guide/[User Guide]
+| Comprehensive reference for configuration schemas, AsciiDoc authoring, partial files, navigation auto-discovery, and dev server live-reloading.
+
+| link:developer-guide/[Developer & Architecture Guide]
+| Deep dive into Golem's AST/ASG compilation pipeline, Pluggy plugin hook specifications, Chameleon ZPT theme authoring, and recipes.
+
+| link:reference/[Reference]
+| Full CLI command dictionary and embedded doctest verification reference.
+|===

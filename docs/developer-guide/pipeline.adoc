@@ -1,0 +1,33 @@
+= AST/ASG Compilation Pipeline
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+Golem operates as a deterministic, compiler-grade document processing pipeline built on top of `asciidoctrine` and `asciidoctype`.
+
+== Pipeline Lifecycle
+
+[source,text]
+----
+ Source .adoc File
+       │
+       ▼ [1. Parse] (asciidoctrine.parse_to_ast / Lark)
+ Concrete Syntax Tree (AST)
+       │
+       ▼ [2. Resolve] (asciidoctrine.resolve_to_asg / Semantic Analysis)
+ Abstract Semantic Graph (ASG Node Dictionary)
+       │
+       ▼ [3. Render] (asciidoctype.AsciiDoctypeRenderer / Chameleon ZPT)
+ HTML5 Fragment (body_html)
+       │
+       ▼ [4. Layout Template] (skeleton.pt / TAL Slot Insertion)
+ Full Static HTML5 Document (dist/*.html)
+----
+
+== Pipeline Stages
+
+1. *Lark AST Parsing:* `asciidoctrine` parses raw text into a lossless concrete syntax tree.
+2. *Semantic ASG Resolution:* Resolves document attributes, include directives, callout numbering, cross-references, and footnote indexing into a clean Abstract Semantic Graph (ASG).
+3. *Node Rendering:* `asciidoctype` renders each ASG block using dedicated Chameleon TAL templates.
+4. *Layout Integration:* Golem injects `page_title`, `site_title`, `body_html`, `nav_tree`, `nav_html`, `toc_html`, `custom_css`, and `custom_js` into the theme's `skeleton.pt`.

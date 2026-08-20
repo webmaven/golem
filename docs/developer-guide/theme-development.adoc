@@ -1,0 +1,59 @@
+= Theme Development & Chameleon TAL
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+Themes in Golem are powered by Chameleon Zope Page Templates (`.pt`) using standard TAL (Template Attribute Language).
+
+== Theme Layout Structure
+
+A Golem theme resides in `templates/<theme_name>/`:
+
+[source,text]
+----
+templates/default/
+├── skeleton.pt         # Main HTML5 base skeleton template
+└── static/             # Theme-specific CSS, fonts, and assets
+    └── theme.css
+----
+
+== Template Context Variables
+
+When rendering `skeleton.pt`, Golem passes the following context variables:
+
+[cols="1,2"]
+|===
+| Variable | Content Description
+
+| `site_title` | Name of the site from `golem.toml` or `pyproject.toml`.
+| `page_title` | Title of the current document (`= Document Title`).
+| `site_author` | Author string if configured.
+| `site_url` | Base URL of the website.
+| `generator_version` | Active Golem version (e.g. `0.1.0a1`).
+| `body_html` | Rendered HTML5 content of the AsciiDoc document.
+| `nav_tree` | Hierarchical list of navigation items (`url`, `title`).
+| `nav_html` | Pre-rendered navigation sidebar HTML.
+| `toc_html` | Table of Contents navigation HTML for the current document.
+| `custom_css` | List of custom CSS stylesheets to link.
+| `custom_js` | List of custom JS script files to link.
+|===
+
+== CSS Theme Custom Properties
+
+The default theme is styled entirely via CSS Custom Properties (`--golem-*`) supporting both light mode and dark mode (`@media (prefers-color-scheme: dark)`):
+
+[source,css]
+----
+:root {
+    --golem-bg: #f7f4ef;
+    --golem-surface: #f2ede8;
+    --golem-code-bg: #ece7de;
+    --golem-text: #1e1a16;
+    --golem-primary: #8b3a12;
+    --golem-font-display: 'Source Serif 4', Georgia, serif;
+    --golem-font-body: 'Source Serif 4', Georgia, serif;
+    --golem-font-ui: 'Source Sans 3', system-ui, sans-serif;
+    --golem-font-mono: 'Source Code Pro', monospace;
+}
+----

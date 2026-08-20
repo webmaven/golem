@@ -1,0 +1,58 @@
+= Creating Your First Site
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+== 1. Project Initialization
+
+Golem provides a scaffolding command `golem init` to generate a ready-to-build workspace:
+
+[source,bash]
+----
+golem init my-project
+cd my-project
+----
+
+This creates the standard standalone documentation structure:
+
+[source,text]
+----
+my-project/
+├── golem.toml          # Site and build configuration
+└── content/            # AsciiDoc source files
+    └── index.adoc      # Homepage entry point
+----
+
+== 2. Scaffolding New Documents
+
+Generate structured chapter or article skeletons with `golem new`:
+
+[source,bash]
+----
+golem new chapter "Getting Started"
+----
+
+This creates `content/getting-started.adoc` with standard headers and metadata.
+
+== 3. Building the Site
+
+Compile the documentation into static HTML5:
+
+[source,bash]
+----
+golem build
+----
+
+By default, Golem reads AsciiDoc sources from `content/` and writes static output to `dist/`.
+
+== 4. Running the Live Dev Server
+
+Start Golem's development server to preview changes in real time:
+
+[source,bash]
+----
+golem serve --port 8000
+----
+
+Navigate to `http://127.0.0.1:8000`. The server automatically watches your source files and live-reloads connected browser tabs over Server-Sent Events (SSE).

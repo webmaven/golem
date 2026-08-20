@@ -1,0 +1,27 @@
+= Security Policy
+:toc: macro
+:idprefix:
+:idseparator: -
+
+== Supported Versions
+
+Security updates and patches are provided for the following versions of Golem:
+
+[cols="1,1",options="header"]
+|===
+| Version | Supported
+| `0.1.x` (Alpha) | Yes
+| `< 0.1.0` | No
+|===
+
+== Reporting a Vulnerability
+
+The Golem team takes the security of our static site generator and the documentation sites built with it seriously.
+
+If you discover a security vulnerability in Golem, please report it privately:
+
+1. *Do NOT file a public issue* on GitHub.
+2. Send a detailed description of the vulnerability directly to the project maintainer via email at: `zopemaven@gmail.com`.
+3. Include reproducible steps, minimal AsciiDoc/Python examples, and any relevant environmental details.
+
+We will acknowledge receipt within 48 hours, investigate the issue, and coordinate a fix and release.

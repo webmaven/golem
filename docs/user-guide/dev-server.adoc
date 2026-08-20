@@ -1,0 +1,34 @@
+= Live-Reload Server & Error Overlays
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+== Launching the Dev Server
+
+Run `golem serve` to start the live authoring environment:
+
+[source,bash]
+----
+golem serve --host 127.0.0.1 --port 8000
+----
+
+== Server-Sent Events (SSE) Live Reload
+
+Golem's dev server is built on Python's native `http.server.ThreadingHTTPServer` with an integrated Server-Sent Events endpoint (`/golem-reload`). 
+
+When source files are modified:
+1. Golem executes an incremental DAG rebuild.
+2. Golem dispatches an SSE reload event to all open browser tabs.
+3. Connected browser pages refresh instantly without manual reloading.
+
+== Non-Crashing Compiler Error Overlay
+
+If a syntax error is introduced into an AsciiDoc file during live authoring:
+
+* Golem *does not crash* or exit the server process.
+* A high-contrast, dark-mode `golem-error-overlay` is injected into the browser displaying:
+** Exact file coordinate: `file:line:col`
+** Source context snippet showing surrounding lines
+** Visual caret pointer identifying the invalid token
+* Once the syntax error is corrected, saving the file clears the overlay automatically.

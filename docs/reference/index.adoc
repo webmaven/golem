@@ -1,0 +1,11 @@
+= Reference
+:idprefix:
+:idseparator: -
+:sectanchors:
+
+Technical reference manuals for Golem's CLI, tools, and specifications.
+
+== Topics in this Section
+
+* link:cli.html[CLI Command Reference]
+* link:doctest.html[Doctest & Code Example Verification]

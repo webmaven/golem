@@ -1,0 +1,28 @@
+= AsciiDoc Authoring & Partial Files Protocol
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+Golem supports full standards-compliant AsciiDoc across 39 node types, rendered through Chameleon ZPT templates.
+
+== Supported AsciiDoc Constructs
+
+* *Admonition Blocks:* `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION` with distinct earth-tone accents.
+* *Code & Callouts:* Syntax-highlighted source listings with numbered callouts (`<1>`, `<2>`).
+* *Complex Tables:* Column formatting, headers, auto-wrapping, and cell alignments.
+* *Footnotes:* Footnote references (`footnote:[...]`) automatically anchored and indexed.
+* *Math & Stem:* Inlined `stem:[E = mc^2]` and display block math.
+* *Description Lists:* Multi-tier term and description syntax.
+
+== Partial Files Protocol (`_*.adoc`)
+
+In large technical books and manuals, chapters are often split across reusable sub-units included into parent documents via `include::path.adoc[]`.
+
+[IMPORTANT]
+====
+Any file prefixed with an underscore (e.g. `_header.adoc`, `_sidebar_notes.adoc`, `_footer.adoc`) is treated as a *Partial File*.
+====
+
+* Partial files are *never compiled into standalone HTML files* in `dist/`.
+* When a partial file is modified, Golem's incremental DAG compiler traverses `.golem/cache.json` and automatically rebuilds every parent document that includes it.

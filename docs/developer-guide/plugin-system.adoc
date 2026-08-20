@@ -1,0 +1,59 @@
+= Pluggy Plugin Hook Specifications
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+Golem utilizes `pluggy`—the plugin engine behind `pytest`—to provide clean lifecycle hooks.
+
+== Available Hook Specifications
+
+Plugins implement hooks using the `@hookimpl` decorator:
+
+[source,python]
+----
+import pluggy
+
+hookimpl = pluggy.HookimplMarker("golem")
+
+class MyPlugin:
+    @hookimpl
+    def on_pre_parse(self, source_text: str, file_path: str) -> str | None:
+        '''Called before AsciiDoc parsing. Can mutate raw source text.'''
+        return source_text
+
+    @hookimpl
+    def on_ast_created(self, ast: dict, file_path: str) -> dict | None:
+        '''Called after Lark AST parsing.'''
+        return ast
+
+    @hookimpl
+    def on_asg_created(self, asg: dict, file_path: str) -> dict | None:
+        '''Called after ASG semantic resolution.'''
+        return asg
+
+    @hookimpl
+    def on_post_render(self, html: str, file_path: str) -> str | None:
+        '''Called after HTML rendering before writing to disk.'''
+        return html
+
+    @hookimpl
+    def on_build_completed(self, site_dist_dir: str, manifest: dict) -> None:
+        '''Called after the entire build completes.'''
+        pass
+
+    @hookimpl
+    def golem_add_subcommands(self, cli_group: object) -> None:
+        '''Inject custom Click subcommands into the golem CLI.'''
+        pass
+----
+
+== Registering Plugins via Entry Points
+
+In your plugin package's `pyproject.toml`:
+
+[source,toml]
+----
+[project.entry-points."golem.plugins"]
+my_plugin = "my_package.plugin:MyPlugin"
+----
