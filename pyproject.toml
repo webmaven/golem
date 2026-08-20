@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "golem-docs"
 version = "0.1.0a1"
 description = "A static site generator built on AsciiDoc, designed for highly technical interactive documentation."
-readme = "README.adoc"
+readme = { file = "README.adoc", content-type = "text/plain" }
 requires-python = ">=3.14"
 license = { text = "Apache-2.0" }
 authors = [
