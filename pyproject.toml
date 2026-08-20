@@ -63,7 +63,8 @@ theme = "default"
 plugins = []
 
 [tool.pytest.ini_options]
-addopts = "--ignore=SPECIFICATION.adoc"
+testpaths = ["tests"]
+addopts = "--ignore=SPECIFICATION.adoc --ignore=docs"
 
 [tool.ruff]
 line-length = 127
