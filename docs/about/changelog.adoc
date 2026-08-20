@@ -1,0 +1,6 @@
+= Changelog
+:idprefix:
+:idseparator: -
+:sectanchors:
+
+include::../../CHANGELOG.adoc[]

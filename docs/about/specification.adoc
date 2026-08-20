@@ -1,0 +1,7 @@
+= Technical Specification
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+include::../../SPECIFICATION.adoc[]

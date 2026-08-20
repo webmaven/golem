@@ -39,4 +39,7 @@ Golem approaches static publishing with the same ethos:
 
 | link:reference/[Reference]
 | Full CLI command dictionary and embedded doctest verification reference.
+
+| link:about/[About & Colophon]
+| Project origin myth, the Hellboy/Ben Grimm archetype, colophon design notes, and governance documents.
 |===

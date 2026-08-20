@@ -111,8 +111,8 @@ In highly technical documentation, the primary site structure is often defined i
 = Golem Documentation
 :toc:
 
-include::01-introduction.adoc[]
-include::02-architecture.adoc[]
+\include::01-introduction.adoc[]
+\include::02-architecture.adoc[]
 ----
 
 When Golem parses the root document, it tracks the inclusion tree. If `navigation.mode` is set to `"auto"` (or `"hybrid"`) and an inclusion tree is found in the entry document, Golem resolves this structural tree directly as the hierarchical table-of-contents navigation for the entire site.

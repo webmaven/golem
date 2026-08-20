@@ -1,0 +1,7 @@
+= Agent & Contributor Protocols
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+include::../../AGENTS.adoc[]

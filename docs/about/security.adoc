@@ -1,0 +1,6 @@
+= Security Policy
+:idprefix:
+:idseparator: -
+:sectanchors:
+
+include::../../SECURITY.adoc[]

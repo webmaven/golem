@@ -1,0 +1,40 @@
+= About Golem
+Michael Bernstein <zopemaven@gmail.com>
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+== The Origin & Archetype
+
+In traditional Jewish lore, a *golem* (`גולם`) is formed from unshaped clay or earth and brought to life through the animating power of the inscribed word—an embodiment of truth (`אמת`) dedicated to protection, labor, and purpose.
+
+Golem draws upon that textual tradition: the conviction that words carry structural, animating force. 
+
+Visually and temperamentally, Golem's character sits at the intersection of **Hellboy** (the blue-collar occult researcher with a heavy stone hand, a dry cigar-stub perspective, and a quiet respect for ancient texts) and **Ben Grimm / The Thing** (the rocky, unadorned powerhouse from the Lower East Side—gruff, utterly loyal, fiercely capable, and completely unpretentious).
+
+Golem is the protector sitting patiently in the archive stacks: solid, enduring, and made with clear purpose.
+
+== The Publishing Workbench
+
+Golem was created to serve as an unadorned, heavy-duty publishing workbench for Python developers, data scientists, and technical authors.
+
+Modern documentation tooling has increasingly inherited the fragility and churn of the JavaScript frontend ecosystem. Golem takes an intentional step back to first principles:
+
+* *Python-Native:* The compiler, dev server, doctest runners, and plugin hooks are standard, idiomatic Python.
+* *AsciiDoc Native:* Deep support for book-grade technical writing—39 node types, native inclusion trees, mathematical formulas, admonitions, and callouts—without the indentation landmines of reStructuredText or the semantic poverty of Markdown.
+* *Pure HTML/CSS Foundation:* Zero JavaScript required for standard page layout, responsive collapsing, and automatic light/dark mode adaptation.
+* *Respect for the Fellow Craftsman:* Clean AST/ASG resolution, pluggy lifecycle hooks, and compiler-grade error coordinates (`path:line:col`) for every issue.
+
+== Project Documents & Governance
+
+Explore the official project documents, specifications, and governance:
+
+* link:colophon.html[The Colophon] — Publication details, typography, color palette tokens, and build environment.
+* link:readme.html[Project Overview (README)] — Package summary, quick start, and feature matrix.
+* link:specification.html[Technical Specification] — Comprehensive architecture and engineering specification.
+* link:agents.html[Agent & Contributor Protocols] — Development invariants and AI agent instructions.
+* link:changelog.html[Changelog] — Chronological release history and semver changes.
+* link:security.html[Security Policy] — Vulnerability disclosure protocols and supported versions.
+* link:code-of-conduct.html[Code of Conduct] — Community standards and craftsman pledge.
+* link:license.html[Software License] — Apache License, Version 2.0.

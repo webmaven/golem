@@ -1,0 +1,61 @@
+= Colophon
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+== Design & Typography
+
+The Golem documentation site and default theme are typeset using Adobe's open-source **Source** typeface family:
+
+[cols="1,1,2"]
+|===
+| Typeface | Designer / Foundry | Role in Theme
+
+| **Source Serif 4**
+| Frank Grießhammer / Adobe
+| Primary display headings and body prose. Rendered with variable optical sizing (`opsz` 36 for display titles, `opsz` 24 for H2 section headers, and `opsz` 12 for body text at 1.75 line-height).
+
+| **Source Sans 3**
+| Paul D. Hunt / Adobe
+| User interface chrome, navigation sidebars, table headers, captions, and admonition badges.
+
+| **Source Code Pro**
+| Paul D. Hunt / Adobe
+| Monospaced code listings, syntax-highlighted blocks, inline code spans, and CLI command references.
+|===
+
+== Color Palette & Surface Tokens
+
+Golem's default theme is built on the **Fired Clay / Workbench** palette—a warm, tactile earth-tone design system inspired by terracotta, woodblock printing, and bookbinding papers:
+
+* *Light Mode (Parchment & Warm Ink):*
+** Page Background: `#f7f4ef` (warm unbleached paper)
+** Panel Surfaces: `#f2ede8`
+** Code Blocks: `#ece7de`
+** Primary Accent: `#8b3a12` (deep terracotta rust)
+** Admonition Accents: Note (`#2d6a5a` forest teal), Tip (`#6e7818` olive), Important (`#8b3a12` rust), Warning (`#b58a00` amber), Caution (`#a31818` crimson)
+* *Dark Mode (Firelight & Hearth Charcoal):*
+** Page Background: `#170f0b` (deep charred earth)
+** Panel Surfaces: `#1e1410`
+** Code Blocks: `#2a1e17`
+** Primary Accent: `#d4692a` (ember orange)
+
+== Surface Texture
+
+To prevent the eyestrain associated with large, stark, flat digital color fields, both light and dark backgrounds incorporate a sub-perceptible, seamless SVG `feTurbulence` procedural noise grain (6% opacity on light mode, 2% opacity on dark mode).
+
+== Technology Stack
+
+This publication was generated with:
+
+* **Compiler:** Golem `v0.1.0a1` incremental DAG static site generator.
+* **Parser:** `asciidoctrine` standard Lark AST parser and ASG resolver.
+* **Template Engine:** `asciidoctype` & Chameleon Zope Page Templates (`.pt`).
+* **Runtime Environment:** Python 3.14 on macOS / Linux.
+* **Hosting:** Static HTML5 / CSS3 hosted on GitHub Pages.
+
+== Copyright & License
+
+Copyright (c) 2026 Michael Bernstein. +
+Licensed under the link:license.html[Apache License, Version 2.0].

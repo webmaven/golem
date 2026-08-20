@@ -1,0 +1,6 @@
+= Code of Conduct
+:idprefix:
+:idseparator: -
+:sectanchors:
+
+include::../../CODE_OF_CONDUCT.adoc[]

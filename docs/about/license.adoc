@@ -1,0 +1,9 @@
+= Apache License 2.0
+:idprefix:
+:idseparator: -
+:sectanchors:
+
+[source,text]
+----
+include::../../LICENSE[]
+----

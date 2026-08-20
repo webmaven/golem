@@ -1,0 +1,7 @@
+= Project Overview
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+include::../../README.adoc[]
