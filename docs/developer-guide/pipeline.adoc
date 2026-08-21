@@ -31,3 +31,30 @@ Golem operates as a deterministic, compiler-grade document processing pipeline b
 2. *Semantic ASG Resolution:* Resolves document attributes, include directives, callout numbering, cross-references, and footnote indexing into a clean Abstract Semantic Graph (ASG).
 3. *Node Rendering:* `asciidoctype` renders each ASG block using dedicated Chameleon TAL templates.
 4. *Layout Integration:* Golem injects `page_title`, `site_title`, `body_html`, `nav_tree`, `nav_html`, `toc_html`, `custom_css`, and `custom_js` into the theme's `skeleton.pt`.
+
+== Core Dependencies
+
+Golem's pipeline is assembled from focused, independently testable Python libraries:
+
+[cols="1,2"]
+|===
+| Library | Role
+
+| `asciidoctrine`
+| Standards-compliant Lark AST parser and semantic ASG resolver.
+
+| `asciidoctype`
+| Template translation engine powered by Chameleon ZPT templates.
+
+| `asciidoctest`
+| Python test runner extracting and executing inline doctests from AsciiDoc blocks.
+
+| `chameleon`
+| Fast, compiled Zope Page Templates (ZPT) engine.
+
+| `pluggy`
+| Standard Python hook and plugin management system (same engine powering pytest).
+
+| `click`
+| Composable command-line interface toolkit.
+|===

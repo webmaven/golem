@@ -4,9 +4,9 @@
 :idseparator: -
 :sectanchors:
 
-Technical reference manuals for Golem's CLI, tools, and specifications.
+Authoritative technical reference for Golem's command-line interface and built-in testing infrastructure. These pages serve as lookup manuals rather than tutorials — consult the link:../user-guide/[User Guide] for guided walkthroughs.
 
 == Topics in this Section
 
-* link:cli.html[CLI Command Reference]
-* link:doctest.html[Doctest & Code Example Verification]
+* link:cli.html[*CLI Command Reference*] — Complete dictionary of `golem build`, `golem serve`, `golem doctest`, and all flags, options, and environment variables.
+* link:doctest.html[*Doctest & Code Example Verification*] — Embedded executable code block testing, `pytest` integration, and verification of inline AsciiDoc source examples.

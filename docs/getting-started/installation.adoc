@@ -40,29 +40,3 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ----
 
-== Core Dependencies
-
-Golem is assembled from focused, independently testable Python libraries:
-
-[cols="1,2"]
-|===
-| Library | Role
-
-| `asciidoctrine`
-| Standards-compliant Lark AST parser and semantic ASG resolver.
-
-| `asciidoctype`
-| Template translation engine powered by Chameleon ZPT templates.
-
-| `asciidoctest`
-| Python test runner extracting and executing inline doctests from AsciiDoc blocks.
-
-| `chameleon`
-| Fast, compiled Zope Page Templates (ZPT) engine.
-
-| `pluggy`
-| Standard Python hook and plugin management system (same engine powering pytest).
-
-| `click`
-| Composable command-line interface toolkit.
-|===

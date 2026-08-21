@@ -30,9 +30,6 @@ Modern documentation tooling has increasingly inherited the fragility and churn 
 Explore the official project documents, specifications, and governance:
 
 * link:colophon.html[The Colophon] — Publication details, typography, color palette tokens, and build environment.
-* link:readme.html[Project Overview (README)] — Package summary, quick start, and feature matrix.
-* link:specification.html[Technical Specification] — Comprehensive architecture and engineering specification.
-* link:agents.html[Agent & Contributor Protocols] — Development invariants and AI agent instructions.
 * link:changelog.html[Changelog] — Chronological release history and semver changes.
 * link:security.html[Security Policy] — Vulnerability disclosure protocols and supported versions.
 * link:code-of-conduct.html[Code of Conduct] — Community standards and craftsman pledge.

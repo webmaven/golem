@@ -4,9 +4,11 @@
 :idseparator: -
 :sectanchors:
 
-Welcome to Golem. This guide walks you through setting up Python 3.14+, installing `golem-docs`, and creating your first documentation project.
+Welcome to Golem. This section walks you through setting up your environment, installing the `golem-docs` package, and building your first documentation site from scratch.
+
+Golem requires *Python >= 3.14* and operates with zero Node.js, npm, or external binary dependencies. A standard `pip install` is all you need.
 
 == Topics in this Section
 
-* link:installation.html[Installation & Environment Setup]
-* link:quickstart.html[Creating Your First Site]
+* link:installation.html[*Installation & Environment Setup*] — Create a virtual environment, install `golem-docs` via pip or from source, and verify your setup.
+* link:quickstart.html[*Creating Your First Site*] — Initialize a new project, write your first AsciiDoc page, build static HTML, and launch the live-reload development server.
