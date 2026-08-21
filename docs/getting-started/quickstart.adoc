@@ -1,4 +1,5 @@
 = Creating Your First Site
+:nav_order: 20
 :idprefix:
 :idseparator: -
 :sectanchors:

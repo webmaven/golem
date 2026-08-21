@@ -1,4 +1,5 @@
 = CI/CD Automation & Deployment Recipes
+:nav_order: 50
 :idprefix:
 :idseparator: -
 :sectanchors:

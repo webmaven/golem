@@ -1,4 +1,5 @@
 = Changelog
+:nav_order: 20
 :idprefix:
 :idseparator: -
 :sectanchors:

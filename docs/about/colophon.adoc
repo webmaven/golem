@@ -1,4 +1,5 @@
 = Colophon
+:nav_order: 10
 :idprefix:
 :idseparator: -
 :sectanchors:

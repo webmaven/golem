@@ -1,4 +1,5 @@
 = Plugin & Macro Recipes
+:nav_order: 40
 :idprefix:
 :idseparator: -
 :sectanchors:

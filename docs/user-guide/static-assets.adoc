@@ -1,4 +1,5 @@
 = Static Assets & Theme Customization
+:nav_order: 60
 :idprefix:
 :idseparator: -
 :sectanchors:

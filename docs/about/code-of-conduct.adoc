@@ -1,4 +1,5 @@
 = Code of Conduct
+:nav_order: 40
 :idprefix:
 :idseparator: -
 :sectanchors:

@@ -1,4 +1,5 @@
 = Compiler Diagnostics & Troubleshooting
+:nav_order: 70
 :idprefix:
 :idseparator: -
 :sectanchors:

@@ -1,4 +1,5 @@
 = Technical Nonfiction & Multi-Chapter Book Authoring
+:nav_order: 30
 :idprefix:
 :idseparator: -
 :sectanchors:

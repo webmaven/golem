@@ -56,17 +56,25 @@ def _extract_metadata_from_doc(path: Path) -> dict[str, Any]:
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 for line in f:
                     line_s = line.strip()
+                    if (
+                        line_s.startswith("==")
+                        or line_s.startswith("----")
+                        or line_s.startswith("....")
+                        or line_s.startswith("++++")
+                        or line_s.startswith("****")
+                    ):
+                        break
                     if line_s.startswith("= ") and not line_s.startswith("== ") and title is None:
                         t = line_s[2:].strip()
                         if t:
                             title = t
-                    elif line_s.startswith(":nav_title:") or line_s.startswith(":navtitle:"):
+                    elif (line_s.startswith(":nav_title:") or line_s.startswith(":navtitle:")) and nav_title is None:
                         val = line_s.split(":", 2)[2].strip()
                         if val:
                             nav_title = val
                     elif (
                         line_s.startswith(":nav_order:") or line_s.startswith(":nav-order:") or line_s.startswith(":navorder:")
-                    ):
+                    ) and nav_order is None:
                         val = line_s.split(":", 2)[2].strip()
                         try:
                             nav_order = int(val)

@@ -1,4 +1,5 @@
 = Doctest & Code Example Verification
+:nav_order: 20
 :idprefix:
 :idseparator: -
 :sectanchors:

@@ -1,4 +1,5 @@
 = Pluggy Plugin Hook Specifications
+:nav_order: 20
 :idprefix:
 :idseparator: -
 :sectanchors:
