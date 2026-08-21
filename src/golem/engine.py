@@ -64,7 +64,9 @@ def _extract_metadata_from_doc(path: Path) -> dict[str, Any]:
                         val = line_s.split(":", 2)[2].strip()
                         if val:
                             nav_title = val
-                    elif line_s.startswith(":nav_order:") or line_s.startswith(":navorder:"):
+                    elif (
+                        line_s.startswith(":nav_order:") or line_s.startswith(":nav-order:") or line_s.startswith(":navorder:")
+                    ):
                         val = line_s.split(":", 2)[2].strip()
                         try:
                             nav_order = int(val)

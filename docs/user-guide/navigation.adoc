@@ -10,7 +10,7 @@ Golem features an intelligent navigation discovery engine that builds sidebar na
 
 1. *Root Page Pinning:* `index.adoc` in `content_dir` is always treated as the home/overview entry point.
 2. *Numeric Prefix Sorting:* Files and directories prefixed with numbers (e.g. `01-introduction.adoc`, `02-architecture.adoc`) are sorted numerically, and the numeric prefix is automatically stripped in the UI menu title (`Introduction`, `Architecture`).
-3. *Explicit Weight Ordering (`:nav_order:`):* AsciiDoc documents can declare their relative menu ordering using the `:nav_order:` (or `:navorder:`) header attribute.
+3. *Explicit Weight Ordering (`:nav_order:`):* AsciiDoc documents can declare their relative menu ordering using the `:nav_order:` header attribute.
 4. *Title Resolution:* Golem extracts document titles from the top-level AsciiDoc header (`= Document Title`) rather than raw filenames.
 5. *Empty Directory Pruning:* Directories that contain no `.adoc` source files are pruned from the navigation tree.
 
