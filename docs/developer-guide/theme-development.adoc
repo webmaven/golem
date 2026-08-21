@@ -4,56 +4,338 @@
 :sectanchors:
 :source-highlighter: highlight.js
 
-Themes in Golem are powered by Chameleon Zope Page Templates (`.pt`) using standard TAL (Template Attribute Language).
+Golem themes provide complete control over the layout, typography, aesthetic styling, and client-side behavior of generated documentation portals. Built on top of *Chameleon Zope Page Templates (`.pt`)* and standard *TAL (Template Attribute Language)*, Golem couples powerful declarative templating with modern, parameterized CSS Custom Properties.
 
-== Theme Layout Structure
+== Theme Architecture & Layout Structure
 
-A Golem theme resides in `templates/<theme_name>/`:
+A Golem theme is a self-contained directory containing layout templates and static assets. Golem locates and resolves themes using the following hierarchy:
+
+1. *Explicit Custom Template*: A template file designated in `templates_dir` (e.g. `templates/page.pt` or `templates/skeleton.pt`).
+2. *Project-Local Theme Folder*: Located at `themes/<theme_name>/` (e.g. `themes/mytheme/skeleton.pt`).
+3. *Packaged Plugin Theme*: Discovered via Python package entry points in the `golem.themes` group.
+4. *Built-in Default Theme*: Shipped directly inside the `golem` package at `src/golem/templates/default/skeleton.pt`.
+
+=== Standard Theme Directory Structure
 
 [source,text]
 ----
-templates/default/
-├── skeleton.pt         # Main HTML5 base skeleton template
-└── static/             # Theme-specific CSS, fonts, and assets
-    └── theme.css
+themes/mytheme/
+├── skeleton.pt         # Main HTML5 Chameleon base template
+└── static/             # Theme static assets (stylesheets, fonts, images, scripts)
+    ├── css/
+    │   └── theme.css
+    ├── js/
+    │   └── theme.js
+    └── images/
+        └── logo.svg
 ----
+
+When Golem builds your documentation site, static assets in `themes/<theme>/static/` are automatically synchronized into the output directory under `dist/static/`.
 
 == Template Context Variables
 
-When rendering `skeleton.pt`, Golem passes the following context variables:
+When rendering `skeleton.pt`, Golem passes a comprehensive set of template variables to Chameleon:
 
-[cols="1,2"]
+[cols="1,1,3"]
 |===
-| Variable | Content Description
+| Variable | Type | Description
 
-| `site_title` | Name of the site from `golem.toml` or `pyproject.toml`.
-| `page_title` | Title of the current document (`= Document Title`).
-| `site_author` | Author string if configured.
-| `site_url` | Base URL of the website.
-| `generator_version` | Active Golem version (e.g. `0.1.0a1`).
-| `body_html` | Rendered HTML5 content of the AsciiDoc document.
-| `nav_tree` | Hierarchical list of navigation items (`url`, `title`).
-| `nav_html` | Pre-rendered navigation sidebar HTML.
-| `toc_html` | Table of Contents navigation HTML for the current document.
-| `custom_css` | List of custom CSS stylesheets to link.
-| `custom_js` | List of custom JS script files to link.
+| `site_title` | `str` | Title of the website configured in `golem.toml` or `pyproject.toml` (default: `"Golem Docs"`).
+| `page_title` | `str` | Title of the current document extracted from the top-level AsciiDoc header (`= Document Title`) or front-matter. Also aliased as `title`.
+| `site_author` | `str` | Configured site author name or organization (default: `"Anonymous"`).
+| `site_url` | `str \| None` | Base URL of the website if configured (useful for `<link rel="canonical">` tags).
+| `generator_version` | `str` | Active version string of the Golem engine (e.g. `0.1.0a1`).
+| `body_html` | `str` | Pre-rendered semantic HTML5 content generated from the AsciiDoc document body. Also accessible as `body_content` and `body`.
+| `nav_tree` | `list[dict]` | Hierarchical site map data structure containing `{title, url, path, children}` dictionary nodes.
+| `nav_html` | `str` | Pre-rendered semantic HTML5 navigation list (`<nav class="golem-nav">...`). Also aliased as `navigation_html`.
+| `toc_html` | `str` | Rendered Table of Contents HTML unordered list generated from document headings (`h2`, `h3`, etc.).
+| `current_path` | `str` | Path of the source document relative to the content root directory.
+| `custom_css` | `list[str]` | List of custom stylesheet URLs or paths injected from configuration.
+| `custom_js` | `list[str]` | List of custom script URLs or paths injected from configuration.
 |===
 
-== CSS Theme Custom Properties
+== Chameleon TAL Syntax Reference
 
-The default theme is styled entirely via CSS Custom Properties (`--golem-*`) supporting both light mode and dark mode (`@media (prefers-color-scheme: dark)`):
+Chameleon templates use standard TAL XML attributes to inject dynamic data without breaking standard HTML syntax:
+
+* `tal:content="variable"`: Replaces the element's text content with an HTML-escaped string value.
+* `tal:content="structure variable"`: Injects raw HTML markup without escaping (essential for `body_html`, `nav_html`, and `toc_html`).
+* `tal:replace="structure variable"`: Replaces the containing HTML tag itself with raw markup.
+* `tal:condition="variable"`: Renders the element conditionally only if the expression evaluates to truthy.
+* `tal:repeat="item collection"`: Loops through an iterable, repeating the element for each item.
+* `tal:attributes="attr expression"`: Dynamically sets HTML element attributes (e.g. `tal:attributes="href item.url"`).
+* `${expression}`: String interpolation syntax for inline variable substitution within text and attributes.
+
+== CSS Theme Custom Properties (`--golem-*`)
+
+The default Golem theme ("Workbench" / Fired Clay aesthetic) is engineered entirely with parameterized CSS Custom Properties (`--golem-*`). Theme developers can completely re-skin Golem by overriding these variables in CSS without modifying the underlying HTML template.
+
+=== Light Mode Palette Tokens
+
+[cols="1,1,3"]
+|===
+| Token | Default Value | Role & Usage
+
+| `--golem-bg` | `#f7f4ef` | Main document background color (warm parchment).
+| `--golem-surface` | `#f2ede8` | Elevated surfaces: header, sidebar navigation, footer, admonition backgrounds.
+| `--golem-code-bg` | `#ece7de` | Background for inline code spans (`<code>`) and block code listings (`<pre>`).
+| `--golem-text` | `#1e1a16` | High-contrast primary reading text and headings.
+| `--golem-text-muted` | `#6b5d52` | Secondary captions, metadata, table headers, and inactive links.
+| `--golem-primary` | `#8b3a12` | Brand accent color (terracotta / fired clay) used for active links, hover states, and key highlights.
+| `--golem-primary-hover` | `#6b2a08` | Interactive hover and active focus state for primary brand elements.
+| `--golem-border` | `#cec8bf` | Subtle borders for sidebar dividers, code blocks, tables, and section separators.
+| `--golem-link` | `#8b3a12` | Standard hyperlink text color.
+| `--golem-link-hover` | `#6b2a08` | Hyperlink hover state color.
+| `--golem-link-visited` | `#3e2518` | Visited hyperlink text color.
+| `--golem-note` | `#2d6a5a` | Accent border color for `NOTE` admonitions (deep teal).
+| `--golem-tip` | `#6e7818` | Accent border color for `TIP` admonitions (olive green).
+| `--golem-important` | `#8b3a12` | Accent border color for `IMPORTANT` admonitions (terracotta).
+| `--golem-warning` | `#b58a00` | Accent border color for `WARNING` admonitions (warm amber).
+| `--golem-caution` | `#a31818` | Accent border color for `CAUTION` admonitions (crimson red).
+| `--golem-texture` | `url("data:image/svg+xml,...")` | Sub-perceptible SVG fractal noise texture overlay applied to the page body.
+|===
+
+=== Dark Mode Palette Overrides
+
+Golem automatically supports dark mode via `@media (prefers-color-scheme: dark)`. The dark theme uses charcoal and warm ember tones:
+
+[source,css]
+----
+@media (prefers-color-scheme: dark) {
+    :root {
+        --golem-bg: #170f0b;
+        --golem-surface: #1e1410;
+        --golem-code-bg: #2a1e17;
+        --golem-text: #f0e4d8;
+        --golem-text-muted: #9a7a68;
+        --golem-primary: #d4692a;
+        --golem-primary-hover: #e07a3a;
+        --golem-border: #3d2a20;
+        --golem-link: #d4692a;
+        --golem-link-hover: #e07a3a;
+        --golem-link-visited: #8a4c32;
+
+        /* Admonitions */
+        --golem-note: #4a9a8a;
+        --golem-tip: #7aaa3a;
+        --golem-important: #d4692a;
+        --golem-warning: #d4a020;
+        --golem-caution: #c04040;
+    }
+}
+----
+
+=== Typography Tokens
+
+Golem utilizes four distinct font tokens corresponding to functional typography roles:
+
+[cols="1,2,3"]
+|===
+| Token | Default Fallback Stack | Purpose
+
+| `--golem-font-display` | `'Source Serif 4', Georgia, serif` | Document titles (`h1`), section headings (`h2`, `h3`), and site branding.
+| `--golem-font-body` | `'Source Serif 4', Georgia, serif` | Main narrative paragraphs, lists, blockquotes, and prose content.
+| `--golem-font-ui` | `'Source Sans 3', system-ui, -apple-system, sans-serif` | Sidebar navigation items, table of contents links, metadata badges, table headers, and footers.
+| `--golem-font-mono` | `'Source Code Pro', SFMono-Regular, Menlo, Monaco, Consolas, monospace` | Code blocks (`<pre><code>`), inline code (`<code>`), keyboard shortcuts (`<kbd>`), and terminal snippets.
+|===
+
+=== Typographical Scale, Optical Sizing & Line-Height
+
+Golem embraces modern CSS variable fonts with optical sizing controls and proportional leading:
+
+* *Optical Sizing (`opsz`)*:
++
+[source,css]
+----
+body {
+    font-optical-sizing: auto;
+    font-variation-settings: "opsz" 12;
+    line-height: 1.75;
+}
+
+#golem-content h1 {
+    font-variation-settings: "opsz" 36;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+}
+
+#golem-content h2 {
+    font-variation-settings: "opsz" 24;
+    line-height: 1.3;
+}
+
+#golem-content h3 {
+    font-variation-settings: "opsz" 18;
+    line-height: 1.4;
+}
+
+pre, .listingblock pre {
+    line-height: 1.55;
+}
+----
+
+* *Container Sizing & Readability*:
++
+The main reading column is constrained for optimal typographical line length (60–75 characters per line):
++
+[source,css]
+----
+#golem-content {
+    flex: 1;
+    padding: 2.5rem 3.5rem;
+    max-width: 860px;
+}
+----
+
+* *Responsive Breakpoints*:
++
+[source,css]
+----
+/* Collapses right Table of Contents on medium viewports */
+@media (max-width: 1100px) {
+    #golem-sidebar-right { display: none; }
+    #golem-content { padding: 2rem 2.5rem; }
+}
+
+/* Stacks navigation and reading pane into single column on mobile */
+@media (max-width: 800px) {
+    #golem-wrapper { flex-direction: column; }
+    #golem-sidebar-left {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--golem-border);
+    }
+    #golem-content { padding: 1.5rem 1.25rem; }
+}
+----
+
+== Loading Custom Web Fonts & External Stylesheets
+
+You can load custom web fonts and external stylesheets across your documentation site using the `custom_css` setting in your configuration file (`golem.toml` or `pyproject.toml`).
+
+=== In `golem.toml`
+
+[source,toml]
+----
+[site]
+title = "My Project Docs"
+custom_css = [
+    "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
+    "/static/css/custom.css",
+]
+custom_js = [
+    "/static/js/theme-switcher.js",
+]
+----
+
+=== In `pyproject.toml`
+
+[source,toml]
+----
+[tool.golem.site]
+title = "My Library Documentation"
+custom_css = [
+    "https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Outfit:wght@400;600;700&display=swap",
+    "/static/css/custom.css",
+]
+----
+
+=== Applying Custom Fonts in `static/css/custom.css`
+
+Once loaded, assign the font families to Golem's typography tokens:
 
 [source,css]
 ----
 :root {
-    --golem-bg: #f7f4ef;
-    --golem-surface: #f2ede8;
-    --golem-code-bg: #ece7de;
-    --golem-text: #1e1a16;
-    --golem-primary: #8b3a12;
-    --golem-font-display: 'Source Serif 4', Georgia, serif;
-    --golem-font-body: 'Source Serif 4', Georgia, serif;
-    --golem-font-ui: 'Source Sans 3', system-ui, sans-serif;
-    --golem-font-mono: 'Source Code Pro', monospace;
+    --golem-font-display: 'Outfit', sans-serif;
+    --golem-font-body: 'Outfit', sans-serif;
+    --golem-font-ui: 'Outfit', sans-serif;
+    --golem-font-mono: 'Fira Code', monospace;
 }
 ----
+
+== Overriding `skeleton.pt` in a Custom Theme
+
+To create a fully customized theme or override Golem's default page structure:
+
+1. Create a theme directory: `themes/mytheme/`.
+2. Place a `skeleton.pt` template inside `themes/mytheme/skeleton.pt`.
+3. Set `theme = "mytheme"` in `golem.toml` under `[build]` (or `[tool.golem.build]` in `pyproject.toml`).
+
+=== Complete Annotated Custom Theme Example
+
+[source,html]
+----
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${page_title} - ${site_title}</title>
+    <meta name="generator" content="${generator_version}" />
+    <meta tal:condition="site_author" name="author" content="${site_author}" />
+    <link rel="canonical" tal:condition="site_url" href="${site_url}" />
+
+    <!-- External and Custom Stylesheets -->
+    <tal:block tal:repeat="css_file custom_css">
+        <link rel="stylesheet" href="${css_file}" />
+    </tal:block>
+
+    <!-- Theme Stylesheet -->
+    <link rel="stylesheet" href="/static/css/theme.css" />
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-container">
+            <a href="/" tal:attributes="href site_url or '/'" class="site-logo">${site_title}</a>
+            <span tal:condition="site_author" class="site-author">By ${site_author}</span>
+        </div>
+    </header>
+
+    <div class="layout-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar-nav">
+            <div tal:condition="nav_html" tal:replace="structure nav_html" />
+            <ul tal:condition="not:nav_html and nav_tree">
+                <li tal:repeat="item nav_tree">
+                    <a href="${item.url}" tal:attributes="href item.url">${item.title}</a>
+                </li>
+            </ul>
+        </aside>
+
+        <!-- Main Document Body -->
+        <main class="content-body">
+            <h1 tal:condition="page_title">${page_title}</h1>
+            <div tal:content="structure body_html" />
+        </main>
+
+        <!-- Table of Contents -->
+        <aside class="sidebar-toc" tal:condition="toc_html">
+            <h3>On This Page</h3>
+            <div tal:content="structure toc_html" />
+        </aside>
+    </div>
+
+    <footer class="site-footer">
+        <p>Built with Golem ${generator_version}</p>
+    </footer>
+
+    <!-- Custom JavaScript Injections -->
+    <tal:block tal:repeat="js_file custom_js">
+        <script src="${js_file}"></script>
+    </tal:block>
+</body>
+</html>
+----
+
+== Distributing Reusable Themes via Python Packages
+
+You can distribute Golem themes as reusable Python packages. Register your theme directory in `pyproject.toml` using entry points:
+
+[source,toml]
+----
+[project.entry-points."golem.themes"]
+mytheme = "my_theme_package"
+----
+
+When installed, users can select your theme simply by setting `theme = "mytheme"` in their `golem.toml`.

@@ -4,31 +4,168 @@
 :sectanchors:
 :source-highlighter: highlight.js
 
+Golem includes a static asset management pipeline that bundles project images, downloadable attachments, custom stylesheets, font files, and JavaScript scripts alongside your compiled documentation.
+
 == Static Assets Directory
 
-Static assets (images, fonts, stylesheets, scripts) placed in your configured `static_dir` (default: `static/` or `docs/static/`) are copied to `dist/static/` during build.
+By default, any static files placed in your project's `static/` directory (or the path configured via `static_dir`) are copied directly into `<output_dir>/static/` (default: `dist/static/`) during the build process, preserving their relative subfolder hierarchy.
+
+=== Typical Asset Directory Structure
+
+[source,text]
+----
+my-docs-project/
+├── content/
+│   └── index.adoc
+├── static/
+│   ├── css/
+│   │   └── custom.css       # Project stylesheet overrides
+│   ├── js/
+│   │   └── custom.js        # Project JavaScript scripts
+│   ├── images/
+│   │   ├── logo.svg
+│   │   └── architecture.png
+│   └── fonts/
+│       └── custom-font.woff2
+├── golem.toml
+└── dist/
+    └── static/              # Assets copied here during compilation
+        ├── css/custom.css
+        ├── js/custom.js
+        └── images/logo.svg
+----
 
 == Asset Precedence & Overrides
 
-When copying static files, Golem applies strict precedence:
+When resolving and synchronizing static files, Golem applies a strict three-tier precedence hierarchy:
 
-1. *Project Static Directory* (`<project_root>/static/`)
-2. *Custom Theme Static Directory* (`<theme>/static/`)
-3. *Golem Built-in Default Theme Assets*
+1. *Project Static Directory* (`<project_root>/static/` or configured `static_dir`)
+2. *Custom Theme Static Directory* (`themes/<theme_name>/static/` or `<templates_dir>/static/`)
+3. *Golem Built-in Default Theme Assets* (`templates/default/static/`)
 
-Project-level static files always override theme files of the same name.
+Project-level static files always override theme files of the same relative path. For example, placing a custom favicon or logo at `static/images/logo.svg` will override any theme-provided `logo.svg` without modifying the theme template or package files.
 
-== Injecting Custom CSS and JS
+== Project-Specific Styling without Modifying Themes
 
-Inject custom stylesheets or scripts across all pages in `golem.toml`:
+Authors can customize colors, typography, and page layout dimensions simply by creating a `static/css/custom.css` file and overriding Golem's CSS Custom Properties.
+
+=== Step 1: Create `static/css/custom.css`
+
+Create your custom stylesheet in your project's static folder:
+
+[source,css]
+----
+/* static/css/custom.css */
+
+/* 1. Custom Color Palette (Modern Slate / Indigo Theme) */
+:root {
+    --golem-bg: #f8fafc;
+    --golem-surface: #ffffff;
+    --golem-code-bg: #f1f5f9;
+    --golem-text: #0f172a;
+    --golem-text-muted: #64748b;
+    --golem-primary: #4f46e5;
+    --golem-primary-hover: #4338ca;
+    --golem-border: #e2e8f0;
+    --golem-link: #4f46e5;
+    --golem-link-hover: #3730a3;
+    --golem-link-visited: #6b21a8;
+
+    /* Custom Admonition Accents */
+    --golem-note: #0284c7;
+    --golem-tip: #16a34a;
+    --golem-important: #ea580c;
+    --golem-warning: #ca8a04;
+    --golem-caution: #dc2626;
+
+    /* Custom Typography Stack */
+    --golem-font-display: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --golem-font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --golem-font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --golem-font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* 2. Dark Mode Overrides */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --golem-bg: #0f172a;
+        --golem-surface: #1e293b;
+        --golem-code-bg: #0b1120;
+        --golem-text: #f8fafc;
+        --golem-text-muted: #94a3b8;
+        --golem-primary: #818cf8;
+        --golem-primary-hover: #a5b4fc;
+        --golem-border: #334155;
+        --golem-link: #818cf8;
+        --golem-link-hover: #a5b4fc;
+        --golem-link-visited: #c084fc;
+    }
+}
+
+/* 3. Layout Adjustments (Optional) */
+#golem-content {
+    max-width: 920px;
+}
+----
+
+=== Step 2: Inject Custom Stylesheets in `golem.toml`
+
+Register your stylesheet and optional web fonts in `golem.toml`:
 
 [source,toml]
 ----
 [site]
+title = "My Project Documentation"
 custom_css = [
-    "/static/css/overrides.css",
+    "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
+    "/static/css/custom.css",
 ]
 custom_js = [
     "/static/js/app.js",
 ]
+
+[build]
+static_dir = "static"
+output_dir = "dist"
+----
+
+=== Using `pyproject.toml`
+
+If you configure Golem inside `pyproject.toml`:
+
+[source,toml]
+----
+[tool.golem.site]
+title = "My Library Documentation"
+custom_css = [
+    "https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono&display=swap",
+    "/static/css/custom.css",
+]
+custom_js = [
+    "/static/js/analytics.js",
+]
+
+[tool.golem.build]
+static_dir = "static"
+----
+
+== Referencing Static Assets in AsciiDoc
+
+You can reference images, media, and downloadable files directly in your AsciiDoc documents using standard AsciiDoc macros:
+
+=== Inline and Block Images
+
+[source,asciidoc]
+----
+// Relative to current document or absolute static root
+image::/static/images/architecture.png[Architecture Diagram,width=800]
+
+You can also use inline images image:/static/images/badge.svg[Build Status] inside paragraphs.
+----
+
+=== File Downloads and Links
+
+[source,asciidoc]
+----
+Download our link:/static/downloads/whitepaper.pdf[Technical Whitepaper (PDF)].
 ----
