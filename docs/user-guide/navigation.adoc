@@ -10,8 +10,26 @@ Golem features an intelligent navigation discovery engine that builds sidebar na
 
 1. *Root Page Pinning:* `index.adoc` in `content_dir` is always treated as the home/overview entry point.
 2. *Numeric Prefix Sorting:* Files and directories prefixed with numbers (e.g. `01-introduction.adoc`, `02-architecture.adoc`) are sorted numerically, and the numeric prefix is automatically stripped in the UI menu title (`Introduction`, `Architecture`).
-3. *Title Resolution:* Golem extracts document titles from the top-level AsciiDoc header (`= Document Title`) rather than raw filenames.
-4. *Empty Directory Pruning:* Directories that contain no `.adoc` source files are pruned from the navigation tree.
+3. *Explicit Weight Ordering (`:nav_order:`):* AsciiDoc documents can declare their relative menu ordering using the `:nav_order:` (or `:navorder:`) header attribute.
+4. *Title Resolution:* Golem extracts document titles from the top-level AsciiDoc header (`= Document Title`) rather than raw filenames.
+5. *Empty Directory Pruning:* Directories that contain no `.adoc` source files are pruned from the navigation tree.
+
+== Section & Document Ordering with `:nav_order:`
+
+When auto-discovering navigation trees, Golem uses document metadata to establish reading hierarchy:
+
+[source,asciidoc]
+----
+= Getting Started
+:nav_order: 10
+:idprefix:
+:idseparator: -
+----
+
+=== Sorting Precedence
+1. **Explicit `:nav_order:` weight:** Documents and directory sections with lower numeric values appear first (e.g. `10` before `20`).
+2. **Directory Section Weights:** For a directory (e.g., `user-guide/`), Golem reads `:nav_order:` from its `index.adoc` (or `readme.adoc`) entry point to determine where the section appears relative to sibling sections.
+3. **Unordered Fallback:** Items without `:nav_order:` default to a weight of `999` and are sorted alphabetically by filename.
 
 == Explicit Navigation Overrides
 

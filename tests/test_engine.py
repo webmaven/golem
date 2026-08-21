@@ -409,7 +409,7 @@ def test_navigation_auto_discovery_basic(tmp_path):
     assert len(nav) == 4
     # Index pinned at top
     assert nav[0]["title"] == "Golem Docs"
-    assert nav[0]["url"] == "index.html"
+    assert nav[0]["url"] == "./"
 
     # Numeric sorting prefixes stripped for display titles
     assert nav[1]["title"] == "Getting Started"
@@ -448,7 +448,7 @@ def test_navigation_auto_discovery_nested_hierarchy(tmp_path):
 
     # Nested section
     assert nav[2]["title"] == "Guides Overview"
-    assert nav[2]["url"] == "02-guides/index.html"
+    assert nav[2]["url"] == "02-guides/"
     children = nav[2]["children"]
     assert len(children) == 2
     assert children[0]["title"] == "Config"
@@ -495,11 +495,11 @@ def test_navigation_html_generation_and_relative_urls(tmp_path):
     assert len(compiled) == 2
 
     root_html = (tmp_path / "dist" / "index.html").read_text(encoding="utf-8")
-    assert 'href="index.html"' in root_html
+    assert 'href="./"' in root_html
     assert 'href="guides/intro.html"' in root_html
 
     nested_html = (tmp_path / "dist" / "guides" / "intro.html").read_text(encoding="utf-8")
-    assert 'href="../index.html"' in nested_html
+    assert 'href="../"' in nested_html
     assert 'href="../guides/intro.html"' in nested_html or 'href="intro.html"' in nested_html
 
 

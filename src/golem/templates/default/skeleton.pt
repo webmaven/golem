@@ -172,12 +172,51 @@
             margin: 0;
         }
         #golem-sidebar-left li {
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.25rem;
+        }
+        .golem-nav-section {
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .golem-nav-section-title {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--golem-text-muted);
+            margin-bottom: 0.35rem;
+            padding: 0.15rem 0.5rem;
+        }
+        .golem-nav-section-title a {
+            color: var(--golem-text-muted) !important;
+            font-weight: 700 !important;
+            font-size: 0.8rem !important;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 0.15rem 0.5rem !important;
+            border-radius: 4px;
+        }
+        .golem-nav-section-title a:hover {
+            color: var(--golem-primary) !important;
+            background-color: var(--golem-surface-alt, rgba(0, 0, 0, 0.04));
+        }
+        .golem-nav-section-title a.active,
+        .golem-nav-section-title a[aria-current="page"] {
+            color: var(--golem-primary) !important;
+            background-color: var(--golem-surface-alt, rgba(0, 0, 0, 0.05));
+            border-left: 3px solid var(--golem-primary);
+        }
+        .golem-nav-sublist {
+            list-style: none;
+            padding-left: 0.5rem !important;
+            margin: 0.25rem 0 0.5rem 0 !important;
+            border-left: 1px solid var(--golem-border);
         }
         #golem-sidebar-left a {
             color: var(--golem-text);
             text-decoration: none;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             display: block;
             padding: 0.25rem 0.5rem;
             border-radius: 4px;

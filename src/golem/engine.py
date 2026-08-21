@@ -30,6 +30,21 @@ def _title_from_filename(name: str) -> str:
     return " ".join(word.capitalize() for word in cleaned.split())
 
 
+def _clean_index_url(url: str) -> str:
+    """Normalize index.html URLs to clean directory paths.
+
+    Converts URLs ending in ``/index.html`` to the parent directory form
+    (ending with ``/``) so that generated navigation and pagination links
+    use the same canonical URL form as hand-authored AsciiDoc ``link:``
+    macros, preventing crawlers from treating them as distinct resources.
+    """
+    if url == "index.html":
+        return "./"
+    if url.endswith("/index.html"):
+        return url[: -len("index.html")]
+    return url
+
+
 def _extract_metadata_from_doc(path: Path) -> dict[str, Any]:
     """Extract document metadata (title, nav_title, nav_order, has_toc) from an AsciiDoc file."""
     title = None
@@ -496,7 +511,7 @@ class BuildEngine:
                     }
                 )
                 title = meta.get("nav_title") or meta.get("title", _title_from_filename(item))
-                rel_url = Path(item).with_suffix(".html").as_posix()
+                rel_url = _clean_index_url(Path(item).with_suffix(".html").as_posix())
                 nav_items.append(
                     {
                         "title": title,
@@ -564,7 +579,7 @@ class BuildEngine:
 
             if current_dir == self.content_dir and index_file is not None:
                 rel_p = index_file.relative_to(self.content_dir).as_posix()
-                rel_u = index_file.relative_to(self.content_dir).with_suffix(".html").as_posix()
+                rel_u = _clean_index_url(index_file.relative_to(self.content_dir).with_suffix(".html").as_posix())
                 meta = self.get_file_metadata(index_file)
                 title = meta.get("nav_title") or meta.get("title", "")
                 items.append(
@@ -582,7 +597,7 @@ class BuildEngine:
                 if current_dir != self.content_dir and f == index_file:
                     continue
                 rel_p = f.relative_to(self.content_dir).as_posix()
-                rel_u = f.relative_to(self.content_dir).with_suffix(".html").as_posix()
+                rel_u = _clean_index_url(f.relative_to(self.content_dir).with_suffix(".html").as_posix())
                 meta = self.get_file_metadata(f)
                 title = meta.get("nav_title") or meta.get("title", "")
                 items.append(
@@ -614,7 +629,7 @@ class BuildEngine:
                 if sub_index is not None:
                     meta = self.get_file_metadata(sub_index)
                     sec_title = meta.get("nav_title") or meta.get("title", "")
-                    sec_url = sub_index.relative_to(self.content_dir).with_suffix(".html").as_posix()
+                    sec_url = _clean_index_url(sub_index.relative_to(self.content_dir).with_suffix(".html").as_posix())
                     sec_path = sub_index.relative_to(self.content_dir).as_posix()
                 else:
                     sec_title = _title_from_filename(d.name)
@@ -662,6 +677,9 @@ class BuildEngine:
                 item_path = item.get("path")
                 children = item.get("children", [])
                 href = f"{prefix}{url}" if url else None
+                # Collapse redundant './' segment: '.././' -> '../', '../.././' -> '../../'
+                if href and href.endswith("./") and len(href) > 2:
+                    href = href[:-2]
                 is_current = bool((curr_posix and item_path == curr_posix) or (curr_html and url == curr_html))
 
                 if children:
@@ -738,7 +756,7 @@ class BuildEngine:
 
         curr_idx = -1
         for idx, p in enumerate(pages):
-            if p["path"] == curr_posix or p["url"] == curr_html:
+            if p["path"] == curr_posix or p["url"] == curr_html or p["url"] == _clean_index_url(curr_html):
                 curr_idx = idx
                 break
 
@@ -748,18 +766,24 @@ class BuildEngine:
         prev_item: dict[str, str] | None = None
         if curr_idx > 0:
             raw_prev = pages[curr_idx - 1]
+            prev_url = f"{prefix}{raw_prev['url']}"
+            if prev_url.endswith("./") and len(prev_url) > 2:
+                prev_url = prev_url[:-2]
             prev_item = {
                 "title": raw_prev["title"],
-                "url": f"{prefix}{raw_prev['url']}",
+                "url": prev_url,
                 "path": raw_prev["path"],
             }
 
         next_item: dict[str, str] | None = None
         if curr_idx < len(pages) - 1:
             raw_next = pages[curr_idx + 1]
+            next_url = f"{prefix}{raw_next['url']}"
+            if next_url.endswith("./") and len(next_url) > 2:
+                next_url = next_url[:-2]
             next_item = {
                 "title": raw_next["title"],
-                "url": f"{prefix}{raw_next['url']}",
+                "url": next_url,
                 "path": raw_next["path"],
             }
 
