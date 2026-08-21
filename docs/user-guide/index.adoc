@@ -8,7 +8,7 @@ The User Guide provides in-depth documentation for configuring Golem, authoring 
 
 == Topics in this Section
 
-* link:configuration.html[Configuration Reference (`golem.toml` & `pyproject.toml`)]
+* link:configuration.html[Configuration Reference (golem.toml & pyproject.toml)]
 * link:authoring.html[AsciiDoc Authoring & Partial Files Protocol]
 * link:book-authoring.html[Technical Nonfiction & Book Authoring]
 * link:navigation.html[Hierarchical Navigation & Auto-Discovery]
