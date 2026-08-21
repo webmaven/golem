@@ -25,3 +25,4 @@ This rule establishes the model selection matrix and thinking level allocations 
 
 1. **Never use `Model: "inherit"`:** Always explicitly designate the subagent model to prevent context bloating and rate limit exhaustion.
 2. **Explicit Thinking Level:** Always configure subagent prompts or agent harnesses with discrete thinking levels (`LOW`, `MEDIUM`, `HIGH`).
+3. **Commit before termination:** Any agent session (orchestrator or subagent) that has modified working tree files **must** run `git add` and `git commit` before terminating. An uncommitted working tree is lost work — subsequent sessions or tree resets will silently destroy it. Even a `WIP:` prefixed commit is acceptable; lost edits are not.
