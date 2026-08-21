@@ -1,5 +1,6 @@
 = About Golem
 Michael Bernstein <zopemaven@gmail.com>
+:nav_order: 50
 :idprefix:
 :idseparator: -
 :sectanchors:

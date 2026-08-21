@@ -960,3 +960,45 @@ def test_dir_has_adoc_content_helper(tmp_path):
     (nested_valid / "sub1" / "sub2").mkdir(parents=True)
     (nested_valid / "sub1" / "sub2" / "doc.adoc").write_text("= Doc")
     assert _dir_has_adoc_content(nested_valid) is True
+
+
+def test_discover_navigation_respects_nav_order(tmp_path):
+    from golem.config import GolemConfig
+    from golem.engine import BuildEngine
+
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "index.adoc").write_text("= Home\n:nav_order: 1\n", encoding="utf-8")
+
+    sec_b = content / "beta"
+    sec_b.mkdir()
+    (sec_b / "index.adoc").write_text("= Beta Section\n:nav_order: 10\n", encoding="utf-8")
+
+    sec_a = content / "alpha"
+    sec_a.mkdir()
+    (sec_a / "index.adoc").write_text("= Alpha Section\n:nav_order: 20\n", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    nav = engine.discover_navigation()
+    # Home first, then Beta (nav_order: 10), then Alpha (nav_order: 20) despite alphabetical 'alpha' < 'beta'
+    titles = [item["title"] for item in nav]
+    assert titles == ["Home", "Beta Section", "Alpha Section"]
+
+
+def test_generate_nav_html_active_states(tmp_path):
+    from golem.config import GolemConfig
+    from golem.engine import BuildEngine
+
+    content = tmp_path / "content"
+    content.mkdir()
+    (content / "index.adoc").write_text("= Home\n", encoding="utf-8")
+    (content / "guide.adoc").write_text("= Guide\n", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    html = engine.generate_nav_html(current_rel_path=Path("guide.adoc"))
+    assert 'class="golem-nav-item active"' in html
+    assert '<a href="guide.html" aria-current="page" class="active">Guide</a>' in html

@@ -31,9 +31,10 @@ def _title_from_filename(name: str) -> str:
 
 
 def _extract_metadata_from_doc(path: Path) -> dict[str, Any]:
-    """Extract document metadata (title, nav_title, has_toc) from an AsciiDoc file."""
+    """Extract document metadata (title, nav_title, nav_order, has_toc) from an AsciiDoc file."""
     title = None
     nav_title = None
+    nav_order: int | None = None
     has_toc = False
     if path.exists() and path.is_file():
         try:
@@ -48,6 +49,12 @@ def _extract_metadata_from_doc(path: Path) -> dict[str, Any]:
                         val = line_s.split(":", 2)[2].strip()
                         if val:
                             nav_title = val
+                    elif line_s.startswith(":nav_order:") or line_s.startswith(":navorder:"):
+                        val = line_s.split(":", 2)[2].strip()
+                        try:
+                            nav_order = int(val)
+                        except ValueError:
+                            pass
                     elif line_s.startswith(":title:") and title is None:
                         val = line_s.split(":", 2)[2].strip()
                         if val:
@@ -68,6 +75,7 @@ def _extract_metadata_from_doc(path: Path) -> dict[str, Any]:
     return {
         "title": title,
         "nav_title": nav_title,
+        "nav_order": nav_order,
         "has_toc": has_toc,
     }
 
@@ -517,13 +525,41 @@ class BuildEngine:
             files = [e for e in valid_entries if e.is_file() and e.suffix == ".adoc"]
             dirs = [e for e in valid_entries if e.is_dir()]
 
-            files.sort(key=lambda x: x.name.lower())
-            dirs.sort(key=lambda x: x.name.lower())
+            def _file_sort_key(p: Path) -> tuple[int, str]:
+                meta = self.get_file_metadata(p)
+                order = meta.get("nav_order")
+                return (order if order is not None else 999, p.name.lower())
+
+            def _dir_sort_key(d: Path) -> tuple[int, str]:
+                sub_index: Path | None = None
+                try:
+                    # Prefer index.adoc first, then readme.adoc
+                    for target_stem in ("index", "readme"):
+                        for sub_f in d.iterdir():
+                            if sub_f.is_file() and sub_f.suffix == ".adoc" and sub_f.stem.lower() == target_stem:
+                                sub_index = sub_f
+                                break
+                        if sub_index is not None:
+                            break
+                except Exception:
+                    pass
+                if sub_index is not None:
+                    meta = self.get_file_metadata(sub_index)
+                    order = meta.get("nav_order")
+                    if order is not None:
+                        return (order, d.name.lower())
+                return (999, d.name.lower())
+
+            files.sort(key=_file_sort_key)
+            dirs.sort(key=_dir_sort_key)
 
             index_file: Path | None = None
-            for f in files:
-                if f.stem.lower() in ("index", "readme"):
-                    index_file = f
+            for target_stem in ("index", "readme"):
+                for f in files:
+                    if f.stem.lower() == target_stem:
+                        index_file = f
+                        break
+                if index_file is not None:
                     break
 
             if current_dir == self.content_dir and index_file is not None:
@@ -561,11 +597,14 @@ class BuildEngine:
             for d in dirs:
                 if not _dir_has_adoc_content(d):
                     continue
-                sub_index: Path | None = None
+                sub_index = None
                 try:
-                    for sub_f in d.iterdir():
-                        if sub_f.is_file() and sub_f.suffix == ".adoc" and sub_f.stem.lower() in ("index", "readme"):
-                            sub_index = sub_f
+                    for target_stem in ("index", "readme"):
+                        for sub_f in d.iterdir():
+                            if sub_f.is_file() and sub_f.suffix == ".adoc" and sub_f.stem.lower() == target_stem:
+                                sub_index = sub_f
+                                break
+                        if sub_index is not None:
                             break
                 except Exception:
                     pass
@@ -611,27 +650,38 @@ class BuildEngine:
             if depth > 0:
                 prefix = "../" * depth
 
+        curr_posix = current_rel_path.as_posix() if current_rel_path else None
+        curr_html = current_rel_path.with_suffix(".html").as_posix() if current_rel_path else None
+
         def render_list(items: list[dict[str, Any]], is_nested: bool = False) -> list[str]:
             ul_class = "golem-nav-sublist" if is_nested else "golem-nav-list"
             out = [f'<ul class="{ul_class}">\n']
             for item in items:
                 title = item.get("title", "")
                 url = item.get("url")
+                item_path = item.get("path")
                 children = item.get("children", [])
                 href = f"{prefix}{url}" if url else None
+                is_current = bool((curr_posix and item_path == curr_posix) or (curr_html and url == curr_html))
 
                 if children:
-                    out.append('  <li class="golem-nav-section">\n')
+                    sec_class = "golem-nav-section active" if is_current else "golem-nav-section"
+                    out.append(f'  <li class="{sec_class}">\n')
+                    curr_attr = ' aria-current="page" class="active"' if is_current else ""
                     if href:
-                        out.append(f'    <span class="golem-nav-section-title"><a href="{href}">{title}</a></span>\n')
+                        out.append(
+                            f'    <span class="golem-nav-section-title"><a href="{href}"{curr_attr}>{title}</a></span>\n'
+                        )
                     else:
                         out.append(f'    <span class="golem-nav-section-title">{title}</span>\n')
                     out.extend(render_list(children, is_nested=True))
                     out.append("  </li>\n")
                 else:
-                    out.append('  <li class="golem-nav-item">')
+                    item_class = "golem-nav-item active" if is_current else "golem-nav-item"
+                    curr_attr = ' aria-current="page" class="active"' if is_current else ""
+                    out.append(f'  <li class="{item_class}">')
                     if href:
-                        out.append(f'<a href="{href}">{title}</a>')
+                        out.append(f'<a href="{href}"{curr_attr}>{title}</a>')
                     else:
                         out.append(f"<span>{title}</span>")
                     out.append("</li>\n")

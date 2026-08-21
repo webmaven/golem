@@ -123,6 +123,26 @@
             flex: 1;
         }
 
+        /* ── Skip Link (Accessibility) ─────────────────────── */
+        .golem-skip-link {
+            position: absolute;
+            top: -999px;
+            left: 1rem;
+            z-index: 1000;
+            padding: 0.5rem 1rem;
+            background: var(--golem-primary);
+            color: #ffffff;
+            font-family: var(--golem-font-ui);
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: 0 0 4px 4px;
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .golem-skip-link:focus {
+            top: 0;
+        }
+
         /* ── Left Sidebar (Navigation) ─────────────────────── */
         #golem-sidebar-left {
             width: 270px;
@@ -131,6 +151,11 @@
             border-right: 1px solid var(--golem-border);
             font-family: var(--golem-font-ui);
             flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            scrollbar-gutter: stable;
         }
         #golem-sidebar-left h3 {
             margin-top: 0;
@@ -154,19 +179,30 @@
             text-decoration: none;
             font-size: 0.9rem;
             display: block;
-            padding: 0.2rem 0;
-            transition: color 0.15s ease, padding-left 0.15s ease;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            transition: color 0.15s ease, background-color 0.15s ease, padding-left 0.15s ease;
         }
         #golem-sidebar-left a:hover {
             color: var(--golem-primary);
-            padding-left: 4px;
+            background-color: var(--golem-surface-alt, rgba(0, 0, 0, 0.04));
+            padding-left: 0.75rem;
+        }
+        #golem-sidebar-left a.active,
+        #golem-sidebar-left a[aria-current="page"] {
+            color: var(--golem-primary);
+            font-weight: 600;
+            background-color: var(--golem-surface-alt, rgba(0, 0, 0, 0.05));
+            border-left: 3px solid var(--golem-primary);
+            padding-left: 0.5rem;
         }
 
         /* ── Main Content Area ─────────────────────────────── */
         #golem-content {
             flex: 1;
-            padding: 2.5rem 3.5rem;
-            max-width: 860px;
+            --golem-content-pad-x: 3.5rem;
+            padding: 2.5rem var(--golem-content-pad-x);
+            max-width: calc(72ch + (2 * var(--golem-content-pad-x)));
         }
         #golem-content h1 {
             font-family: var(--golem-font-display);
@@ -451,19 +487,24 @@
     </style>
 </head>
 <body>
+    <a href="#golem-content" class="golem-skip-link">Skip to main content</a>
     <header id="golem-header" class="golem-header">
         <h1><a href="/" tal:attributes="href site_url or '/'">${site_title}</a></h1>
         <span tal:condition="site_author" class="golem-author">${site_author}</span>
     </header>
     <div id="golem-wrapper">
-        <aside id="golem-sidebar-left" class="golem-sidebar-left">
-            <h3>Navigation</h3>
-            <div tal:condition="nav_html" tal:replace="structure nav_html" />
-            <ul tal:condition="not:nav_html and nav_tree">
-                <li tal:repeat="item nav_tree">
-                    <a href="${item.url}" tal:attributes="href item.url">${item.title}</a>
-                </li>
-            </ul>
+        <aside id="golem-sidebar-left" class="golem-sidebar-left" aria-label="Site Navigation">
+            <details class="golem-nav-details" open="open">
+                <summary class="golem-nav-summary"><h3>Navigation</h3></summary>
+                <div class="golem-nav-content">
+                    <div tal:condition="nav_html" tal:replace="structure nav_html" />
+                    <ul tal:condition="not:nav_html and nav_tree" class="golem-nav-list">
+                        <li tal:repeat="item nav_tree" class="golem-nav-item">
+                            <a href="${item.url}" tal:attributes="href item.url">${item.title}</a>
+                        </li>
+                    </ul>
+                </div>
+            </details>
         </aside>
         <main id="golem-content" class="golem-content">
             <h1 tal:condition="page_title">${page_title}</h1>
