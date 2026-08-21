@@ -185,6 +185,8 @@ class PageCompiler:
         current_path: str = "",
         custom_css: list[str] | None = None,
         custom_js: list[str] | None = None,
+        prev_page: dict[str, str] | None = None,
+        next_page: dict[str, str] | None = None,
     ) -> str:
         """
         == compile_page
@@ -202,6 +204,8 @@ class PageCompiler:
         - `current_path`:: Current document path relative to content dir.
         - `custom_css`:: Custom CSS stylesheet links to inject.
         - `custom_js`:: Custom JS script links to inject.
+        - `prev_page`:: Previous document metadata for pagination.
+        - `next_page`:: Next document metadata for pagination.
         """
         effective_title = page_title if page_title is not None else title
         effective_body = body_html if body_html is not None else body_content
@@ -252,6 +256,8 @@ class PageCompiler:
             navigation_html=nav_html,
             nav_tree=nav_tree or [],
             current_path=current_path,
+            prev_page=prev_page,
+            next_page=next_page,
             site_title=getattr(self.config, "site_title", "Golem Docs"),
             site_author=getattr(self.config, "site_author", "Anonymous"),
             site_url=getattr(self.config, "site_url", None),

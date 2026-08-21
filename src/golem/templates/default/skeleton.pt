@@ -337,6 +337,73 @@
             margin: 0;
         }
 
+        /* ── Chapter Pagination (Prev / Next) ──────────────── */
+        .golem-pagination {
+            display: flex;
+            align-items: stretch;
+            justify-content: space-between;
+            gap: 1.25rem;
+            margin-top: 3.5rem;
+            padding-top: 1.75rem;
+            border-top: 1px solid var(--golem-border);
+            font-family: var(--golem-font-ui);
+        }
+        .golem-pagination-spacer {
+            flex: 1;
+        }
+        .golem-pagination-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 0.9rem 1.15rem;
+            background: var(--golem-surface);
+            border: 1px solid var(--golem-border);
+            border-radius: 6px;
+            text-decoration: none;
+            transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .golem-pagination-card:hover {
+            border-color: var(--golem-primary);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+            transform: translateY(-1px);
+        }
+        .golem-pagination-next {
+            text-align: right;
+            align-items: flex-end;
+        }
+        .golem-pagination-prev {
+            text-align: left;
+            align-items: flex-start;
+        }
+        .golem-pagination-subtitle {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--golem-text-muted);
+            margin-bottom: 0.25rem;
+        }
+        .golem-pagination-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--golem-text);
+            line-height: 1.35;
+        }
+        .golem-pagination-card:hover .golem-pagination-title {
+            color: var(--golem-primary);
+        }
+
+        /* ── Reduced Motion ────────────────────────────────── */
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+            *, *::before, *::after {
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+            }
+        }
+
         /* ── Responsive Breakdown ──────────────────────────── */
         @media (max-width: 1100px) {
             #golem-sidebar-right { display: none; }
@@ -345,11 +412,41 @@
         @media (max-width: 800px) {
             #golem-wrapper { flex-direction: column; }
             #golem-sidebar-left {
+                position: static;
                 width: 100%;
+                height: auto;
+                max-height: none;
                 border-right: none;
                 border-bottom: 1px solid var(--golem-border);
+                padding: 0.75rem 1.25rem;
             }
-            #golem-content { padding: 1.5rem 1.25rem; }
+            .golem-nav-details summary {
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0.25rem 0;
+            }
+            .golem-nav-details summary::after {
+                content: "▾";
+                font-size: 0.85rem;
+                transition: transform 0.15s ease;
+            }
+            .golem-nav-details[open] summary::after {
+                transform: rotate(180deg);
+            }
+            #golem-content {
+                --golem-content-pad-x: 1.25rem;
+                padding: 1.5rem var(--golem-content-pad-x);
+                max-width: 100%;
+            }
+            .golem-pagination {
+                flex-direction: column;
+            }
+            .golem-pagination-next {
+                text-align: left;
+                align-items: flex-start;
+            }
         }
     </style>
 </head>
@@ -371,6 +468,17 @@
         <main id="golem-content" class="golem-content">
             <h1 tal:condition="page_title">${page_title}</h1>
             <div tal:content="structure body_html" />
+            <nav tal:condition="prev_page or next_page" class="golem-pagination" aria-label="Chapter Navigation">
+                <a tal:condition="prev_page" href="${prev_page.url}" tal:attributes="href prev_page.url" class="golem-pagination-card golem-pagination-prev" rel="prev">
+                    <span class="golem-pagination-subtitle">← Previous</span>
+                    <span class="golem-pagination-title">${prev_page.title}</span>
+                </a>
+                <div tal:condition="not:prev_page" class="golem-pagination-spacer"></div>
+                <a tal:condition="next_page" href="${next_page.url}" tal:attributes="href next_page.url" class="golem-pagination-card golem-pagination-next" rel="next">
+                    <span class="golem-pagination-subtitle">Next →</span>
+                    <span class="golem-pagination-title">${next_page.title}</span>
+                </a>
+            </nav>
         </main>
         <aside id="golem-sidebar-right" class="golem-sidebar-right golem-toc">
             <h4>On This Page</h4>

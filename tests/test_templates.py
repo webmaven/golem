@@ -244,3 +244,27 @@ def test_workspace_theme_skeleton_override(tmp_path, monkeypatch):
 
     assert "<title>Theme Skeleton: Theme Page</title>" in html
     assert '<div id="theme-content"><p>Theme Content</p></div>' in html
+
+
+def test_chapter_pagination_rendering(tmp_path):
+    """Test prev/next chapter pagination cards rendering."""
+    config = GolemConfig(output_dir=str(tmp_path / "dist"))
+    compiler = PageCompiler(config)
+
+    html = compiler.compile_page(
+        title="Chapter 2: Architecture",
+        body_content="<p>Detailed architecture description.</p>",
+        toc_html="",
+        prev_page={"title": "Introduction", "url": "intro.html"},
+        next_page={"title": "Configuration Reference", "url": "config.html"},
+    )
+
+    assert 'class="golem-pagination"' in html
+    assert 'class="golem-pagination-card golem-pagination-prev"' in html
+    assert 'class="golem-pagination-card golem-pagination-next"' in html
+    assert 'href="intro.html"' in html
+    assert "Introduction" in html
+    assert 'href="config.html"' in html
+    assert "Configuration Reference" in html
+    assert "← Previous" in html
+    assert "Next →" in html

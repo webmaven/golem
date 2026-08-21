@@ -643,6 +643,78 @@ class BuildEngine:
         res.append("</nav>")
         return "".join(res)
 
+    def get_ordered_nav_pages(self) -> list[dict[str, Any]]:
+        """
+        == get_ordered_nav_pages
+
+        Flatten the hierarchical navigation tree into a linear reading order.
+        """
+        nav_tree = self.discover_navigation()
+        pages: list[dict[str, Any]] = []
+
+        def _flatten(items: list[dict[str, Any]]) -> None:
+            for item in items:
+                title = item.get("title", "")
+                url = item.get("url")
+                path = item.get("path")
+                children = item.get("children", [])
+
+                if url:
+                    pages.append({"title": title, "url": url, "path": path or ""})
+                if children:
+                    _flatten(children)
+
+        _flatten(nav_tree)
+        return pages
+
+    def get_page_pagination(self, current_rel_path: Path | None = None) -> tuple[dict[str, str] | None, dict[str, str] | None]:
+        """
+        == get_page_pagination
+
+        Retrieve previous and next page information relative to current_rel_path.
+        """
+        if current_rel_path is None:
+            return None, None
+
+        pages = self.get_ordered_nav_pages()
+        if not pages:
+            return None, None
+
+        depth = len(current_rel_path.parent.parts)
+        prefix = ("../" * depth) if depth > 0 else ""
+
+        curr_posix = current_rel_path.as_posix()
+        curr_html = current_rel_path.with_suffix(".html").as_posix()
+
+        curr_idx = -1
+        for idx, p in enumerate(pages):
+            if p["path"] == curr_posix or p["url"] == curr_html:
+                curr_idx = idx
+                break
+
+        if curr_idx == -1:
+            return None, None
+
+        prev_item: dict[str, str] | None = None
+        if curr_idx > 0:
+            raw_prev = pages[curr_idx - 1]
+            prev_item = {
+                "title": raw_prev["title"],
+                "url": f"{prefix}{raw_prev['url']}",
+                "path": raw_prev["path"],
+            }
+
+        next_item: dict[str, str] | None = None
+        if curr_idx < len(pages) - 1:
+            raw_next = pages[curr_idx + 1]
+            next_item = {
+                "title": raw_next["title"],
+                "url": f"{prefix}{raw_next['url']}",
+                "path": raw_next["path"],
+            }
+
+        return prev_item, next_item
+
     def _get_template_search_paths(self) -> list[Path]:
         """Collect template search paths for asciidoctype / Chameleon."""
         paths: list[Path] = []
@@ -778,15 +850,20 @@ class BuildEngine:
 
                 toc_html = generate_toc_html(asg)  # type: ignore[arg-type]
 
-                # Generate dynamic navigation HTML for this page
+                # Generate dynamic navigation HTML and chapter pagination for this page
                 rel_path = doc_path.relative_to(self.content_dir)
                 nav_html = self.generate_nav_html(current_rel_path=rel_path)
+                prev_page, next_page = self.get_page_pagination(current_rel_path=rel_path)
 
                 final_html = self.compiler.compile_page(
                     title=title_str,
                     body_content=body_content,
                     toc_html=toc_html,
                     nav_html=nav_html,
+                    nav_tree=self.discover_navigation(),
+                    current_path=str(rel_path),
+                    prev_page=prev_page,
+                    next_page=next_page,
                 )
 
                 # Trigger post-render hooks sequentially (chain modifications)
