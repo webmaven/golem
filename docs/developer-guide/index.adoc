@@ -8,8 +8,8 @@ This guide explains Golem's internals, AST/ASG compilation pipeline, plugin syst
 
 == Topics in this Section
 
-* link:pipeline.html[AST/ASG Compilation Pipeline]
-* link:plugin-system.html[Pluggy Plugin Hook Specifications]
-* link:theme-development.html[Theme Development & Chameleon TAL]
-* link:recipes.html[Plugin & Macro Recipes]
-* link:deployment.html[CI/CD Automation & Deployment Recipes]
+* link:pipeline.html[*AST/ASG Compilation Pipeline*] — Deterministic, compiler-grade document processing lifecycle from source `.adoc` to static HTML5.
+* link:plugin-system.html[*Pluggy Plugin Hook Specifications*] — Lifecycle hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_post_render`, `golem_add_subcommands`) and entry-point packaging.
+* link:theme-development.html[*Theme Development & Chameleon TAL*] — Creating custom themes, skeleton templates, context variables, and CSS property tokens.
+* link:recipes.html[*Plugin & Macro Recipes*] — Production-ready recipes for role-based AST transformers and custom CLI command extensions.
+* link:deployment.html[*CI/CD Automation & Deployment Recipes*] — GitHub Actions workflows, artifact caching, and static hosting deployment.

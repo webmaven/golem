@@ -15,10 +15,10 @@ toc::[]
 
 In folklore, a golem is an unadorned creature shaped from common earth and brought to life through the animating power of the inscribed word. 
 
-Golem approaches static publishing with the same ethos:
+Golem approaches static publishing with a similar ethos:
 
 * *Unadorned & Heavy-Duty:* A sturdy maple workbench with cast-iron vises. No fragile web framework graphs or opaque build magic.
-* *AsciiDoc Native:* Moving beyond the semantic poverty of Markdown and the brittle syntax traps of reStructuredText into an industrial-strength document format.
+* *AsciiDoc Native:* Moving beyond the semantic limitations of Markdown and the brittle syntax of reStructuredText into an industrial-strength document format.
 * *Pure HTML/CSS Baseline:* Zero JavaScript required for default layouts, mode switching (`prefers-color-scheme`), or navigation.
 * *Fellow Craftsman Respect:* Transparent ASTs, clean `pluggy` hooks, and compiler-grade diagnostic coordinates (`path:line:col`) for every syntax issue.
 
@@ -41,5 +41,5 @@ Golem approaches static publishing with the same ethos:
 | Full CLI command dictionary and embedded doctest verification reference.
 
 | link:about/[About & Colophon]
-| Project origin myth, the Hellboy/Ben Grimm archetype, colophon design notes, and governance documents.
+| Project origin, publishing philosophy, colophon design notes, and governance documents.
 |===

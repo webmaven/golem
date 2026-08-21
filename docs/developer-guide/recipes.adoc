@@ -6,7 +6,7 @@
 
 == Recipe 1: AST Macro Transformer
 
-Transform custom AsciiDoc roles (like `[.alert]`) into styled admonition containers:
+Transform custom AsciiDoc roles (like `[.alert]`) into custom CSS-styled admonition blocks during ASG semantic resolution:
 
 [source,python]
 ----
@@ -15,33 +15,78 @@ import pluggy
 hookimpl = pluggy.HookimplMarker("golem")
 
 class AlertBadgePlugin:
+    """Mutates ASG nodes tagged with role='alert'."""
+
     @hookimpl
     def on_asg_created(self, asg: dict, file_path: str) -> dict:
         for block in asg.get("blocks", []):
             if block.get("role") == "alert":
-                block["attributes"]["class"] = "golem-custom-alert"
+                attrs = block.setdefault("attributes", {})
+                existing_class = attrs.get("class", "")
+                attrs["class"] = f"{existing_class} golem-custom-alert".strip()
         return asg
 ----
 
-== Recipe 2: CLI Subcommand Injection
+== Recipe 2: Custom CLI Subcommand (Site Statistics Auditor)
 
-Inject custom commands (like `golem sitemap` or `golem search-index`) into Golem's CLI:
+Register a new command `golem stats` that scans the output directory and prints a summary report of generated pages and total payload size:
 
 [source,python]
 ----
+from pathlib import Path
 import click
 import pluggy
 
 hookimpl = pluggy.HookimplMarker("golem")
 
-@click.command()
-@click.option("--format", default="xml")
-def sitemap(format: str):
-    '''Generate search-engine sitemap index.'''
-    click.echo(f"Building search sitemap in {format} format...")
+@click.command(name="stats")
+@click.option("--output-dir", default="dist", help="Target build output directory.")
+def stats_command(output_dir: str) -> None:
+    """Inspect and report static build artifact metrics."""
+    dist_path = Path(output_dir)
+    if not dist_path.exists():
+        raise click.ClickException(f"Output directory '{output_dir}' does not exist. Run 'golem build' first.")
 
-class SitemapPlugin:
+    html_files = list(dist_path.rglob("*.html"))
+    static_files = [f for f in dist_path.rglob("*") if f.is_file() and f.suffix != ".html"]
+    total_bytes = sum(f.stat().st_size for f in dist_path.rglob("*") if f.is_file())
+
+    click.secho(f"=== Golem Build Metrics ({output_dir}) ===", bold=True)
+    click.echo(f"  • HTML Pages Compiled: {len(html_files)}")
+    click.echo(f"  • Static Assets:       {len(static_files)}")
+    click.echo(f"  • Total Build Size:    {total_bytes / 1024:.1f} KB")
+
+class SiteStatsPlugin:
+    """Registers the 'stats' command with Golem's CLI group."""
+
     @hookimpl
-    def golem_add_subcommands(self, cli_group):
-        cli_group.add_command(sitemap)
+    def golem_add_subcommands(self, cli: click.Group) -> None:
+        cli.add_command(stats_command)
+----
+
+== Recipe 3: Post-Render Canonical URL Injector
+
+Inject custom OpenGraph metadata and canonical link tags into the rendered HTML `<head>` prior to writing files to disk:
+
+[source,python]
+----
+import pluggy
+
+hookimpl = pluggy.HookimplMarker("golem")
+
+class CanonicalUrlPlugin:
+    """Injects a canonical <link> tag into the <head> of compiled HTML pages."""
+
+    def __init__(self, base_url: str = "https://example.com/docs/"):
+        self.base_url = base_url.rstrip("/")
+
+    @hookimpl
+    def on_post_render(self, html_content: str, file_path: str) -> str:
+        # Determine relative URL slug
+        rel_slug = file_path.replace(".adoc", ".html")
+        canonical_tag = f'<link rel="canonical" href="{self.base_url}/{rel_slug}">'
+
+        if "</head>" in html_content:
+            return html_content.replace("</head>", f"  {canonical_tag}\n</head>", 1)
+        return html_content
 ----

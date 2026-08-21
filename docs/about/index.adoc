@@ -6,15 +6,13 @@ Michael Bernstein <zopemaven@gmail.com>
 :sectanchors:
 :source-highlighter: highlight.js
 
-== The Origin & Archetype
+== The Origin & Philosophy
 
-In traditional Jewish lore, a *golem* (`גולם`) is formed from unshaped clay or earth and brought to life through the animating power of the inscribed word—an embodiment of truth (`אמת`) dedicated to protection, labor, and purpose.
+In traditional Jewish lore, a *golem* (`גולם`) is formed from unshaped clay or earth and brought to life through the animating power of the inscribed word—an embodiment of truth (`אמת`) dedicated to labor and purpose.
 
 Golem draws upon that textual tradition: the conviction that words carry structural, animating force. 
 
-Visually and temperamentally, Golem's character sits at the intersection of **Hellboy** (the blue-collar occult researcher with a heavy stone hand, a dry cigar-stub perspective, and a quiet respect for ancient texts) and **Ben Grimm / The Thing** (the rocky, unadorned powerhouse from the Lower East Side—gruff, utterly loyal, fiercely capable, and completely unpretentious).
-
-Golem is the protector sitting patiently in the archive stacks: solid, enduring, and made with clear purpose.
+Temperamentally, Golem is an unadorned, heavy-duty tool: solid, capable, and completely unpretentious. It brings a craftsman's respect for enduring materials to technical documentation—engineered for longevity, transparent operation, and a refusal to indulge in fragile, ephemeral tooling.
 
 == The Publishing Workbench
 

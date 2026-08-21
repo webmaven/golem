@@ -8,12 +8,89 @@ Golem supports full standards-compliant AsciiDoc across 39 node types, rendered 
 
 == Supported AsciiDoc Constructs
 
-* *Admonition Blocks:* `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, `CAUTION` with distinct earth-tone accents.
-* *Code & Callouts:* Syntax-highlighted source listings with numbered callouts (`<1>`, `<2>`).
-* *Complex Tables:* Column formatting, headers, auto-wrapping, and cell alignments.
-* *Footnotes:* Footnote references (`footnote:[...]`) automatically anchored and indexed.
-* *Math & Stem:* Inlined `stem:[E = mc^2]` and display block math.
-* *Description Lists:* Multi-tier term and description syntax.
+=== 1. Admonition Blocks
+Golem supports all 5 standard admonitions with distinctive, color-coded callout boxes:
+
+[source,asciidoc]
+----
+[NOTE]
+====
+Informational note for helpful side details.
+====
+
+[TIP]
+====
+Pro-tip for efficiency or performance.
+====
+
+[IMPORTANT]
+====
+Essential requirement or critical design invariant.
+====
+
+[WARNING]
+====
+Cautionary warning against breaking changes or syntax errors.
+====
+
+[CAUTION]
+====
+High-risk warning for potential data loss or security issues.
+====
+----
+
+=== 2. Source Code & Callouts
+Syntax-highlighted listings with numbered callouts:
+
+[source,asciidoc]
+------
+[source,python]
+----
+import click <1>
+
+@click.command() <2>
+def hello():
+    click.echo("Hello, Golem!")
+----
+<1> Import the click CLI framework.
+<2> Decorate the function as a command entry point.
+------
+
+=== 3. Structured Tables
+Tables support explicit column widths, header alignment, and embedded formatting:
+
+[source,asciidoc]
+----
+[cols="1,2,1"]
+|===
+| Command | Purpose | Default Port
+
+| `golem serve` | Live-reload development server | `8000`
+| `golem build` | Compile static site to `dist/` | N/A
+|===
+----
+
+=== 4. Mathematical Expressions (STEM)
+Inline formulas and block equations:
+
+[source,asciidoc]
+----
+Inline formula: stem:[E = mc^2]
+
+[stem]
+++++
+\sum_{i=1}^{n} i = \frac{n(n+1)}{2}
+++++
+----
+
+=== 5. Description Lists & Footnotes
+Hierarchical term-definition syntax and anchored footnotes:
+
+[source,asciidoc]
+----
+AST:: Concrete Abstract Syntax Tree parsed by Lark.
+ASG:: Semantic Abstract Semantic Graph resolved by `asciidoctrine`.footnote:[Named after the compiler intermediate representation.]
+----
 
 == Partial Files Protocol (`_*.adoc`)
 
@@ -24,5 +101,5 @@ In large technical books and manuals, chapters are often split across reusable s
 Any file prefixed with an underscore (e.g. `_header.adoc`, `_sidebar_notes.adoc`, `_footer.adoc`) is treated as a *Partial File*.
 ====
 
-* Partial files are *never compiled into standalone HTML files* in `dist/`.
-* When a partial file is modified, Golem's incremental DAG compiler traverses `.golem/cache.json` and automatically rebuilds every parent document that includes it.
+* *No Standalone Compilation:* Partial files are *never compiled into standalone HTML files* in `dist/`.
+* *DAG Dependency Tracking:* When a partial file is modified, Golem's incremental DAG compiler traverses `.golem/cache.json` and automatically rebuilds every parent document that includes it.
