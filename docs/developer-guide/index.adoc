@@ -3,7 +3,7 @@
 :idseparator: -
 :sectanchors:
 
-This guide explains Golem's internals, AST/ASG compilation pipeline, plugin system, and theme template engine for developers, plugin creators, and theme authors.
+This guide explains Golem's internals, AST/ASG compilation pipeline, plugin system, theme template engine, and CI/CD automation for developers and documentation maintainers.
 
 == Topics in this Section
 
@@ -11,3 +11,4 @@ This guide explains Golem's internals, AST/ASG compilation pipeline, plugin syst
 * link:plugin-system.html[Pluggy Plugin Hook Specifications]
 * link:theme-development.html[Theme Development & Chameleon TAL]
 * link:recipes.html[Plugin & Macro Recipes]
+* link:deployment.html[CI/CD Automation & Deployment Recipes]

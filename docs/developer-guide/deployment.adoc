@@ -1,0 +1,165 @@
+= CI/CD Automation & Deployment Recipes
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+:toc:
+:toclevels: 3
+
+Golem static sites are designed for zero-runtime hosting across static hosting platforms including GitHub Pages, Cloudflare Pages, and GitLab Pages. Because Golem is implemented in pure Python with deterministic incremental caching, CI/CD build pipelines can be configured for sub-second execution and strict build verification.
+
+== 1. GitHub Actions for GitHub Pages
+
+Deploying your Golem documentation site to GitHub Pages with automatic build caching, strict error checking, and tokenless deployment using `actions/deploy-pages`:
+
+=== `.github/workflows/docs.yml`
+
+[source,yaml]
+----
+name: Deploy Documentation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'golem.toml'
+      - 'pyproject.toml'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: "pip"
+
+      - name: Restore Golem build cache
+        uses: actions/cache@v4
+        with:
+          path: .golem/cache.json
+          key: golem-cache-${{ runner.os }}-${{ hashFiles('docs/**', 'golem.toml', 'pyproject.toml') }}
+          restore-keys: |
+            golem-cache-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install golem-docs
+
+      - name: Compile documentation site
+        run: |
+          golem build --strict --clean
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+----
+
+[IMPORTANT]
+====
+Always supply the `--strict` flag in CI/CD environments. In strict mode, Golem fails the build with a non-zero exit code if any parsing warnings, unresolvable includes, or invalid syntax constructs are encountered.
+====
+
+== 2. Build Caching Optimization
+
+Golem persists a dependency Directed Acyclic Graph (DAG) and document hash index in `.golem/cache.json`.
+
+* *Sub-Second Incremental Builds:* When `.golem/cache.json` is restored in the CI runner, Golem only recompiles pages that have modified source text or changed `include::` dependencies.
+* *Cache Key Strategy:* Use `actions/cache` matching the operating system and content file hashes as shown above.
+
+== 3. Cloudflare Pages Deployment
+
+Cloudflare Pages can build and deploy Golem documentation directly from your Git repository.
+
+=== Build Configuration
+
+Configure the build settings in the Cloudflare Pages Dashboard:
+
+[cols="1,2"]
+|===
+| Setting | Value
+
+| *Framework Preset* | None (Custom)
+| *Build Command* | `pip install golem-docs && golem build --strict`
+| *Build Output Directory* | `dist`
+| *Root Directory* | `/`
+|===
+
+=== Environment Variables
+
+Under **Settings > Environment variables**, specify the Python runtime version:
+
+[source,text]
+----
+PYTHON_VERSION = 3.14
+----
+
+== 4. GitLab CI/CD Deployment
+
+For repositories hosted on GitLab, deploy to GitLab Pages using `.gitlab-ci.yml`:
+
+=== `.gitlab-ci.yml`
+
+[source,yaml]
+----
+image: python:3.14-slim
+
+pages:
+  stage: deploy
+  cache:
+    key: golem-cache
+    paths:
+      - .golem/cache.json
+      - .cache/pip
+  before_script:
+    - pip install --upgrade pip
+    - pip install golem-docs
+  script:
+    - golem build --strict --clean
+    - mv dist public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+----
+
+== 5. Verification & Pre-Deployment Checklist
+
+Prior to triggering production deployments, execute the following local pre-flight checks:
+
+* [x] Run `golem build --strict` to ensure zero compilation warnings.
+* [x] Verify that custom stylesheets (`static_dir`) and fonts resolve properly with relative URLs.
+* [x] Confirm that `:site_url:` is configured correctly in `golem.toml` or `pyproject.toml` for canonical link generation.

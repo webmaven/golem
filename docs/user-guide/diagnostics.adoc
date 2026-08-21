@@ -1,0 +1,101 @@
+= Compiler Diagnostics & Troubleshooting
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+:toc:
+:toclevels: 3
+
+Golem is engineered with compiler-grade error reporting and actionable diagnostic coordinates. Instead of failing with opaque Python stack traces, Golem identifies the exact file, line, and column position of syntax errors and unresolvable dependencies.
+
+== 1. Understanding Compiler Diagnostics
+
+When Golem encounters a syntax error, attribute misconfiguration, or unresolvable include directive, it formats a diagnostic report modeled after modern compilers (like Clang and Rustc):
+
+[source,text]
+----
+Error: Syntax error during AsciiDoc AST parsing
+  --> docs/chapters/02-architecture.adoc:42:15
+   |
+42 | [source,python
+   |               ^
+   | Unclosed block attribute delimiter; expected ']'
+----
+
+=== Diagnostic Anatomy
+
+* *Target File Path:* `docs/chapters/02-architecture.adoc`
+* *Line & Column Position:* Line 42, Column 15 (`path:line:col`).
+* *Source Context Window:* Up to 3 lines of source code surrounding the failure.
+* *Caret Indicator (`^`):* Points directly to the offending character or token.
+* *Diagnostic Message:* Explanation of the syntax requirement.
+
+== 2. Common AsciiDoc Authoring Pitfalls
+
+=== 1. Missing Blank Lines Before Blocks & Lists
+In AsciiDoc, block attributes (`[source,...]`, `[NOTE]`, `[cols="..."]`) and lists must be preceded by a blank line. If jammed directly against preceding paragraphs, the parser may treat them as literal text.
+
+[cols="1,1"]
+|===
+| ❌ Problematic Syntax | ✅ Correct Syntax
+
+a|
+[source,asciidoc]
+----
+Here is my code example:
+[source,python]
+def hello():
+    pass
+----
+
+a|
+[source,asciidoc]
+----
+Here is my code example:
+
+[source,python]
+def hello():
+    pass
+----
+|===
+
+=== 2. Unbalanced Block Delimiters
+Block delimiters must contain at least 4 matching delimiter characters:
+
+* Source code blocks: `----` (4 hyphens)
+* Admonition blocks: `====` (4 equals signs)
+* Open blocks: `--` (2 hyphens)
+* Passthrough blocks: `++++` (4 plus signs)
+
+[TIP]
+====
+If an inner code block itself contains four hyphens, you can enclose the outer listing in 6 or more hyphens: `------`.
+====
+
+=== 3. Invalid Include Paths
+Paths in `include::path.adoc[]` are evaluated relative to the directory containing the parent document. If you move a file into a subdirectory, update all relative include targets accordingly.
+
+=== 4. Accidental Macro Execution in Code Examples
+When writing documentation *about* AsciiDoc in AsciiDoc, escape include and xref directives with a leading backslash (`\include::...` or `\xref:...`) inside listings so Golem does not attempt to evaluate them during parsing.
+
+== 3. Debugging Incremental Cache & DAG Dependencies
+
+Golem caches parsed ASTs and semantic graphs in `.golem/cache.json`.
+
+* *Forced Clean Build:* If you suspect cached state is stale after moving files or renaming branches, run:
++
+[source,bash]
+----
+golem build --clean
+----
+
+* *Strict Mode Verification:* Use strict mode locally before pushing commits:
++
+[source,bash]
+----
+golem build --strict
+----
+
+== 4. Development Server Live-Reload Diagnostics
+
+When running `golem serve`, syntax errors do not crash the local server. Instead, Golem injects an interactive error overlay directly into your browser via Server-Sent Events (SSE), displaying the diagnostic traceback until the offending file is saved with valid syntax.

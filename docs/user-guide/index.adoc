@@ -14,3 +14,4 @@ The User Guide provides in-depth documentation for configuring Golem, authoring 
 * link:navigation.html[Hierarchical Navigation & Auto-Discovery]
 * link:dev-server.html[Live-Reload Server & Error Overlays]
 * link:static-assets.html[Static Assets & Theme Customization]
+* link:diagnostics.html[Compiler Diagnostics & Troubleshooting]
