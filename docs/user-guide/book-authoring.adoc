@@ -1,0 +1,275 @@
+= Technical Nonfiction & Multi-Chapter Book Authoring
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+:toc:
+:toclevels: 3
+
+Golem is engineered from first principles to support long-form technical nonfiction, architecture decision records, comprehensive reference manuals, and multi-chapter book manuscripts. While simple static site generators treat documentation as isolated markdown pages, Golem leverages standard AsciiDoc semantics, AST-level transformations, and an incremental dependency Directed Acyclic Graph (DAG) to deliver a world-class book authoring experience.
+
+== 1. Multi-File Structuring & The Partial Files Protocol
+
+Large books and manuals quickly become unwieldy when maintained in a single massive file. Golem provides full support for modular, multi-file manuscripts using the standard AsciiDoc `include::` directive paired with Golem's *Partial Files Protocol*.
+
+=== The `include::` Directive
+You can decompose complex chapters into smaller, focused subsections or reusable components:
+
+[source,asciidoc]
+----
+= Designing Distributed Systems
+:doctype: book
+:toc:
+
+\include::_frontmatter/preface.adoc[]
+
+\include::chapters/01-consensus.adoc[]
+\include::chapters/02-replication.adoc[]
+\include::chapters/03-partitioning.adoc[]
+
+\include::_backmatter/glossary.adoc[]
+----
+
+Paths in `include::` directives are evaluated relative to the directory of the including document, enabling clean, hierarchical folder organization.
+
+=== The Partial Files Convention (`_*.adoc`)
+In Golem, any file whose filename begins with an underscore (for example, `_preface.adoc`, `_sidebar_note.adoc`, `_footer.adoc`, or `_ch01_part_a.adoc`) is designated as a *Partial File*.
+
+[IMPORTANT]
+====
+Partial files (`_*.adoc`) follow two critical operational rules in Golem:
+
+1. *No Standalone HTML Emission:* Partial files are *never compiled into standalone HTML files* in the output directory (`dist/`). This prevents incomplete fragments or orphaned pages from cluttering your published site or search index.
+2. *DAG Dependency Tracking:* Golem's build engine inspects all `include::` references across your project and constructs a dependency Directed Acyclic Graph (DAG) persisted in `.golem/cache.json`. When a partial file is modified, Golem automatically identifies every parent document that includes it and triggers an incremental recompilation of the affected pages.
+====
+
+=== Example Multi-File Project Layout
+
+A typical multi-chapter technical book project in Golem is structured as follows:
+
+[source,text]
+----
+my-book/
+├── golem.toml
+└── docs/
+    ├── index.adoc                  <-- Main landing / overview page
+    ├── 01-foundations/
+    │   ├── index.adoc              <-- Chapter 1 master page
+    │   ├── _math-prerequisites.adoc<-- Partial included by Chapter 1
+    │   └── _code-samples.adoc      <-- Partial included by Chapter 1
+    ├── 02-architecture/
+    │   ├── index.adoc              <-- Chapter 2 master page
+    │   └── _diagrams.adoc          <-- Partial included by Chapter 2
+    ├── _shared/
+    │   ├── _admonitions.adoc       <-- Reusable callouts
+    │   └── _glossary-terms.adoc    <-- Reusable terms
+    └── appendices/
+        ├── index.adoc              <-- Appendices overview
+        └── a-specifications.adoc   <-- Appendix A
+----
+
+== 2. Book Document Attributes & Typographical Conventions
+
+AsciiDoc document header attributes give you fine-grained control over document metadata, typographical numbering, table of contents rendering, and interactive UI macros.
+
+=== Document Types (`:doctype:`)
+By default, Golem renders documents using `:doctype: article`. For long-form nonfiction and books, declare `:doctype: book`:
+
+[source,asciidoc]
+----
+= Scalable Storage Engines
+:doctype: book
+----
+
+In `book` doctype:
+* Top-level sections (`==`) are treated as book chapters.
+* Level 0 titles (`=`) serve as the overall book title or part titles (`= Part I: Fundamentals`).
+* Semantic structural elements like prefaces, dedications, and appendices adopt book-specific formatting.
+
+=== Section Numbering (`:sectnums:` & `:sectnumlevels:`)
+Technical books require clear, multi-tiered section numbering for precise citations and cross-referencing:
+
+[source,asciidoc]
+----
+:sectnums:
+:sectnumlevels: 3
+----
+
+* `:sectnums:`: Enables automatic decimal numbering on section titles (e.g., `1. Introduction`, `1.1 System Architecture`, `1.1.1 Network Topology`).
+* `:sectnumlevels: <depth>`: Specifies the deepest heading level to number (default is 3).
+* To disable numbering on specific sections (such as prefaces or summaries), place `[unnumbered]` or `:!sectnums:` immediately above the section header.
+
+=== Table of Contents Controls (`:toc:` & `:toclevels:`)
+Configure document-level and book-level table of contents generation:
+
+[source,asciidoc]
+----
+:toc:
+:toclevels: 3
+:toc-title: Table of Contents
+----
+
+* `:toc:`: Enables table of contents rendering. In Golem's responsive themes, this generates both the sticky sidebar navigation and the in-page TOC.
+* `:toclevels:`: Sets the maximum heading depth displayed in the table of contents.
+* `:toc-title:`: Customizes the header label displayed above the TOC.
+
+=== UI Macros & Interactive Controls (`:experimental:`)
+Technical books often describe user interface workflows, keyboard combinations, and command sequences. Enable the `:experimental:` attribute to activate AsciiDoc UI macros:
+
+[source,asciidoc]
+----
+:experimental:
+
+Press kbd:[Ctrl+Shift+P] to open the Command Palette.
+Navigate to menu:File[Export > Generate Static Site].
+Click btn:[Build Artifacts] to trigger the compilation pipeline.
+----
+
+=== Recommended Master Book Header
+
+Here is the standard, recommended attribute configuration for technical book master documents:
+
+[source,asciidoc]
+----
+= Advanced Compiler Design & Optimization
+:doctype: book
+:idprefix:
+:idseparator: -
+:sectanchors:
+:sectnums:
+:sectnumlevels: 3
+:toc:
+:toclevels: 3
+:experimental:
+:source-highlighter: highlight.js
+:icons: font
+:stem: latexmath
+----
+
+== 3. Cross-Document References & Anchors
+
+Golem provides rich support for intra-document and inter-document cross-references, ensuring referential integrity across chapters and sections.
+
+=== Inter-Document References (`xref:`)
+To link across chapters and documents within your book, use the `xref:` macro pointing to the target AsciiDoc source file:
+
+[source,asciidoc]
+----
+For detailed algorithmic complexity analysis, see xref:02-architecture/index.adoc[Chapter 2: Architecture].
+
+For installation prerequisites, refer to xref:getting-started/installation.adoc#system-requirements[System Requirements].
+----
+
+Golem automatically translates `.adoc` references into the corresponding published `.html` URLs during site generation.
+
+=== Explicit Section Anchors
+Define persistent, human-readable anchor IDs above sections, tables, or listings:
+
+[source,asciidoc]
+----
+[#sec-distributed-transactions]
+=== Distributed Two-Phase Commit
+
+This protocol guarantees atomicity across independent database shards.
+----
+
+You can now reference this specific section from any other chapter:
+
+[source,asciidoc]
+----
+As analyzed in xref:01-foundations/index.adoc#sec-distributed-transactions[Section 1.3: Distributed Two-Phase Commit], network partitions require special recovery logic.
+----
+
+=== Hyperlinks vs. Cross-References
+* Use `\xref:chapter-02.adoc#anchor[Chapter 2]` for *internal links* to pages within your documentation project. Golem validates internal xref targets and resolves relative paths dynamically.
+* Use `\link:https://example.com[Label]` or `https://example.com[Label]` for *external URLs* outside the documentation site.
+
+[TIP]
+====
+When running `golem build --strict`, Golem's build engine validates document references and reports any broken cross-document links with precise file, line, and column coordinates.
+====
+
+== 4. Organizing Front Matter, Chapters, Appendices & Back Matter
+
+High-quality nonfiction manuscripts follow standard publishing conventions for document sequence and hierarchy.
+
+=== 1. Front Matter & Prefaces
+Front matter consists of introductory material preceding the first numbered chapter:
+
+[source,asciidoc]
+----
+[preface]
+== Preface
+
+Welcome to *Advanced Systems Engineering*. This book is intended for distributed systems architects and senior backend engineers.
+
+=== Audience & Prerequisites
+Readers should be comfortable with concurrent programming and TCP/IP network fundamentals.
+
+=== Typographical Conventions
+* `Monospace` indicates code symbols, configuration keys, and terminal commands.
+* *Bold* denotes key terms and concepts introduced for the first time.
+----
+
+The `[preface]` role indicates to the renderer that this section precedes Chapter 1 and should not receive standard chapter numbering.
+
+=== 2. Main Chapters & Parts
+Organize your core technical content using Part headers (`=`) or Chapter headers (`==`):
+
+[source,asciidoc]
+----
+= Part I: Fundamentals of Consensus
+
+== Raft Protocol Implementation
+
+The Raft protocol decomposes distributed consensus into leader election, log replication, and safety.
+
+=== Leader Election
+When a follower node experiences an election timeout, it transitions to the candidate state...
+----
+
+=== 3. Appendices (`[appendix]`)
+Appendices provide supplementary specifications, reference tables, or mathematical proofs. Use the `[appendix]` attribute to designate an appendix section:
+
+[source,asciidoc]
+----
+[appendix]
+== Formal TLA+ Specifications
+
+This appendix presents the complete, machine-checked TLA+ specification for our leader election algorithm.
+----
+
+[NOTE]
+====
+When `:sectnums:` is active, AsciiDoc automatically renumbers `[appendix]` sections using letters (`Appendix A`, `Appendix B`) instead of sequential numbers (`Chapter 7`).
+====
+
+=== 4. Glossaries & Back Matter
+Back matter provides index definitions, bibliographic references, and colophon notes:
+
+[source,asciidoc]
+----
+[glossary]
+== Glossary of Terms
+
+[glossary]
+Consensus::
+  The process of agreeing on a single data value among multiple distributed processes or nodes.
+
+Linearizability::
+  A strong consistency model where all operations appear to execute atomically at a specific point in time between their invocation and completion.
+
+Quorum::
+  The minimum number of voting members that must be present and participating to make transactions valid.
+----
+
+== Summary Checklist for Technical Nonfiction
+
+When authoring multi-chapter books and technical guides in Golem:
+
+* [x] Structure chapters into modular files and use `_*.adoc` for partial components included via `\include::`.
+* [x] Set `:doctype: book`, `:sectnums:`, `:sectnumlevels: 3`, and `:toc:` in the document header.
+* [x] Activate `:experimental:` for UI keyboard shortcuts (`kbd:[]`), menus (`menu:[]`), and buttons (`btn:[]`).
+* [x] Use `\xref:target.adoc#anchor[Label]` for robust internal cross-chapter references.
+* [x] Organize content into `[preface]`, chapter parts, `[appendix]`, and `[glossary]` back matter.
+* [x] Run `golem build --strict` to verify syntax validity, DAG dependencies, and clean HTML compilation.

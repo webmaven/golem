@@ -2,6 +2,7 @@
 :idprefix:
 :idseparator: -
 :sectanchors:
+:nav_order: 20
 
 The User Guide provides in-depth documentation for configuring Golem, authoring rich AsciiDoc content, managing navigation, and leveraging dev tools.
 
@@ -9,6 +10,7 @@ The User Guide provides in-depth documentation for configuring Golem, authoring 
 
 * link:configuration.html[Configuration Reference (`golem.toml` & `pyproject.toml`)]
 * link:authoring.html[AsciiDoc Authoring & Partial Files Protocol]
+* link:book-authoring.html[Technical Nonfiction & Book Authoring]
 * link:navigation.html[Hierarchical Navigation & Auto-Discovery]
 * link:dev-server.html[Live-Reload Server & Error Overlays]
 * link:static-assets.html[Static Assets & Theme Customization]
