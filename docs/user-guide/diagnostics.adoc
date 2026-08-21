@@ -36,11 +36,8 @@ Error: Syntax error during AsciiDoc AST parsing
 === 1. Missing Blank Lines Before Blocks & Lists
 In AsciiDoc, block attributes (`[source,...]`, `[NOTE]`, `[cols="..."]`) and lists must be preceded by a blank line. If jammed directly against preceding paragraphs, the parser may treat them as literal text.
 
-[cols="1,1"]
-|===
-| ❌ Problematic Syntax | ✅ Correct Syntax
+*❌ Problematic Syntax:*
 
-a|
 [source,asciidoc]
 ----
 Here is my code example:
@@ -49,7 +46,8 @@ def hello():
     pass
 ----
 
-a|
+*✅ Correct Syntax:*
+
 [source,asciidoc]
 ----
 Here is my code example:
@@ -58,7 +56,7 @@ Here is my code example:
 def hello():
     pass
 ----
-|===
+
 
 === 2. Unbalanced Block Delimiters
 Block delimiters must contain at least 4 matching delimiter characters:
