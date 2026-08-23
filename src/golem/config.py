@@ -22,6 +22,9 @@ class GolemConfig:
     static_dir: str = "static"
     plugins_dir: str = "plugins"
     plugins: list[str] = field(default_factory=list)
+    api_packages: list[str] = field(default_factory=list)
+    api_output_dir: str = "api"
+    api_docstring_style: str = "auto"
     config_path: str | None = None
 
 
@@ -73,6 +76,24 @@ def _parse_plugins(raw_plugins: Any) -> list[str] | None:
     return None
 
 
+def _parse_api_packages(raw_packages: Any) -> list[str]:
+    if raw_packages is None:
+        return []
+    if isinstance(raw_packages, str):
+        return [raw_packages]
+    if isinstance(raw_packages, list):
+        parsed = []
+        for item in raw_packages:
+            if isinstance(item, dict) and "name" in item:
+                parsed.append(str(item["name"]))
+            elif isinstance(item, str):
+                parsed.append(item)
+            else:
+                parsed.append(str(item))
+        return parsed
+    return []
+
+
 def load_config(config_path: Path) -> GolemConfig:
     if not config_path.exists():
         return GolemConfig()
@@ -117,6 +138,30 @@ def load_config(config_path: Path) -> GolemConfig:
         plugins = parsed_plugins if parsed_plugins is not None else []
         raw_nav = nav_data.get("nav") if "nav" in nav_data else (golem_data.get("navigation_nav") or golem_data.get("nav"))
         navigation_nav = _parse_nav(raw_nav)
+
+        api_data = golem_data.get("api", {}) if isinstance(golem_data.get("api"), dict) else {}
+        raw_api_packages = (
+            api_data.get("packages")
+            if "packages" in api_data
+            else (
+                api_data.get("api_packages")
+                if "api_packages" in api_data
+                else (
+                    golem_data.get("api_packages")
+                    or (golem_data.get("api") if isinstance(golem_data.get("api"), (list, str)) else None)
+                )
+            )
+        )
+        api_packages = _parse_api_packages(raw_api_packages)
+        api_output_dir = (
+            api_data.get("output_dir") or api_data.get("api_output_dir") or golem_data.get("api_output_dir") or "api"
+        )
+        api_docstring_style = (
+            api_data.get("docstring_style")
+            or api_data.get("api_docstring_style")
+            or golem_data.get("api_docstring_style")
+            or "auto"
+        )
     else:
         site_data = data.get("site", {})
         build_data = data.get("build", {})
@@ -146,6 +191,22 @@ def load_config(config_path: Path) -> GolemConfig:
             else (data.get("navigation_nav") if "navigation_nav" in data else data.get("nav"))
         )
         navigation_nav = _parse_nav(raw_nav)
+
+        api_data = data.get("api", {}) if isinstance(data.get("api"), dict) else {}
+        raw_api_packages = (
+            api_data.get("packages")
+            if "packages" in api_data
+            else (
+                api_data.get("api_packages")
+                if "api_packages" in api_data
+                else (data.get("api_packages") or (data.get("api") if isinstance(data.get("api"), (list, str)) else None))
+            )
+        )
+        api_packages = _parse_api_packages(raw_api_packages)
+        api_output_dir = api_data.get("output_dir") or api_data.get("api_output_dir") or data.get("api_output_dir") or "api"
+        api_docstring_style = (
+            api_data.get("docstring_style") or api_data.get("api_docstring_style") or data.get("api_docstring_style") or "auto"
+        )
 
     # Ensure resolved content_dir and output_dir do not overlap (identical or nested)
     try:
@@ -183,5 +244,8 @@ def load_config(config_path: Path) -> GolemConfig:
         static_dir=static_dir,
         plugins_dir=plugins_dir,
         plugins=plugins,
+        api_packages=api_packages,
+        api_output_dir=api_output_dir,
+        api_docstring_style=api_docstring_style,
         config_path=str(config_path.resolve()),
     )

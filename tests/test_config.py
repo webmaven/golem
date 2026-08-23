@@ -343,3 +343,72 @@ static_dir = "my_assets"
 """)
     config_pyproject = load_config(config_file_pyproject)
     assert config_pyproject.static_dir == "my_assets"
+
+
+def test_config_api_defaults():
+    config = GolemConfig()
+    assert config.api_packages == []
+    assert config.api_output_dir == "api"
+    assert config.api_docstring_style == "auto"
+
+
+def test_config_api_golem_toml(tmp_path):
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+[site]
+title = "API Test Docs"
+
+[api]
+packages = ["golem", "mymodule"]
+output_dir = "reference/api"
+docstring_style = "google"
+""")
+    config = load_config(config_file)
+    assert config.api_packages == ["golem", "mymodule"]
+    assert config.api_output_dir == "reference/api"
+    assert config.api_docstring_style == "google"
+
+
+def test_config_api_pyproject_toml(tmp_path):
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text("""
+[tool.golem.site]
+title = "PyProject API Docs"
+
+[tool.golem.api]
+packages = ["pkg_a", "pkg_b"]
+output_dir = "api_docs"
+docstring_style = "sphinx"
+""")
+    config = load_config(config_file)
+    assert config.api_packages == ["pkg_a", "pkg_b"]
+    assert config.api_output_dir == "api_docs"
+    assert config.api_docstring_style == "sphinx"
+
+
+def test_config_api_alternative_keys_and_formats(tmp_path):
+    # Test single string package and api_* prefixes in golem.toml
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+[api]
+api_packages = "single_package"
+api_output_dir = "custom_api"
+api_docstring_style = "numpy"
+""")
+    config = load_config(config_file)
+    assert config.api_packages == ["single_package"]
+    assert config.api_output_dir == "custom_api"
+    assert config.api_docstring_style == "numpy"
+
+    # Test flattened [tool.golem] in pyproject.toml
+    config_pyproject = tmp_path / "pyproject.toml"
+    config_pyproject.write_text("""
+[tool.golem]
+api_packages = ["flat_pkg"]
+api_output_dir = "flat_api"
+api_docstring_style = "auto"
+""")
+    config_flat = load_config(config_pyproject)
+    assert config_flat.api_packages == ["flat_pkg"]
+    assert config_flat.api_output_dir == "flat_api"
+    assert config_flat.api_docstring_style == "auto"
