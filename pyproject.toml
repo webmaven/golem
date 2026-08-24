@@ -42,7 +42,9 @@ dev = [
     "mypy",
     "requests",
 ]
-docs = []
+docs = [
+    "golem-docs",  # self-hosting: use golem itself to build golem's docs
+]
 
 [project.scripts]
 golem = "golem.cli:main"
