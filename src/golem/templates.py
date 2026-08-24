@@ -1,5 +1,4 @@
 """
-= Page Layout Compilation
 
 This module handles loading and compiling physical Chameleon `.pt` templates
 from disk, with standard fallback to an integrated HTML5 layout.
@@ -130,7 +129,6 @@ DEFAULT_TEMPLATE = """\
 
 class PageCompiler:
     """
-    = PageCompiler
 
     Compiles body fragments into complete HTML pages using Chameleon templates.
 
@@ -153,7 +151,6 @@ class PageCompiler:
 
     def __init__(self, config: GolemConfig):
         """
-        == __init__
 
         Initialize the compiler with a Golem configuration.
         """
@@ -189,7 +186,6 @@ class PageCompiler:
         next_page: dict[str, str] | None = None,
     ) -> str:
         """
-        == compile_page
 
         Compile a full static page.
 

@@ -1,5 +1,4 @@
 """
-= HTML Rendering Engine
 
 This module provides the static HTML rendering interface for Golem, delegating
 document and node translation directly to `asciidoctype.AsciiDoctypeRenderer`
@@ -18,7 +17,6 @@ def render_body(
     search_paths: Optional[List[Path]] = None,
 ) -> str:
     """
-    == render_body
 
     Render an ASG dictionary or AST Node structure into static HTML5 markup.
 
@@ -188,7 +186,6 @@ def _collect_sections(node: Any, sections: list) -> None:
 
 def generate_toc_html(asg_root: Union[Node, dict[str, Any]]) -> str:
     """
-    == generate_toc_html
 
     Traverse sections in ASG dictionaries or AST nodes and build a clean `<nav class="toc">` HTML.
 

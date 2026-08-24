@@ -1,5 +1,4 @@
 """
-= CLI Interface for Golem
 
 This module provides the primary Click-based command-line interface for the
 Golem static site generator.
@@ -47,7 +46,6 @@ def change_working_dir(directory: Path | str | None) -> Iterator[None]:
 
 def format_diagnostic(error: dict[str, Any] | Exception, content_dir: Path | str | None = None) -> str:
     """
-    = format_diagnostic
 
     Format clean AsciiDoc compiler diagnostics with source coordinates and context snippets.
 
@@ -197,7 +195,6 @@ class GolemGroup(click.Group):
 )
 def main(version: bool = False, directory: str | None = None) -> None:
     """
-    = main
 
     Entry point for the click CLI.
 
@@ -240,7 +237,6 @@ def main(version: bool = False, directory: str | None = None) -> None:
 )
 def init(template, output_dir, directory=None):
     """
-    = init
 
     Create a standard directory structure and basic `golem.toml` configuration.
 
@@ -464,7 +460,6 @@ This is the homepage of your newly initialized Golem static documentation portal
 )
 def new(doc_type, name, directory=None):
     """
-    = new
 
     Generate a structured `.adoc` file with pre-populated metadata templates.
 
@@ -554,7 +549,6 @@ Welcome to your newly scaffolded {doc_type}: "{name}".
 )
 def build(config, clean, strict, verbose, directory=None):
     """
-    = build
 
     Run the incremental compiler, building static pages.
 
@@ -636,7 +630,6 @@ def build(config, clean, strict, verbose, directory=None):
 @click.option("--test-only", is_flag=True, hidden=True, help="Exit immediately for testing")
 def serve(port, host, strict, directory=None, test_only=False):
     """
-    = serve
 
     Invoke build and launch a local web server with SSE live reloading.
 
@@ -713,7 +706,6 @@ def serve(port, host, strict, directory=None, test_only=False):
 )
 def plugins(json_format: bool = False, directory: str | None = None) -> None:
     """
-    = plugins
 
     Inspect active, installed, and local Golem plugins.
 
@@ -845,7 +837,6 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
 )
 def themes(json_format: bool = False, directory: str | None = None) -> None:
     """
-    = themes
 
     Inspect active and available Golem themes.
 

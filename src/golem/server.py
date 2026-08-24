@@ -12,7 +12,6 @@ logger = logging.getLogger("golem.server")
 
 class LiveReloadServer:
     """
-    = LiveReloadServer
 
     An independent, multi-threaded static file development server
     featuring standard Server-Sent Events (SSE) live hot-reloading and
@@ -61,7 +60,6 @@ class LiveReloadServer:
 
     def run(self):
         """
-        = run
 
         Launch the server event loops, starting the file watcher thread and
         blocking on the HTTP request handler listener.
@@ -233,7 +231,6 @@ class LiveReloadServer:
 
     def shutdown(self):
         """
-        == shutdown
 
         Cleanly stop the running ThreadingHTTPServer.
         """

@@ -1,5 +1,4 @@
 """
-= Site Build Orchestration and Incremental Compilation
 
 This module drives the central compile orchestrator (`BuildEngine`) which
 inspects source paths, parses content using `asciidoctrine`, renders bodies,
@@ -125,7 +124,6 @@ def _dir_has_adoc_content(dir_path: Path) -> bool:
 
 class BuildEngine:
     """
-    = BuildEngine
 
     Incremental DAG compilation loop to parse, resolve, and generate pages.
 
@@ -146,7 +144,6 @@ class BuildEngine:
 
     def __init__(self, config: GolemConfig, cache_file: Path | None = None):
         """
-        == __init__
 
         Initialize compiler engine state and load existing DAG cache file.
         """
@@ -168,7 +165,6 @@ class BuildEngine:
 
     def _load_cache(self) -> dict:
         """
-        == _load_cache
 
         Load and parse the DAG dependency JSON cache.
         """
@@ -196,7 +192,6 @@ class BuildEngine:
 
     def save_cache(self):
         """
-        == save_cache
 
         Persist DAG compilation hashes back to the local file system atomically.
         """
@@ -222,7 +217,6 @@ class BuildEngine:
     @contextmanager
     def _cache_lock(self):
         """
-        == _cache_lock
 
         Advisory cross-process lock using fcntl.flock on a dedicated lock file.
         """
@@ -250,7 +244,6 @@ class BuildEngine:
 
     def is_partial(self, path: Path) -> bool:
         """
-        == is_partial
 
         Check if a path is considered a partial file or is located inside a partial directory.
         Files or directories starting with an underscore '_' are partials.
@@ -263,7 +256,6 @@ class BuildEngine:
 
     def get_file_metadata(self, path: Path) -> dict[str, Any]:
         """
-        == get_file_metadata
 
         Retrieve metadata for a document, using DAG cache if file is unmodified.
         Only reads and parses from disk if uncached or modified.
@@ -284,7 +276,6 @@ class BuildEngine:
 
     def _get_sha256(self, path: Path) -> str:
         """
-        == _get_sha256
 
         Compute SHA-256 hash of a file on disk, utilizing an in-memory mtime/size cache.
         """
@@ -313,7 +304,6 @@ class BuildEngine:
 
     def get_outdated_files(self, commit: bool = True) -> set[Path]:
         """
-        == get_outdated_files
 
         Resolve file hashes, detect deleted files, purge orphaned cache keys,
         and walk parents recursively to flag outdated nodes in the DAG.
@@ -437,7 +427,6 @@ class BuildEngine:
 
     def update_cache_for_file(self, path: Path, included_files: list[str] | None = None):
         """
-        == update_cache_for_file
 
         Parse inclusions inside an AsciiDoc file and record hashes to cache.
         """
@@ -499,7 +488,6 @@ class BuildEngine:
 
     def discover_navigation(self) -> list[dict[str, Any]]:
         """
-        == discover_navigation
 
         Discover hierarchical site map and navigation tree from content files,
         supporting explicit config overrides (navigation_nav), index page pinning,
@@ -661,7 +649,6 @@ class BuildEngine:
 
     def generate_nav_html(self, current_rel_path: Path | None = None) -> str:
         """
-        == generate_nav_html
 
         Render navigation tree into semantic HTML with proper relative links.
         """
@@ -723,7 +710,6 @@ class BuildEngine:
 
     def get_ordered_nav_pages(self) -> list[dict[str, Any]]:
         """
-        == get_ordered_nav_pages
 
         Flatten the hierarchical navigation tree into a linear reading order.
         """
@@ -747,7 +733,6 @@ class BuildEngine:
 
     def get_page_pagination(self, current_rel_path: Path | None = None) -> tuple[dict[str, str] | None, dict[str, str] | None]:
         """
-        == get_page_pagination
 
         Retrieve previous and next page information relative to current_rel_path.
         """
@@ -814,7 +799,6 @@ class BuildEngine:
 
     def sync_static_assets(self) -> None:
         """
-        == sync_static_assets
 
         Synchronize static assets from theme directories and user static directory
         to output_dir / "static".
@@ -859,7 +843,6 @@ class BuildEngine:
 
     def build_site(self) -> list[Path]:
         """
-        == build_site
 
         Orchestrate complete Golem compilation of outdated adoc pages.
         """
