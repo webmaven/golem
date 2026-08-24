@@ -249,3 +249,56 @@ def generate_toc_html(asg_root: Union[Node, dict[str, Any]]) -> str:
         current_level -= 1
     toc_parts.append("</li>\n</ul>\n</nav>")
     return "".join(toc_parts)
+
+
+def collect_node_types(asg_root: Union[Node, dict[str, Any]]) -> list[str]:
+    """
+    Extract all unique AST/ASG node names found in a document or AST/ASG tree.
+
+    === Arguments
+
+    - `asg_root`:: ASG dictionary representation or AST Node.
+
+    === Returns
+
+    Sorted list of unique node names.
+    """
+    node_types: set[str] = set()
+
+    def _traverse(node: Any) -> None:
+        if not node:
+            return
+        if isinstance(node, list):
+            for item in node:
+                _traverse(item)
+            return
+        if isinstance(node, dict):
+            name = node.get("name")
+            if name and isinstance(name, str):
+                node_types.add(name.lower())
+            for key in ("blocks", "children", "items", "inlines", "title", "rows", "cells", "footnotes", "header"):
+                if key in node and node[key] is not None:
+                    _traverse(node[key])
+            return
+
+        name = getattr(node, "name", "") or (node.__class__.__name__.lower() if hasattr(node, "__class__") else "")
+        if name and isinstance(name, str):
+            node_types.add(name.lower())
+
+        if hasattr(node, "get_child_collections"):
+            try:
+                collections = node.get_child_collections()
+                if isinstance(collections, dict):
+                    for collection in collections.values():
+                        _traverse(collection)
+            except Exception:
+                pass
+
+        for attr in ("blocks", "children", "items", "inlines", "title", "rows", "cells", "footnotes", "header"):
+            if hasattr(node, attr):
+                val = getattr(node, attr)
+                if val is not None:
+                    _traverse(val)
+
+    _traverse(asg_root)
+    return sorted(node_types)

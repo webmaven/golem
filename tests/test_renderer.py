@@ -252,3 +252,51 @@ End content.
     assert '<a href="#first-section">First Section</a>' in toc_asg_html
     assert '<a href="#nested-section">Nested Section</a>' in toc_asg_html
     assert '<a href="#second-section">Second Section</a>' in toc_asg_html
+
+
+def test_collect_node_types():
+    from golem.renderer import collect_node_types
+
+    asg = {
+        "name": "document",
+        "blocks": [
+            {"name": "section", "title": [{"name": "text", "value": "Sec 1"}]},
+            {"name": "listing", "language": "python", "value": "print(1)"},
+            {"name": "admonition", "style": "NOTE", "blocks": [{"name": "paragraph", "value": "note text"}]},
+        ],
+    }
+    types = collect_node_types(asg)
+    assert "document" in types
+    assert "section" in types
+    assert "listing" in types
+    assert "admonition" in types
+    assert "paragraph" in types
+    assert "text" in types
+    assert types == sorted(list(set(types)))
+
+
+def test_collect_node_types_with_ast_node():
+    from asciidoctrine.nodes import Document, Section, Paragraph, Text, Table, TableRow, TableCell
+    from golem.renderer import collect_node_types
+
+    doc = Document(
+        blocks=[
+            Section(
+                level=1,
+                title=[Text("Sec 1")],
+                blocks=[
+                    Paragraph(inlines=[Text("Para 1")]),
+                    Table(rows=[TableRow(cells=[TableCell(blocks=[Paragraph(inlines=[Text("Cell 1")])])])]),
+                ],
+            )
+        ]
+    )
+    types = collect_node_types(doc)
+    assert "document" in types
+    assert "section" in types
+    assert "paragraph" in types
+    assert "text" in types
+    assert "table" in types
+    assert "row" in types
+    assert "cell" in types
+    assert types == sorted(list(set(types)))
