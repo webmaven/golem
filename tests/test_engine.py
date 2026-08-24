@@ -1002,3 +1002,20 @@ def test_generate_nav_html_active_states(tmp_path):
     html = engine.generate_nav_html(current_rel_path=Path("guide.adoc"))
     assert 'class="golem-nav-item active"' in html
     assert '<a href="guide.html" aria-current="page" class="active">Guide</a>' in html
+
+
+def test_cache_records_node_types(tmp_path):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    doc = content_dir / "index.adoc"
+    doc.write_text("= Title\n\n[NOTE]\n====\nImportant\n====\n\n[source,python]\n----\nx = 1\n----\n", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+    engine.build_site()
+
+    p_abs = str(doc.resolve())
+    metadata = engine.cache_data.get("metadata", {}).get(p_abs, {})
+    assert "node_types" in metadata
+    assert "admonition" in metadata["node_types"]
+    assert "listing" in metadata["node_types"]

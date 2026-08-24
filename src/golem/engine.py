@@ -15,7 +15,7 @@ from typing import Any
 import asciidoctrine
 from asciidoctrine.resolver import ASGResolver
 from golem.config import GolemConfig
-from golem.renderer import render_body
+from golem.renderer import collect_node_types, render_body
 from golem.templates import PageCompiler
 
 
@@ -425,14 +425,25 @@ class BuildEngine:
 
         return outdated
 
-    def update_cache_for_file(self, path: Path, included_files: list[str] | None = None):
+    def update_cache_for_file(
+        self,
+        path: Path,
+        included_files: list[str] | None = None,
+        node_types: list[str] | None = None,
+    ):
         """
 
         Parse inclusions inside an AsciiDoc file and record hashes to cache.
         """
         p_abs = str(path.resolve())
         self.cache_data["files"][p_abs] = self._get_sha256(path)
-        self.cache_data.setdefault("metadata", {})[p_abs] = _extract_metadata_from_doc(path)
+        meta = _extract_metadata_from_doc(path)
+        existing_meta = self.cache_data.get("metadata", {}).get(p_abs, {})
+        if node_types is not None:
+            meta["node_types"] = node_types
+        elif isinstance(existing_meta, dict) and "node_types" in existing_meta:
+            meta["node_types"] = existing_meta["node_types"]
+        self.cache_data.setdefault("metadata", {})[p_abs] = meta
         if included_files is not None:
             unique_deps = list(dict.fromkeys(str(Path(f).resolve()) for f in included_files))
             self.cache_data["dependencies"][p_abs] = unique_deps
@@ -909,6 +920,8 @@ class BuildEngine:
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
                     asg = impl.function(asg=asg)  # type: ignore[assignment]
 
+                page_node_types = collect_node_types(asg)
+
                 # 3. Render body using Golem's ASG visitor
                 body_content = render_body(asg, search_paths=search_paths)  # type: ignore[arg-type]
 
@@ -966,7 +979,7 @@ class BuildEngine:
                     f_out.write(final_html)
 
                 # 7. Update file dependency hash in DAG cache
-                self.update_cache_for_file(doc_path, getattr(ast, "included_files", []))
+                self.update_cache_for_file(doc_path, getattr(ast, "included_files", []), node_types=page_node_types)
                 compiled_files.append(out_path)
 
                 # Progress logging
