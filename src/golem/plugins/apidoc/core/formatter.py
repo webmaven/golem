@@ -1,11 +1,54 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import asciidocstring
 import griffe
 
 from .extractor import get_class_members, get_module_members
+
+# Maximum length (in characters) of an attribute value rendered inline.
+# Values longer than this are replaced with a truncated note.
+_MAX_INLINE_VALUE_LEN = 80
+
+
+def _safe_attr_value(attr: griffe.Attribute) -> str:
+    """Return a safe, single-line representation of an attribute value for AsciiDoc.
+
+    Long values (e.g. multi-line string constants) are replaced with a
+    truncated note so they don't inject AsciiDoc markup into the output.
+    """
+    raw = str(attr.value) if attr.value is not None else ""
+    if not raw:
+        return ""
+    # Collapse real newlines (shouldn't happen in griffe's expr repr, but be safe)
+    single = raw.replace("\n", " ").replace("\r", "")
+    if len(single) > _MAX_INLINE_VALUE_LEN:
+        preview = single[:_MAX_INLINE_VALUE_LEN].rstrip()
+        return f"_{preview}..._ (truncated; see source)"
+    return f"`{single}`"
+
+
+def _offset_headings(text: str, offset: int) -> str:
+    """Shift every AsciiDoc section heading in *text* down by *offset* levels.
+
+    This prevents a docstring that opens with ``= Title`` from producing a
+    second root-level heading when it is embedded inside a document that
+    already has a root heading.
+
+    Only leading ``=`` sequences on their own line are affected; ``==+``
+    inside code blocks or description list markers are left alone because
+    this is a simple line-start replacement — code blocks are delimited by
+    ``----`` and their content lines don't start with ``=``.
+    """
+    if offset <= 0:
+        return text
+
+    def _bump(m: re.Match) -> str:
+        return "=" * (len(m.group(1)) + offset) + m.group(2)
+
+    return re.sub(r"^(=+)( )", _bump, text, flags=re.MULTILINE)
 
 
 def format_parameters(parameters: griffe.Parameters | list[griffe.Parameter]) -> str:
@@ -98,8 +141,20 @@ def format_attribute_signature(attr: griffe.Attribute) -> str:
 def format_docstring(
     docstring: griffe.Docstring | str | None,
     style: str = "auto",
+    heading_offset: int = 0,
 ) -> str:
-    """Convert a docstring into clean AsciiDoc markup using asciidocstring and Griffe."""
+    """Convert a docstring into clean AsciiDoc markup using asciidocstring and Griffe.
+
+    Args:
+        docstring: The docstring to convert.
+        style: Docstring parsing style (``"google"``, ``"numpy"``, ``"sphinx"``,
+            or ``"auto"``).
+        heading_offset: Number of heading levels to shift any ``=`` headings
+            found in the docstring text.  Use this when embedding a docstring
+            inside a document that already has a root heading, so that a
+            docstring opening with ``= Title`` doesn't produce a second
+            document-root-level heading.
+    """
     if not docstring:
         return ""
 
@@ -111,9 +166,11 @@ def format_docstring(
     try:
         style_lit: Any = style if style in ("google", "numpy", "sphinx", "auto") else "auto"
         sections = griffe.parse(doc_obj, style_lit)
-        return asciidocstring.griffe_bridge.to_asciidoc(sections)
+        result = asciidocstring.griffe_bridge.to_asciidoc(sections)
     except Exception:
-        return str(doc_obj.value).strip()
+        result = str(doc_obj.value).strip()
+
+    return _offset_headings(result, heading_offset)
 
 
 def format_attribute(
@@ -132,7 +189,7 @@ def format_attribute(
         "----",
     ]
 
-    doc_text = format_docstring(attr.docstring, style=docstring_style)
+    doc_text = format_docstring(attr.docstring, style=docstring_style, heading_offset=heading_level)
     if doc_text:
         lines.append("")
         lines.append(doc_text)
@@ -156,7 +213,7 @@ def format_function(
         "----",
     ]
 
-    doc_text = format_docstring(func.docstring, style=docstring_style)
+    doc_text = format_docstring(func.docstring, style=docstring_style, heading_offset=heading_level)
     if doc_text:
         lines.append("")
         lines.append(doc_text)
@@ -183,7 +240,7 @@ def format_class(
         "----",
     ]
 
-    doc_text = format_docstring(cls.docstring, style=docstring_style)
+    doc_text = format_docstring(cls.docstring, style=docstring_style, heading_offset=heading_level)
     if doc_text:
         lines.append("")
         lines.append(doc_text)
@@ -203,9 +260,20 @@ def format_class(
         for attr in members["attributes"]:
             if isinstance(attr, griffe.Attribute):
                 ann = f" ({attr.annotation})" if attr.annotation else ""
-                val = f" Defaults to `{attr.value}`." if attr.value else ""
-                doc = f" {format_docstring(attr.docstring, style=docstring_style)}" if attr.docstring else ""
-                lines.append(f"`{attr.name}`::{ann}{doc}{val}")
+                val = _safe_attr_value(attr)
+                doc = format_docstring(attr.docstring, style=docstring_style) if attr.docstring else ""
+                lines.append(f"`{attr.name}`::{ann}")
+                lines.append("")
+                if doc:
+                    lines.append(doc)
+                    if val:
+                        lines.append("")
+                        lines.append(f"Default value: {val}")
+                elif val:
+                    lines.append(f"Default value: {val}")
+                else:
+                    lines.append("_(no description)_")
+                lines.append("")
 
     # Methods
     if depth in ("all", "methods"):
@@ -238,7 +306,7 @@ def format_module(
         f"{heading} {title_name}",
     ]
 
-    doc_text = format_docstring(module.docstring, style=docstring_style)
+    doc_text = format_docstring(module.docstring, style=docstring_style, heading_offset=heading_level)
     if doc_text:
         lines.append("")
         lines.append(doc_text)
@@ -258,9 +326,23 @@ def format_module(
         for attr in members["attributes"]:
             if isinstance(attr, griffe.Attribute):
                 ann = f" ({attr.annotation})" if attr.annotation else ""
-                val = f" = `{attr.value}`" if attr.value else ""
-                doc = f" {format_docstring(attr.docstring, style=docstring_style)}" if attr.docstring else ""
-                lines.append(f"`{attr.name}`::{ann}{val}{doc}")
+                val = _safe_attr_value(attr)
+                doc = format_docstring(attr.docstring, style=docstring_style) if attr.docstring else ""
+                # AsciiDoc description list: term on its own line, then a
+                # blank line, then the description — prevents the parser from
+                # treating inline content as a new block element.
+                lines.append(f"`{attr.name}`::{ann}")
+                lines.append("")
+                if doc:
+                    lines.append(doc)
+                    if val:
+                        lines.append("")
+                        lines.append(f"Default value: {val}")
+                elif val:
+                    lines.append(f"Default value: {val}")
+                else:
+                    lines.append("_(no description)_")
+                lines.append("")
 
     # Classes
     if depth in ("all", "classes"):
