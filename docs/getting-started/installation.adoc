@@ -41,3 +41,26 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ----
 
+== Building Golem's Own Documentation
+
+Golem is self-hosting: it uses itself to build its own documentation site.
+The `[docs]` optional-dependency group declares `golem-docs` as its own dependency.
+When installed in editable mode, pip satisfies that self-reference with the editable
+install already in the environment — no duplicate copy is created.
+
+[source,bash]
+----
+# Install in editable mode with the docs extra (self-hosting)
+pip install -e ".[docs]"
+
+# Build the Golem documentation site
+golem build
+----
+
+[NOTE]
+====
+`pip install -e ".[dev,docs]"` installs both the development toolchain and the
+self-hosting docs dependency in a single command, which is the recommended setup
+for Golem contributors.
+====
+
