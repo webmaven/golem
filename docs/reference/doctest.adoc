@@ -31,4 +31,66 @@ In your AsciiDoc source:
 ....
 ----
 
-Running `golem doctest` extracts these blocks and executes them using pytest.
+Running `golem doctest` extracts these blocks and executes them in an isolated test environment.
+
+== Test Block Roles & State Models
+
+Golem's doctest plugin supports advanced state management and isolation models:
+
+=== Isolated Blocks (Default)
+
+By default or when marked with `[source,python,role="test"]`, blocks run in isolated, ephemeral state:
+
+[source,asciidoc]
+----
+[source,python,role="test"]
+----
+>>> a = 10
+>>> a * 2
+20
+----
+----
+
+=== Shared State Timelines
+
+Use `role="shared"` to retain variable definitions and state across subsequent blocks:
+
+[source,asciidoc]
+----
+[source,python,role="shared"]
+----
+base_url = "https://example.com"
+----
+
+[source,python,role="shared test"]
+----
+>>> f"{base_url}/api"
+'https://example.com/api'
+----
+----
+
+=== Section Boundary Scoping
+
+Shared state automatically resets at top-level section boundaries (`==`), isolating independent document chapters or topics while preserving sequential state flow within each section.
+
+=== Named Context Scopes
+
+Manage multiple independent timelines within a single document using named contexts:
+
+[source,asciidoc]
+----
+[source,python,shared="server"]
+----
+port = 8080
+----
+
+[source,python,shared="client"]
+----
+timeout = 30
+----
+----
+
+=== Explicit Reset Markers
+
+Clear all accumulated shared state and named contexts on demand using `[source,python,reset]`.
+

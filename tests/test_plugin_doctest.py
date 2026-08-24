@@ -263,17 +263,13 @@ def test_cli_subcommand_doctest_passing(tmp_path: Path):
     from golem.plugins import doctest
 
     doc = tmp_path / "index.adoc"
-    # NOTE: expected output must NOT start with '['. asciidoctrine's preprocessor
-    # mistakes a '['-prefixed line inside a listing block for a block-attribute list,
-    # which triggers a PreprocessorWarning about same-length nested verbatim blocks.
-    # Use sum() so the output is a plain integer. Filed upstream as a parser bug.
     doc.write_text(
         """= Welcome
 
 [source,python,role="test"]
 ----
->>> sum(x * 2 for x in [1, 2, 3])
-12
+>>> [x * 2 for x in [1, 2, 3]]
+[2, 4, 6]
 ----
 """,
         encoding="utf-8",
