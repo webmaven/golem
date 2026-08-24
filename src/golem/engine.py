@@ -863,9 +863,29 @@ class BuildEngine:
 
         Orchestrate complete Golem compilation of outdated adoc pages.
         """
+        import sys
+
         self.errors = []
         self.diagnostics = self.errors
         compiled_files = []
+
+        # Automated API doc generation when api_packages is configured
+        if getattr(self.config, "api_packages", None):
+            try:
+                from golem.plugins.apidoc import generate_api_docs
+
+                dest_dir = self.content_dir / getattr(self.config, "api_output_dir", "api")
+                generate_api_docs(
+                    packages=self.config.api_packages,
+                    output_dir=dest_dir,
+                    search_paths=[Path.cwd(), Path("src")] + [Path(p) for p in sys.path if p],
+                    docstring_style=getattr(self.config, "api_docstring_style", "auto"),
+                )
+            except Exception as e:
+                logging.warning(f"Failed to generate API documentation during build: {e}")
+                if getattr(self.config, "strict", False):
+                    raise
+
         outdated = self.get_outdated_files()
 
         all_docs = (
