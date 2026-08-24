@@ -15,3 +15,5 @@ docs/superpowers/
 .ruff_cache/
 .venv/
 
+# Generated API reference docs — rebuilt fresh from source on every deploy via `golem apidoc`
+docs/api/

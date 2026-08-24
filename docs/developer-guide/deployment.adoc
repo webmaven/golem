@@ -69,6 +69,11 @@ jobs:
           # itself as a dependency, satisfied by the wheel just installed.
           python -m pip install "golem-docs[docs]"
 
+      - name: Generate API reference docs
+        run: |
+          # docs/api/ is excluded from git — generated fresh from source on every deploy
+          golem apidoc
+
       - name: Compile documentation site
         run: |
           golem build --strict --clean
@@ -150,6 +155,7 @@ pages:
     - pip install --upgrade pip
     - pip install golem-docs
   script:
+    - golem apidoc  # docs/api/ excluded from git; regenerated fresh on every deploy
     - golem build --strict --clean
     - mv dist public
   artifacts:
@@ -163,6 +169,7 @@ pages:
 
 Prior to triggering production deployments, execute the following local pre-flight checks:
 
+* [x] Run `golem apidoc` to regenerate `docs/api/` from source (these files are excluded from git).
 * [x] Run `golem build --strict` to ensure zero compilation warnings.
 * [x] Verify that custom stylesheets (`static_dir`) and fonts resolve properly with relative URLs.
 * [x] Confirm that `:site_url:` is configured correctly in `golem.toml` or `pyproject.toml` for canonical link generation.
