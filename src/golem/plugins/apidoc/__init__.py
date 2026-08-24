@@ -39,7 +39,7 @@ def _parse_macro_args(args_str: str) -> dict[str, str]:
 
 @hookimpl
 def on_pre_parse(raw_content: str) -> str:
-    """Pre-parse hook: replaces golem:apidoc[...] macros with rendered AsciiDoc."""
+    """Pre-parse hook: replaces golem apidoc block macros with rendered AsciiDoc."""
     if "golem:apidoc[" not in raw_content:
         return raw_content
 
@@ -59,7 +59,7 @@ def on_pre_parse(raw_content: str) -> str:
             return api.render_symbol(target, depth=depth)
         except Exception as e:
             logger.warning("Golem ApiDoc macro error for target '%s': %s", target, e)
-            return f"[WARNING]\n====\nGolem ApiDoc: Could not resolve target '{target}': {e}\n===="
+            return f"[WARNING]\n====\nGolem ApiDoc: Could not resolve target '{target}': {e}\n====\n"
 
     return _MACRO_PATTERN.sub(_replace, raw_content)
 

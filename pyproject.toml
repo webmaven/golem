@@ -62,7 +62,14 @@ output_dir = "dist"
 theme = "default"
 
 [tool.golem.plugins]
-plugins = []
+plugins = [
+    "golem.plugins.apidoc",
+    "golem.plugins.doctest",
+]
+
+[tool.golem.api]
+packages = ["golem"]
+output_dir = "api"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
