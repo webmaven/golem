@@ -61,13 +61,13 @@ def hello():
 === 2. Unbalanced Block Delimiters
 Block delimiters must contain at least 4 matching delimiter characters:
 
+* Generic open blocks: `~~~~` (4 tildes)
 * Listing / source blocks: `----` (4 hyphens)
 * Example / admonition blocks: `====` (4 equals signs)
 * Sidebar blocks: `****` (4 asterisks)
-* Passthrough blocks: `++++` (4 plus signs)
-* STEM / formula blocks: `~~~~` (4 tildes)
+* Passthrough / STEM blocks: `++++` (4 plus signs, e.g. `[pass]` or `[stem]`)
 * Literal blocks: `....` (4 dots)
-* Quote / verse blocks: `____` (4 underscores)
+* Quote / verse blocks: `____` (4 underscores, e.g. `[quote]` or `[verse]`)
 * Table delimiters: `|===` (pipe followed by 3 equals signs)
 
 [TIP]
