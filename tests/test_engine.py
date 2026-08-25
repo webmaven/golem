@@ -1019,3 +1019,44 @@ def test_cache_records_node_types(tmp_path):
     assert "node_types" in metadata
     assert "admonition" in metadata["node_types"]
     assert "listing" in metadata["node_types"]
+
+
+def test_theme_template_fine_grained_invalidation(tmp_path, monkeypatch):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    theme_dir = tmp_path / "themes" / "custom"
+    theme_dir.mkdir(parents=True)
+
+    # Page 1 has code listing
+    doc1 = content_dir / "has_code.adoc"
+    doc1.write_text("= Doc 1\n\n[source,python]\n----\nx = 1\n----\n", encoding="utf-8")
+
+    # Page 2 has only prose
+    doc2 = content_dir / "only_prose.adoc"
+    doc2.write_text("= Doc 2\n\nJust simple text paragraphs.\n", encoding="utf-8")
+
+    listing_tpl = theme_dir / "listing.html"
+    listing_tpl.write_text("<pre tal:content=\"node.get('value', '')\"></pre>", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(tmp_path / "dist"),
+        theme="custom",
+    )
+    # Ensure current working directory or search paths find the custom theme
+    monkeypatch.chdir(tmp_path)
+
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+    engine.build_site()
+
+    # Initial state should be clean (0 outdated)
+    assert len(engine.get_outdated_files(commit=False)) == 0
+
+    # Modify listing.html
+    listing_tpl.write_text("<div class='code'><pre tal:content=\"node.get('value', '')\"></pre></div>", encoding="utf-8")
+
+    # Recheck outdated files
+    engine_recheck = BuildEngine(config, cache_file=tmp_path / "cache.json")
+    outdated = engine_recheck.get_outdated_files(commit=False)
+    assert doc1.resolve() in outdated
+    assert doc2.resolve() not in outdated

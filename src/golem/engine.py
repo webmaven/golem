@@ -370,23 +370,68 @@ class BuildEngine:
                 if commit:
                     self.cache_data.setdefault("meta", {})["config_file"] = h_config
 
-        # Check template skeleton.pt
-        theme_dir = Path("themes") / self.config.theme
-        skeleton_pt = theme_dir / "skeleton.pt"
-        if skeleton_pt.exists():
-            h_pt = self._get_sha256(skeleton_pt)
-            cached_pt = self.cache_data.get("meta", {}).get("skeleton_pt")
-            if cached_pt != h_pt:
+        # Check theme and layout templates
+        current_templates: dict[str, str] = {}
+        for search_dir in self._get_template_search_paths():
+            if search_dir.exists() and search_dir.is_dir():
+                for tpl_file in search_dir.rglob("*"):
+                    if tpl_file.is_file() and tpl_file.suffix in (".html", ".pt"):
+                        try:
+                            rel = tpl_file.relative_to(search_dir)
+                        except ValueError:
+                            rel = Path(tpl_file.name)
+                        if any(part.startswith(".") or part == "static" for part in rel.parts):
+                            continue
+                        key = rel.as_posix()
+                        if key not in current_templates:
+                            current_templates[key] = self._get_sha256(tpl_file)
+
+        cached_templates = self.cache_data.get("meta", {}).get("theme_templates")
+        if cached_templates is None and "skeleton_pt" in self.cache_data.get("meta", {}):
+            cached_templates = {"skeleton.pt": self.cache_data["meta"]["skeleton_pt"]}
+
+        templates_changed = False
+        master_layout_keys = {"skeleton.pt", "page.pt", "layout.pt", "skeleton.html", "page.html", "layout.html"}
+        master_layout_stems = {"skeleton", "page", "layout"}
+        changed_granular_nodes: set[str] = set()
+
+        if cached_templates is not None:
+            all_tpl_keys = set(cached_templates.keys()) | set(current_templates.keys())
+            for tpl_key in all_tpl_keys:
+                old_h = cached_templates.get(tpl_key)
+                new_h = current_templates.get(tpl_key)
+                if old_h != new_h:
+                    templates_changed = True
+                    stem = Path(tpl_key).stem.lower()
+                    if tpl_key in master_layout_keys or stem in master_layout_stems:
+                        global_changed = True
+                    else:
+                        changed_granular_nodes.add(stem)
+        elif self.cache_data.get("files"):
+            templates_changed = True
+            if current_templates:
                 global_changed = True
-                if commit:
-                    self.cache_data.setdefault("meta", {})["skeleton_pt"] = h_pt
+
+        if changed_granular_nodes:
+            for f_abs_str, meta in self.cache_data.get("metadata", {}).items():
+                if not isinstance(meta, dict):
+                    continue
+                f_path = Path(f_abs_str)
+                if not f_path.exists() or self.is_partial(f_path):
+                    continue
+                node_types = meta.get("node_types")
+                if node_types is None or any(node in node_types for node in changed_granular_nodes):
+                    outdated.add(f_path)
+
+        if commit:
+            self.cache_data.setdefault("meta", {})["theme_templates"] = current_templates
 
         # If a global layout or config changed, we must mark all existing non-partial .adoc documents as outdated!
         if global_changed:
             logging.info("[BuildEngine] Global configuration or template change detected. Invalidating all pages...")
             outdated.update(f for f in all_files if not self.is_partial(f))
             # Short-circuit and return full re-build
-            if commit and (deleted_files or global_changed):
+            if commit and (deleted_files or global_changed or templates_changed):
                 for d in deleted_files:
                     self.cache_data["files"].pop(d, None)
                     self.cache_data["dependencies"].pop(d, None)
@@ -416,7 +461,7 @@ class BuildEngine:
                     queue.append(p_path)
 
         # 5. Purge deleted files from the cache database
-        if commit and (deleted_files or global_changed):
+        if commit and (deleted_files or global_changed or templates_changed):
             for d in deleted_files:
                 self.cache_data["files"].pop(d, None)
                 self.cache_data["dependencies"].pop(d, None)
