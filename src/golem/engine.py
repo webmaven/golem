@@ -143,9 +143,31 @@ class BuildEngine:
     """
 
     def __init__(self, config: GolemConfig, cache_file: Path | None = None):
-        """
+        """Initialise the build engine and load the existing DAG cache.
 
-        Initialize compiler engine state and load existing DAG cache file.
+        Sets up content and config path resolution, loads (or creates)
+        the JSON dependency cache, instantiates the :class:`~golem.templates.PageCompiler`,
+        and registers all configured Pluggy plugins.
+
+        === Arguments
+
+        - ``config``:: A fully-populated :class:`~golem.config.GolemConfig`
+          describing the project layout, theme, plugins, and API settings.
+        - ``cache_file``:: Optional explicit path to the JSON cache file.
+          Defaults to ``<project_root>/.golem/cache.json`` (where
+          ``project_root`` is the parent of ``config.content_dir``).
+
+        === Side effects
+
+        - ``self.cache_data`` is populated from disk if the cache file
+          exists and is valid JSON; otherwise it is initialised to
+          ``{"files": {}, "dependencies": {}, "metadata": {}}``.
+        - ``self.compiler`` is a new :class:`~golem.templates.PageCompiler`
+          for the configured theme.
+        - ``self.pm`` is a :class:`~pluggy.PluginManager` with all
+          configured plugins registered.
+        - ``self.errors`` / ``self.diagnostics`` start as empty lists;
+          individual build methods append to them as warnings/errors occur.
         """
         self.config = config
         self.content_dir = Path(config.content_dir).resolve()
@@ -164,9 +186,24 @@ class BuildEngine:
         self.pm = get_plugin_manager(config=config, plugins_dir=plugins_dir)
 
     def _load_cache(self) -> dict:
-        """
+        """Load and parse the JSON DAG dependency cache from disk.
 
-        Load and parse the DAG dependency JSON cache.
+        Acquires the advisory file lock before reading so concurrent
+        ``golem serve`` and ``golem build`` processes do not read a
+        partially-written file.
+
+        If the cache file does not exist, is empty, or contains invalid
+        JSON, the corrupt file is deleted and a fresh empty cache dict is
+        returned.  This keeps the build resilient to interrupted writes.
+
+        Also repopulates :attr:`_sha_cache` (the in-memory mtime/size →
+        SHA-256 lookup) from the ``"mtimes"`` key if present, avoiding
+        redundant hash computation on a warm restart.
+
+        === Returns
+
+        ``dict`` with at minimum the keys ``"files"``, ``"dependencies"``,
+        and ``"metadata"``, each mapping to a ``dict``.
         """
         with self._cache_lock():
             if self.cache_file.exists():
@@ -191,9 +228,19 @@ class BuildEngine:
             return {"files": {}, "dependencies": {}, "metadata": {}}
 
     def save_cache(self):
-        """
+        """Persist the in-memory DAG cache to disk atomically.
 
-        Persist DAG compilation hashes back to the local file system atomically.
+        Serialises :attr:`cache_data` (plus the current :attr:`_sha_cache`
+        mtime/size index) as indented JSON, writes to a temporary file in
+        the same directory as :attr:`cache_file`, then atomically renames
+        the temp file over the target using :func:`os.replace`.
+
+        Using a rename ensures that a concurrent reader never sees a
+        half-written file: the cache is either the old complete version or
+        the new complete version, never a partial write.
+
+        The advisory lock from :meth:`_cache_lock` is held for the
+        duration of the write.
         """
         import os
         import tempfile
@@ -216,9 +263,23 @@ class BuildEngine:
 
     @contextmanager
     def _cache_lock(self):
-        """
+        """Advisory cross-process exclusive lock on the cache directory.
 
-        Advisory cross-process lock using fcntl.flock on a dedicated lock file.
+        Uses :func:`fcntl.flock` (POSIX exclusive lock) on a dedicated
+        ``cache.lock`` file adjacent to the cache JSON.  This prevents
+        simultaneous ``golem build`` and ``golem serve`` processes from
+        corrupting the cache via interleaved reads and writes.
+
+        Falls back gracefully (no-op) on platforms where ``fcntl`` is
+        unavailable (e.g. Windows) or where the lock file cannot be
+        created (e.g. read-only filesystem), so the lock is advisory —
+        it reduces the race window but does not eliminate it on
+        non-POSIX platforms.
+
+        Intended for use as a context manager only::
+
+            with self._cache_lock():
+                # read or write self.cache_file
         """
         import fcntl
 
@@ -275,9 +336,27 @@ class BuildEngine:
         return meta
 
     def _get_sha256(self, path: Path) -> str:
-        """
+        """Compute the SHA-256 hash of a file, using an mtime/size fast-path cache.
 
-        Compute SHA-256 hash of a file on disk, utilizing an in-memory mtime/size cache.
+        The in-memory :attr:`_sha_cache` maps absolute path strings to
+        ``(mtime, size, hexdigest)`` tuples.  If the cached mtime and size
+        both match the current ``stat()`` result, the cached hexdigest is
+        returned without re-reading the file — making repeated staleness
+        checks on unchanged files essentially free.
+
+        The cache is intentionally per-process; it is not shared with the
+        on-disk JSON cache, so it resets on every ``golem build`` invocation
+        (but persists across :meth:`get_outdated_files` calls within the
+        same process, e.g. during ``golem serve``).
+
+        === Arguments
+
+        - ``path``:: :class:`~pathlib.Path` to the file to hash.
+
+        === Returns
+
+        Lowercase hex SHA-256 digest string, or ``""`` if the file cannot
+        be stat'd or read (e.g. permission error, race with deletion).
         """
         p_abs = str(path.resolve())
         try:
@@ -303,10 +382,37 @@ class BuildEngine:
         return hexdigest
 
     def get_outdated_files(self, commit: bool = True) -> set[Path]:
-        """
+        """Identify every source file that needs to be (re)built.
 
-        Resolve file hashes, detect deleted files, purge orphaned cache keys,
-        and walk parents recursively to flag outdated nodes in the DAG.
+        Performs a five-step incremental staleness analysis:
+
+        1. **Enumerate disk** — glob all ``*.adoc`` files under
+           :attr:`content_dir`.
+        2. **Detect deletions** — files in ``cache_data["files"]`` that
+           no longer exist on disk are removed from the cache and their
+           dependants are added to the outdated set.
+        3. **Hash comparison** — for each file still on disk, compute its
+           SHA-256 and compare it against the cached hash; changed files
+           are added to the outdated set.
+        4. **Plugin stale declarations** — call the
+           :meth:`~golem.plugins.GolemSpecs.golem_mark_stale` hook so
+           plugins (e.g. ``apidoc``) can add pages that depend on
+           non-``.adoc`` inputs (Python source, config, etc.).
+        5. **Reverse-dependency propagation** — walk the
+           ``cache_data["dependencies"]`` graph upward from every
+           directly-stale file and mark all pages that include or depend
+           on it as stale too.
+
+        === Arguments
+
+        - ``commit``:: When ``True`` (default), persist the updated cache
+          to disk via :meth:`save_cache` before returning.  Pass
+          ``False`` in test helpers or read-only inspection calls.
+
+        === Returns
+
+        ``set[Path]`` of absolute paths to ``.adoc`` files that must be
+        compiled on the next build pass.
         """
         outdated: set[Path] = set()
         if not self.content_dir.exists():
@@ -911,9 +1017,47 @@ class BuildEngine:
                 shutil.copytree(user_static, output_static_dir, dirs_exist_ok=True)
 
     def build_site(self) -> list[Path]:
-        """
+        """Orchestrate a full incremental compilation pass of all outdated pages.
 
-        Orchestrate complete Golem compilation of outdated adoc pages.
+        This is the primary entry point called by ``golem build`` and the
+        ``golem serve`` watcher loop.  It performs the following steps in
+        order:
+
+        1. **Reset error state** — clears :attr:`errors` so a rebuild
+           reports only current-pass warnings.
+        2. **API doc generation** — if
+           :attr:`~golem.config.GolemConfig.api_packages` is set, calls
+           the ``apidoc`` plugin to regenerate ``.adoc`` stubs from live
+           Python source before staleness detection.
+        3. **Staleness detection** — calls :meth:`get_outdated_files` to
+           determine which pages need to be compiled.
+        4. **Per-page compilation loop** — for each outdated file (skipping
+           partials):
+
+           a. Reads source, runs ``on_pre_parse`` hooks.
+           b. Parses with ``asciidoctrine``, runs ``on_ast_created`` hooks.
+           c. Resolves ASG, runs ``on_asg_created`` hooks.
+           d. Renders body HTML via :func:`~golem.renderer.render_body`.
+           e. Generates Table of Contents if ``:toc:`` is set.
+           f. Assembles final page via :class:`~golem.templates.PageCompiler`
+              (Chameleon template), runs ``on_post_render`` hooks.
+           g. Writes the rendered HTML to :attr:`~golem.config.GolemConfig.output_dir`.
+           h. Updates the DAG cache with the new hash, node types, and
+              include dependencies.
+
+        5. **Static asset copy** — copies ``static_dir`` contents into
+           ``output_dir`` verbatim.
+        6. **Cache persistence** — saves the updated cache to disk.
+
+        Failures on individual pages are logged and appended to
+        :attr:`errors` rather than aborting the whole build.  In
+        ``--strict`` mode, any error causes the method to raise
+        immediately after the failed page.
+
+        === Returns
+
+        List of :class:`~pathlib.Path` objects for every HTML file
+        successfully written to ``output_dir`` during this pass.
         """
         import sys
 

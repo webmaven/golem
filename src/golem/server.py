@@ -1,3 +1,39 @@
+"""
+Development HTTP server with live-reload and build-error overlays for Golem.
+
+Threading model
+---------------
+The server uses two concurrent execution contexts:
+
+1. **File-watcher thread** (daemon) — polls the ``watch_dir`` once per
+   second via :attr:`~LiveReloadServer.change_detected_func`.  On
+   detecting a change it calls :attr:`~LiveReloadServer.rebuild_func`,
+   then puts a ``"reload"`` message onto every registered SSE queue.
+
+2. **ThreadingHTTPServer** (main thread, blocking) — handles each HTTP
+   request in its own thread.  Requests to the synthetic
+   ``/golem-reload`` endpoint block indefinitely in SSE streaming mode,
+   reading from a per-connection :class:`~queue.Queue` until the
+   watcher signals or the client disconnects.
+
+Live-reload protocol
+--------------------
+Golem injects a tiny ``<script>`` block into every served ``.html``
+page that opens an SSE connection to ``/golem-reload``.  When the
+watcher signals, the script calls ``window.location.reload()``
+in every connected browser tab simultaneously.  A ``": ping\\n\\n"``
+keep-alive comment is sent every 10 s to prevent socket timeouts on
+proxies and load balancers.
+
+Build-error overlays
+--------------------
+If the rebuild callback raises an exception, its message is stored in
+:attr:`~LiveReloadServer.last_error_message`.  The next page served has
+a red fixed-position banner injected at the top of the ``<head>``
+showing the error; the banner disappears once a subsequent clean rebuild
+clears :attr:`~LiveReloadServer.last_error_message`.
+"""
+
 import http.server
 import logging
 import queue
@@ -47,6 +83,27 @@ class LiveReloadServer:
         port: int = 8000,
         errors_func: Callable[[], list[dict]] | None = None,
     ):
+        """Initialise a live-reload dev server.
+
+        === Arguments
+
+        - ``public_dir``:: Directory of pre-built static files to serve
+          (typically the Golem ``output_dir``, e.g. ``dist/``).
+        - ``watch_dir``:: Directory to monitor for source changes
+          (typically the Golem ``content_dir``).
+        - ``change_detected_func``:: Zero-argument callable returning
+          ``True`` if source files have changed since the last poll
+          cycle.  Called once per second from the watcher thread.
+        - ``rebuild_func``:: Zero-argument callable that performs a full
+          or incremental site rebuild.  Called immediately after
+          *change_detected_func* returns ``True``; exceptions are caught
+          and stored in :attr:`last_error_message`.
+        - ``port``:: TCP port to bind.  Default: ``8000``.
+        - ``errors_func``:: Optional callable returning a list of
+          ``{"file": …, "message": …}`` dicts from the most recent
+          build.  When provided, its output is merged with
+          :attr:`last_error_message` to populate the error overlay.
+        """
         self.public_dir = Path(public_dir)
         self.watch_dir = Path(watch_dir)
         self.change_detected_func = change_detected_func
@@ -59,10 +116,21 @@ class LiveReloadServer:
         self.last_error_message: str | None = None
 
     def run(self):
-        """
+        """Start the server and block until interrupted.
 
-        Launch the server event loops, starting the file watcher thread and
-        blocking on the HTTP request handler listener.
+        Launches the file-watcher daemon thread, then enters the
+        :class:`~http.server.ThreadingHTTPServer` serve-forever loop on
+        the configured :attr:`port`.  Returns only after
+        :meth:`shutdown` is called or a ``KeyboardInterrupt`` /
+        ``SystemExit`` is raised.
+
+        Each ``.html`` response has the SSE listener ``<script>`` and
+        optional error banner injected just before ``</head>`` on the
+        fly, so the built files themselves remain unmodified on disk.
+
+        The method sets :attr:`is_running` to ``True`` on entry and
+        ``False`` in the ``finally`` block, making it safe to use
+        :attr:`is_running` as a liveness sentinel from other threads.
         """
         self.is_running = True
         dist_abs = str(self.public_dir.resolve())
@@ -230,9 +298,18 @@ class LiveReloadServer:
             self.httpd.server_close()
 
     def shutdown(self):
-        """
+        """Cleanly stop the server and release all resources.
 
-        Cleanly stop the running ThreadingHTTPServer.
+        Sets :attr:`is_running` to ``False`` to signal the watcher
+        thread to exit its next iteration, sends a ``"shutdown"``
+        sentinel to all open SSE queues so their request-handler threads
+        can drain and exit, then calls
+        :meth:`~http.server.HTTPServer.shutdown` on the underlying
+        :class:`~http.server.ThreadingHTTPServer` to stop
+        ``serve_forever``.
+
+        Safe to call from any thread, including from the watcher thread
+        itself or from a signal handler.
         """
         self.is_running = False
         with self.queues_lock:
