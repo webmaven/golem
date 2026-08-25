@@ -329,6 +329,19 @@ class BuildEngine:
         for d in deleted_files:
             changed_directly.add(Path(d))
 
+        if self.pm:
+            results = self.pm.hook.golem_mark_stale(
+                changed_files=list(changed_directly),
+                cache_metadata=self.cache_data.get("metadata", {}),
+            )
+            for res in results:
+                if res and isinstance(res, list):
+                    for path in res:
+                        path_p = Path(path).resolve()
+                        if path_p.exists() and not self.is_partial(path_p):
+                            outdated.add(path_p)
+                            changed_directly.add(path_p)
+
         # 3. Map current file hashes and identify immediately changed files
         for f in all_files:
             f_abs = f.resolve()

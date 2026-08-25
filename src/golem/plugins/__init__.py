@@ -46,6 +46,15 @@ class GolemSpecs:
         """Executed during CLI startup to register subcommands with click."""
         pass
 
+    @hookspec
+    def golem_mark_stale(
+        self,
+        changed_files: list[Path],
+        cache_metadata: dict[str, dict[str, Any]],
+    ) -> list[Path] | None:
+        """Executed during dependency resolution to allow plugins to register stale pages for recompilation."""
+        return []
+
 
 def get_plugin_manager(config: GolemConfig | None = None, plugins_dir: Path | None = None) -> pluggy.PluginManager:
     pm = pluggy.PluginManager(HOOK_NAMESPACE)
