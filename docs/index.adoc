@@ -1,6 +1,6 @@
 = Golem Documentation
 Michael Bernstein <zopemaven@gmail.com>
-v0.1.0a1
+v0.1.0a2
 :toc: macro
 :idprefix:
 :idseparator: -

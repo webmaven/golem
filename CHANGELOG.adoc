@@ -10,6 +10,30 @@ and this project adheres to https://semver.org/spec/v2.0.0.html[Semantic Version
 
 toc::[]
 
+== [0.1.0a2] - 2026-08-24
+
+=== Added
+
+* *Fine-Grained Cache Invalidation (Issue #1):*
+** AST/ASG `node_types` inventory recorded per page in `.golem/cache.json`.
+** Theme template fingerprinting and scoped cache invalidation for specific node template changes (e.g. `listing.html` only recompiles pages with code blocks).
+** New Pluggy lifecycle hook `golem_mark_stale(changed_files, cache_metadata)` enabling plugins to perform selective cache invalidation.
+* *Automated API Documentation Generation (`golem apidoc`):*
+** Built-in plugin `golem.plugins.apidoc` using Griffe and `asciidocstring` to introspect packages and generate clean AsciiDoc API reference documentation.
+
+=== Changed
+
+* *Upgraded Dependencies:*
+** Upgraded `asciidoctrine` dependency requirement to `>=0.2.0a3` (incorporating parser memoization, underscore emphasis fixes, and listing block bracket fixes).
+** Upgraded `asciidoctest` dependency requirement to `>=0.2.0a3` (supporting AST section scoping and named test contexts).
+
+=== Fixed
+
+* *API Reference Formatting:*
+** Description list multi-line formatting in apidoc output avoiding parser bloat.
+** Truncation of large inline attribute constants (such as HTML templates).
+** Heading level offset adjustment for docstrings opening with section headings.
+
 == [0.1.0a1] - 2026-08-18
 
 === Added

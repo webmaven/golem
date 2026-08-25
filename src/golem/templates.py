@@ -208,7 +208,7 @@ class PageCompiler:
 
         import golem
 
-        generator_version = getattr(golem, "__version__", "0.1.0a1")
+        generator_version = getattr(golem, "__version__", "0.1.0a2")
 
         if template_path and template_path.exists():
             try:

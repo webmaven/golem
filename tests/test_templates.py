@@ -147,7 +147,7 @@ def test_rich_structured_context_passed_to_template(tmp_path):
     )
 
     assert "<title>Architecture Overview - My Docs Site</title>" in html
-    assert f'content="{getattr(golem, "__version__", "0.1.0a1")}"' in html
+    assert f'content="{getattr(golem, "__version__", "0.1.0a2")}"' in html
     assert '<span id="author">Jane Developer</span>' in html
     assert '<span id="url">https://example.com/docs</span>' in html
     assert '<span id="current-path">arch/overview.adoc</span>' in html

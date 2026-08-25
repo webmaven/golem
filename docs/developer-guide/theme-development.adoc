@@ -45,7 +45,7 @@ When rendering `skeleton.pt`, Golem passes a comprehensive set of template varia
 | `page_title` | `str` | Title of the current document extracted from the top-level AsciiDoc header (`= Document Title`) or front-matter. Also aliased as `title`.
 | `site_author` | `str` | Configured site author name or organization (default: `"Anonymous"`).
 | `site_url` | `str \| None` | Base URL of the website if configured (useful for `<link rel="canonical">` tags).
-| `generator_version` | `str` | Active version string of the Golem engine (e.g. `0.1.0a1`).
+| `generator_version` | `str` | Active version string of the Golem engine (e.g. `0.1.0a2`).
 | `body_html` | `str` | Pre-rendered semantic HTML5 content generated from the AsciiDoc document body. Also accessible as `body_content` and `body`.
 | `nav_tree` | `list[dict]` | Hierarchical site map data structure containing `{title, url, path, children}` dictionary nodes.
 | `nav_html` | `str` | Pre-rendered semantic HTML5 navigation list (`<nav class="golem-nav">...`). Also aliased as `navigation_html`.

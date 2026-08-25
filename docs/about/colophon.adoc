@@ -50,7 +50,7 @@ To prevent the eyestrain associated with large, stark, flat digital color fields
 
 This publication was generated with:
 
-* **Compiler:** Golem `v0.1.0a1` incremental DAG static site generator.
+* **Compiler:** Golem `v0.1.0a2` incremental DAG static site generator.
 * **Parser:** `asciidoctrine` standard Lark AST parser and ASG resolver.
 * **Template Engine:** `asciidoctype` & Chameleon Zope Page Templates (`.pt`).
 * **Runtime Environment:** Python 3.14 on macOS / Linux.

@@ -1,6 +1,6 @@
 = Golem (`golem-docs`)
 Michael Bernstein <zopemaven@gmail.com>
-v0.1.0a1
+v0.1.0a2
 :toc: macro
 :icons: font
 :idprefix:
@@ -10,7 +10,7 @@ v0.1.0a1
 
 image:https://img.shields.io/badge/python-3.14+-blue.svg[Python 3.14+,link=https://www.python.org/downloads/]
 image:https://img.shields.io/badge/License-Apache%202.0-blue.svg[License: Apache-2.0,link=LICENSE]
-image:https://img.shields.io/badge/release-v0.1.0a1-green.svg[Release: Alpha MVP,link=https://pypi.org/project/golem-docs/]
+image:https://img.shields.io/badge/release-v0.1.0a2-green.svg[Release: Alpha MVP,link=https://pypi.org/project/golem-docs/]
 
 Golem is an extensible, Python-native static site generator and publishing workbench built from the ground up for technical, interactive documentation using *AsciiDoc* as its primary source format.
 
