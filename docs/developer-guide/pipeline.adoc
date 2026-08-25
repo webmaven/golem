@@ -32,6 +32,7 @@ Golem operates as a deterministic, compiler-grade document processing pipeline b
 2. *Semantic ASG Resolution:* Resolves document attributes, include directives, callout numbering, cross-references, and footnote indexing into a clean Abstract Semantic Graph (ASG).
 3. *Node Rendering:* `asciidoctype` renders each ASG block using dedicated Chameleon TAL templates.
 4. *Layout Integration:* Golem injects `page_title`, `site_title`, `body_html`, `nav_tree`, `nav_html`, `toc_html`, `custom_css`, and `custom_js` into the theme's `skeleton.pt`.
+5. *Fine-Grained Cache Invalidation:* During build planning, Golem triggers the `golem_mark_stale` hook, allowing themes and plugins to selectively invalidate cache for specific templates or document nodes based on metadata.
 
 == Core Dependencies
 

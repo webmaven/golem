@@ -39,6 +39,19 @@ class MyPlugin:
         return html
 
     @hookimpl
+    def golem_mark_stale(
+        self,
+        changed_files: list[Path],
+        cache_metadata: dict[str, dict[str, Any]],
+    ) -> list[Path] | None:
+        '''
+        Called during dependency analysis to allow plugins to register stale pages for recompilation.
+        Inspects `changed_files` and per-document `cache_metadata` (including `node_types`).
+        Returns a list of `Path` objects corresponding to pages that need recompilation.
+        '''
+        return []
+
+    @hookimpl
     def on_build_completed(self, site_dist_dir: str, manifest: dict) -> None:
         '''Called after the entire build completes.'''
         pass
