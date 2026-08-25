@@ -18,13 +18,14 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "asciidoctrine>=0.2.0a3",
+    "asciidoctrine>=0.2.0a4",
     "asciidocstring>=0.1.0a7",
     "asciidoctest>=0.2.0a3",
-    "asciidoctype>=0.1.0a3",
+    "asciidoctype>=0.1.0a4",
     "chameleon",
     "click",
     "pluggy",
+    "pygments>=2.18",
     "griffe>=1.5.0",
     "tomli; python_version < '3.11'",
 ]
