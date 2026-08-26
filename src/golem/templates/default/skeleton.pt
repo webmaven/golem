@@ -275,6 +275,34 @@
             margin-bottom: 0.5rem;
             color: var(--golem-text);
         }
+        #golem-content h4 {
+            font-family: var(--golem-font-ui);
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--golem-text);
+            margin-top: 1.25rem;
+            margin-bottom: 0.35rem;
+        }
+        #golem-content h5 {
+            font-family: var(--golem-font-ui);
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--golem-text-muted);
+            margin-top: 1rem;
+            margin-bottom: 0.25rem;
+        }
+        #golem-content h6 {
+            font-family: var(--golem-font-ui);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--golem-text-muted);
+            margin-top: 0.75rem;
+            margin-bottom: 0.2rem;
+        }
         #golem-content p {
             margin-top: 0;
             margin-bottom: 1.25rem;
@@ -308,6 +336,7 @@
         pre, .listingblock pre {
             background: var(--golem-code-bg);
             border: 1px solid var(--golem-border);
+            border-left: 3px solid var(--golem-primary);
             border-radius: 4px;
             padding: 1rem 1.25rem;
             overflow-x: auto;
@@ -338,6 +367,22 @@
         .admonitionblock.warning, aside.golem-admonition.warning, .admonition.warning { border-left-color: var(--golem-warning); }
         .admonitionblock.caution, aside.golem-admonition.caution, .admonition.caution { border-left-color: var(--golem-caution); }
 
+        /* ── Definition Lists (API Parameters) ─────────────── */
+        #golem-content dl {
+            margin: 1rem 0 1.25rem 0;
+        }
+        #golem-content dt {
+            font-family: var(--golem-font-mono);
+            font-weight: 600;
+            color: var(--golem-primary);
+            margin-top: 0.75rem;
+        }
+        #golem-content dd {
+            margin-left: 1.25rem;
+            margin-bottom: 0.5rem;
+            color: var(--golem-text);
+        }
+
         /* ── Tables ────────────────────────────────────────── */
         table, table.golem-table {
             width: 100%;
@@ -359,6 +404,27 @@
         td {
             padding: 0.6rem 0.85rem;
             border-bottom: 1px solid var(--golem-border);
+        }
+
+        /* ── Full-Bleed Table Breakout ──────────────────────── */
+        #golem-content table,
+        #golem-content .tableblock {
+            margin-inline: calc(-1 * var(--golem-content-pad-x));
+            width: calc(100% + (2 * var(--golem-content-pad-x)));
+            max-width: none;
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* ── Focus Rings (Accessibility) ───────────────────── */
+        a:focus-visible,
+        button:focus-visible,
+        details summary:focus-visible,
+        [tabindex]:focus-visible {
+            outline: 2px solid var(--golem-primary);
+            outline-offset: 2px;
+            border-radius: 2px;
         }
 
         /* ── Right Sidebar (TOC) ───────────────────────────── */
