@@ -5,27 +5,27 @@ This module is the bridge between the parsed document representation
 (ASG dict or AST Node from ``asciidoctrine``) and the final HTML markup
 that the Chameleon template layer wraps into a full page.
 
-=== Main responsibilities
-
-- `render_body` — delegates to ``asciidoctype.AsciiDoctypeRenderer``
+Main responsibilities
+---------------------
+- :func:`render_body` — delegates to ``asciidoctype.AsciiDoctypeRenderer``
   to convert an ASG dict into the inner HTML of the ``<main>`` content
   area, with special handling for document-level footnote rendering.
-- `generate_toc_html` — traverses the section tree and produces a
+- :func:`generate_toc_html` — traverses the section tree and produces a
   ``<nav class="toc">`` element for sidebar or inline TOC use.
-- `collect_node_types` — walks the ASG to extract the set of node
+- :func:`collect_node_types` — walks the ASG to extract the set of node
   names present in a document (used by the engine to fingerprint which
   template partials a page depends on, enabling scoped cache invalidation).
 
-=== Internal helpers
-
-- `_slugify` — converts arbitrary text to a URL/HTML-id-safe slug.
-- `_ensure_section_ids` — recursively assigns ``id`` attributes to
+Internal helpers
+----------------
+- :func:`_slugify` — converts arbitrary text to a URL/HTML-id-safe slug.
+- :func:`_ensure_section_ids` — recursively assigns ``id`` attributes to
   every section node that lacks one, deriving them from the section title
-  via `_slugify`.
-- `_extract_plain_text` — recursively extracts the concatenated
+  via :func:`_slugify`.
+- :func:`_extract_plain_text` — recursively extracts the concatenated
   plain-text content from nested inline or block nodes (used for TOC
   link labels and section ID generation).
-- `_collect_sections` — recursively accumulates all section nodes
+- :func:`_collect_sections` — recursively accumulates all section nodes
   from an ASG tree for TOC construction.
 """
 
