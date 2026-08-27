@@ -1,32 +1,8 @@
 """
-HTML rendering pipeline for Golem — body content, TOC, and ASG traversal utilities.
 
-This module is the bridge between the parsed document representation
-(ASG dict or AST Node from ``asciidoctrine``) and the final HTML markup
-that the Chameleon template layer wraps into a full page.
-
-Main responsibilities
----------------------
-- :func:`render_body` — delegates to ``asciidoctype.AsciiDoctypeRenderer``
-  to convert an ASG dict into the inner HTML of the ``<main>`` content
-  area, with special handling for document-level footnote rendering.
-- :func:`generate_toc_html` — traverses the section tree and produces a
-  ``<nav class="toc">`` element for sidebar or inline TOC use.
-- :func:`collect_node_types` — walks the ASG to extract the set of node
-  names present in a document (used by the engine to fingerprint which
-  template partials a page depends on, enabling scoped cache invalidation).
-
-Internal helpers
-----------------
-- :func:`_slugify` — converts arbitrary text to a URL/HTML-id-safe slug.
-- :func:`_ensure_section_ids` — recursively assigns ``id`` attributes to
-  every section node that lacks one, deriving them from the section title
-  via :func:`_slugify`.
-- :func:`_extract_plain_text` — recursively extracts the concatenated
-  plain-text content from nested inline or block nodes (used for TOC
-  link labels and section ID generation).
-- :func:`_collect_sections` — recursively accumulates all section nodes
-  from an ASG tree for TOC construction.
+This module provides the static HTML rendering interface for Golem, delegating
+document and node translation directly to `asciidoctype.AsciiDoctypeRenderer`
+and generating clean Table of Contents navigation trees.
 """
 
 import re
@@ -40,47 +16,18 @@ def render_body(
     asg_root: Union[Node, dict[str, Any]],
     search_paths: Optional[List[Path]] = None,
 ) -> str:
-    """Render an ASG dictionary or AST Node structure into static HTML5 markup.
+    """
 
-    Constructs an :class:`asciidoctype.AsciiDoctypeRenderer` instance,
-    optionally seeded with *search_paths* for template override lookup,
-    then dispatches rendering based on the root node type:
-
-    - **document node** — renders each top-level block separately and
-      concatenates the results, then appends a ``<div id="footnotes">``
-      block if the document has footnote definitions.
-    - **any other node** — renders the single node directly.
-
-    Section IDs are guaranteed before rendering via
-    :func:`_ensure_section_ids`, so every ``<h2>``–``<h6>`` in the
-    output has a stable ``id`` attribute that TOC anchors can target.
-
-    Template context construction
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    The renderer itself does not build a Chameleon template context;
-    that is the responsibility of :class:`golem.templates.PageCompiler`.
-    ``render_body`` produces only the *inner* content string
-    (``body_content``) that ``PageCompiler`` injects into the
-    ``skeleton.pt`` layout template.
+    Render an ASG dictionary or AST Node structure into static HTML5 markup.
 
     === Arguments
 
-    - ``asg_root``:: ASG dictionary representation (a ``dict`` whose root
-      has ``"name": "document"``) or an ``asciidoctrine`` AST Node.
-    - ``search_paths``:: Optional list of :class:`~pathlib.Path` objects
-      passed to ``AsciiDoctypeRenderer`` for project-local template
-      partial overrides.
+    - `asg_root`:: ASG dictionary representation or AST Node.
+    - `search_paths`:: Optional list of template directory paths for overrides.
 
     === Returns
 
-    Rendered inner HTML5 markup string ready for injection into the
-    ``skeleton.pt`` layout.
-
-    === Raises
-
-    ``TypeError``
-        If *asg_root* is neither a ``dict`` nor an object with a
-        ``to_dict()`` method.
+    Rendered HTML5 markup string.
     """
     if hasattr(asg_root, "to_dict"):
         node_dict = asg_root.to_dict()
@@ -238,31 +185,17 @@ def _collect_sections(node: Any, sections: list) -> None:
 
 
 def generate_toc_html(asg_root: Union[Node, dict[str, Any]]) -> str:
-    """Traverse the document section tree and emit a ``<nav class="toc">`` HTML element.
+    """
 
-    Calls :func:`_ensure_section_ids` first so every section anchor is
-    stable, then collects all section nodes via :func:`_collect_sections`
-    and iterates over them in document order.
-
-    Nesting algorithm
-    ~~~~~~~~~~~~~~~~~
-    The generator tracks a ``current_level`` cursor and emits opening
-    ``<ul class="toc-level-N">`` elements as level increases and closing
-    ``</ul>`` elements as level decreases, producing a correctly nested
-    multi-level tree.  The base level of the first section is used as the
-    reference; sections with a level lower than the base are clamped to
-    the base to handle documents where the first section is not a top-
-    level ``==`` heading.
+    Traverse sections in ASG dictionaries or AST nodes and build a clean `<nav class="toc">` HTML.
 
     === Arguments
 
-    - ``asg_root``:: ASG dictionary representation (root ``dict`` with
-      ``"name": "document"``) or an ``asciidoctrine`` AST Node.
+    - `asg_root`:: ASG dictionary representation or AST Node.
 
     === Returns
 
-    Rendered ``<nav class="toc">…</nav>`` HTML string, or ``""`` if the
-    document has no sections.
+    Rendered HTML5 Table of Contents or empty string if no sections exist.
     """
     _ensure_section_ids(asg_root)
     sections: list[Any] = []
@@ -319,43 +252,16 @@ def generate_toc_html(asg_root: Union[Node, dict[str, Any]]) -> str:
 
 
 def collect_node_types(asg_root: Union[Node, dict[str, Any]]) -> list[str]:
-    """Extract all unique ASG/AST node names present in a document tree.
-
-    Performs a depth-first walk of the full node hierarchy — handling
-    both the ``dict``-based ASG representation and object-based AST nodes
-    — and accumulates every distinct lowercase node name (e.g.
-    ``"listing"``, ``"table"``, ``"section"``, ``"admonition"``) into a
-    set, then returns it sorted.
-
-    Primary use case
-    ~~~~~~~~~~~~~~~~
-    The build engine calls this after rendering each page and stores the
-    result in ``cache_data["metadata"][path]["node_types"]``.  When a
-    theme template partial is updated, the engine compares the partial
-    name against each page's stored node types to determine which pages
-    need to be rebuilt — avoiding a full site rebuild when, for example,
-    only the ``listing`` partial changes.
-
-    Traversal strategy
-    ~~~~~~~~~~~~~~~~~~
-    For ``dict`` nodes, the traversal recurses into the following child
-    collection keys (when present): ``"blocks"``, ``"children"``,
-    ``"items"``, ``"inlines"``, ``"title"``, ``"rows"``, ``"cells"``,
-    ``"footnotes"``, ``"header"``.
-
-    For object nodes, the same attribute names are tried plus
-    ``get_child_collections()`` when available (for AST nodes that
-    expose their children through a method rather than attributes).
+    """
+    Extract all unique AST/ASG node names found in a document or AST/ASG tree.
 
     === Arguments
 
-    - ``asg_root``:: ASG dictionary representation or ``asciidoctrine``
-      AST Node for the document to inspect.
+    - `asg_root`:: ASG dictionary representation or AST Node.
 
     === Returns
 
-    Sorted ``list[str]`` of unique node name strings found anywhere in
-    the document tree.
+    Sorted list of unique node names.
     """
     node_types: set[str] = set()
 
