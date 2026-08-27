@@ -1,23 +1,23 @@
 """
 Development HTTP server with live-reload and build-error overlays for Golem.
 
-Threading model
----------------
+=== Threading model
+
 The server uses two concurrent execution contexts:
 
 1. **File-watcher thread** (daemon) — polls the ``watch_dir`` once per
-   second via :attr:`~LiveReloadServer.change_detected_func`.  On
-   detecting a change it calls :attr:`~LiveReloadServer.rebuild_func`,
+   second via ``LiveReloadServer.change_detected_func``.  On
+   detecting a change it calls ``LiveReloadServer.rebuild_func``,
    then puts a ``"reload"`` message onto every registered SSE queue.
 
 2. **ThreadingHTTPServer** (main thread, blocking) — handles each HTTP
    request in its own thread.  Requests to the synthetic
    ``/golem-reload`` endpoint block indefinitely in SSE streaming mode,
-   reading from a per-connection :class:`~queue.Queue` until the
+   reading from a per-connection ``queue.Queue`` until the
    watcher signals or the client disconnects.
 
-Live-reload protocol
---------------------
+=== Live-reload protocol
+
 Golem injects a tiny ``<script>`` block into every served ``.html``
 page that opens an SSE connection to ``/golem-reload``.  When the
 watcher signals, the script calls ``window.location.reload()``
@@ -25,13 +25,13 @@ in every connected browser tab simultaneously.  A ``": ping\\n\\n"``
 keep-alive comment is sent every 10 s to prevent socket timeouts on
 proxies and load balancers.
 
-Build-error overlays
---------------------
+=== Build-error overlays
+
 If the rebuild callback raises an exception, its message is stored in
-:attr:`~LiveReloadServer.last_error_message`.  The next page served has
+``LiveReloadServer.last_error_message``.  The next page served has
 a red fixed-position banner injected at the top of the ``<head>``
 showing the error; the banner disappears once a subsequent clean rebuild
-clears :attr:`~LiveReloadServer.last_error_message`.
+clears ``LiveReloadServer.last_error_message``.
 """
 
 import http.server

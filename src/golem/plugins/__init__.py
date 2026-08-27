@@ -1,66 +1,63 @@
 """
 Golem plugin system — hook specifications and plugin manager factory.
 
-Architecture
-------------
-Golem uses `Pluggy <https://pluggy.readthedocs.io/>`_ for its plugin
-system.  All hook specifications live in :class:`GolemSpecs`; the
+=== Architecture
+
+Golem uses https://pluggy.readthedocs.io/[Pluggy] for its plugin
+system.  All hook specifications live in ``GolemSpecs``; the
 ``@hookspec`` marker registers them under the ``"golem"`` project name.
 Plugin implementations must use the matching ``@hookimpl`` marker
 (re-exported from this module) and be registered with
-:func:`get_plugin_manager`.
+``get_plugin_manager``.
 
-Hook execution order
---------------------
+=== Hook execution order
+
 Hooks are called in the order plugins were registered.  The four core
 document-processing hooks fire in this pipeline sequence for every
 source file:
 
-1. :meth:`GolemSpecs.on_pre_parse` — raw AsciiDoc source string
+1. ``GolemSpecs.on_pre_parse`` — raw AsciiDoc source string
    manipulation (e.g. front-matter injection, include preprocessing).
-2. :meth:`GolemSpecs.on_ast_created` — post-parse Lark AST
+2. ``GolemSpecs.on_ast_created`` — post-parse Lark AST
    transformation (structural rewrites before semantic resolution).
-3. :meth:`GolemSpecs.on_asg_created` — post-resolution ASG dict
+3. ``GolemSpecs.on_asg_created`` — post-resolution ASG dict
    manipulation (metadata enrichment, cross-reference injection).
-4. :meth:`GolemSpecs.on_post_render` — post-render HTML string
+4. ``GolemSpecs.on_post_render`` — post-render HTML string
    manipulation (minification, post-processing passes).
 
 Supplementary hooks:
 
-- :meth:`GolemSpecs.golem_add_subcommands` — called once at CLI startup
+- ``GolemSpecs.golem_add_subcommands`` — called once at CLI startup
   so plugins can register additional Click subcommands.
-- :meth:`GolemSpecs.golem_mark_stale` — called during incremental build
+- ``GolemSpecs.golem_mark_stale`` — called during incremental build
   dependency resolution so plugins can declare additional stale pages.
 
-Plugin discovery (in priority order)
--------------------------------------
-:func:`get_plugin_manager` discovers plugins via three mechanisms:
+=== Plugin discovery (in priority order)
+
+``get_plugin_manager`` discovers plugins via three mechanisms:
 
 1. **Entry points** — packages that declare a ``golem.plugins``
    entry-point group are loaded automatically.
 2. **Config plugins list** — fully-qualified module names listed in
-   :attr:`~golem.config.GolemConfig.plugins` are imported and
-   registered.
+   ``GolemConfig.plugins`` are imported and registered.
 3. **Local plugins directory** — every ``*.py`` file in
-   :attr:`~golem.config.GolemConfig.plugins_dir` (default:
-   ``plugins/``) is loaded as a module and registered if it implements
-   at least one ``@hookimpl``.
+   ``GolemConfig.plugins_dir`` (default: ``plugins/``) is loaded as a
+   module and registered if it implements at least one ``@hookimpl``.
 
-Example plugin skeleton
------------------------
+=== Example plugin skeleton
 
-.. code-block:: python
+----
+from golem.plugins import hookimpl
 
-    from golem.plugins import hookimpl
+@hookimpl
+def on_pre_parse(raw_content: str) -> str:
+    # Insert a custom front-matter attribute before parsing
+    return ":custom-attr: injected\\n" + raw_content
 
-    @hookimpl
-    def on_pre_parse(raw_content: str) -> str:
-        # Insert a custom front-matter attribute before parsing
-        return ":custom-attr: injected\\n" + raw_content
-
-    @hookimpl
-    def on_post_render(html_content: str) -> str:
-        return html_content.replace("</body>", "<p>Built by Golem</p></body>")
+@hookimpl
+def on_post_render(html_content: str) -> str:
+    return html_content.replace("</body>", "<p>Built by Golem</p></body>")
+----
 """
 
 from __future__ import annotations
