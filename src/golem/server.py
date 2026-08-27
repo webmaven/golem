@@ -298,8 +298,39 @@ class LiveReloadServer:
 
                 return super().send_head()
 
+        # Custom ThreadingHTTPServer that logs client disconnects cleanly at DEBUG level
+        class _ThreadingDevHTTPServer(http.server.ThreadingHTTPServer):
+            """Threading HTTP server with graceful client disconnection logging."""
+
+            daemon_threads = True
+
+            def handle_error(self, request, client_address):
+                """Handle server errors, suppressing noisy client disconnect stack traces.
+
+                Logs benign network disconnections (`ConnectionResetError`, `BrokenPipeError`,
+                `ConnectionAbortedError`) at `DEBUG` level and forwards genuine internal server
+                exceptions to standard error handling.
+
+                [parameters]
+                `request` (Any):: Active network socket or request instance.
+                `client_address` (tuple):: Remote client address `(ip, port)`.
+                """
+                import sys
+
+                exc_type, exc_val = sys.exc_info()[:2]
+                if exc_type is not None and issubclass(
+                    exc_type, (ConnectionResetError, BrokenPipeError, ConnectionAbortedError)
+                ):
+                    logger.debug(
+                        "[LiveReload] Client %s disconnected during request processing: %s",
+                        client_address,
+                        exc_val,
+                    )
+                    return
+                super().handle_error(request, client_address)
+
         # ThreadingHTTPServer enables concurrent multi-client and SSE streaming
-        self.httpd = http.server.ThreadingHTTPServer(("", self.port), CustomHTTPHandler)
+        self.httpd = _ThreadingDevHTTPServer(("", self.port), CustomHTTPHandler)
         logger.info(f"[LiveReload] DevServer active on http://127.0.0.1:{self.port}...")
         try:
             self.httpd.serve_forever()

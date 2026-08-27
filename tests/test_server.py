@@ -169,3 +169,45 @@ def test_dev_server_error_overlay_injection(tmp_path):
     finally:
         server.shutdown()
         t.join(timeout=2)
+
+
+def test_dev_server_client_disconnect_handling(tmp_path, capsys):
+    """Verify that abrupt client socket resets are handled cleanly without stderr tracebacks."""
+    dist_dir = tmp_path / "dist"
+    dist_dir.mkdir()
+    index_file = dist_dir / "index.html"
+    index_file.write_text("<html><body>Test</body></html>")
+
+    port = get_free_port()
+    server = LiveReloadServer(
+        public_dir=dist_dir,
+        watch_dir=tmp_path / "content",
+        change_detected_func=lambda: False,
+        rebuild_func=lambda: None,
+        port=port,
+    )
+
+    t = threading.Thread(target=server.run, daemon=True)
+    t.start()
+    time.sleep(0.5)
+
+    try:
+        # Connect and immediately close with TCP RST
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(("127.0.0.1", port))
+        # SO_LINGER with timeout 0 sends RST on close
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, b"\x01\x00\x00\x00\x00\x00\x00\x00")
+        s.close()
+        time.sleep(0.2)
+
+        # Standard GET should still succeed cleanly
+        resp = requests.get(f"http://127.0.0.1:{port}/index.html")
+        assert resp.status_code == 200
+
+        # Confirm no socketserver traceback leaked to stderr
+        captured = capsys.readouterr()
+        assert "Traceback" not in captured.err
+        assert "ConnectionResetError" not in captured.err
+    finally:
+        server.shutdown()
+        t.join(timeout=2)
