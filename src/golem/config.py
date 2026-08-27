@@ -1,4 +1,32 @@
-# golem/config.py
+"""Manage configuration discovery, loading, parsing, and data models for Golem.
+
+== Configuration Discovery
+
+Golem locates site configuration by checking the local directory:
+1. `golem.toml` is prioritized if present.
+2. `pyproject.toml` is inspected for a `[tool.golem]` section if `golem.toml` is absent.
+3. If neither configuration file is found, defaults are loaded targeting `golem.toml`.
+
+== Configuration Structure
+
+Configuration options can be organized in `golem.toml` or `pyproject.toml`:
+
+`[site]` / `[tool.golem.site]`:: Defines site metadata such as `title`, `author`, and base `url`.
+`[build]` / `[tool.golem.build]`:: Configures build settings including `content_dir`, `output_dir`, `theme`, `templates_dir`, `static_dir`, `plugins_dir`, and `strict` mode.
+`[navigation]` / `[tool.golem.navigation]`:: Declares custom navigation order and page lists via `nav`.
+`[api]` / `[tool.golem.api]`:: Configures API documentation generation including target `packages`, `output_dir`, and `docstring_style`.
+`[plugins]` / `[tool.golem.plugins]`:: Declares plugin extensions via `plugins` or `enabled` lists.
+
+Flattened keys directly under `[tool.golem]` in `pyproject.toml` or top-level keys in `golem.toml` are also supported.
+
+== Configuration Lifecycle
+
+1. Discovery: `find_default_config_path()` identifies the active configuration file.
+2. Loading & Parsing: `load_config()` reads TOML data via `tomllib` or `tomli` fallback and normalizes nested tables.
+3. Validation: Directory paths are checked to prevent overlapping or nested `content_dir` and `output_dir` targets.
+4. Instantiation: A typed `GolemConfig` instance is created and passed to the build engine, CLI, and plugins.
+"""
+
 try:
     import tomllib
 except ImportError:
@@ -10,6 +38,30 @@ from typing import Any
 
 @dataclass
 class GolemConfig:
+    """Store site configuration and build parameters for Golem.
+
+    Holds resolved site metadata, build flags, filesystem directory locations,
+    navigation structures, plugin configurations, and API documentation options.
+
+    [attributes]
+    `site_title` (str):: Title of the documentation site. Defaults to `"Golem Docs"`.
+    `site_author` (str):: Author or organization name for the site metadata. Defaults to `"Anonymous"`.
+    `site_url` (str | None):: Canonical base URL where the site is hosted. Defaults to `None`.
+    `strict` (bool):: Whether strict build mode is enabled to fail on warnings. Defaults to `False`.
+    `navigation_nav` (list[str] | None):: Ordered list of content page paths for site navigation. Defaults to `None`.
+    `content_dir` (str):: Directory path containing source content files. Defaults to `"content"`.
+    `output_dir` (str):: Directory path where compiled static output is generated. Defaults to `"dist"`.
+    `theme` (str):: Name of the site theme to apply. Defaults to `"default"`.
+    `templates_dir` (str):: Directory path containing custom Jinja HTML templates. Defaults to `"templates"`.
+    `static_dir` (str):: Directory path containing static asset files. Defaults to `"static"`.
+    `plugins_dir` (str):: Directory path containing custom plugin definitions. Defaults to `"plugins"`.
+    `plugins` (list[str]):: List of enabled plugin module names or paths. Defaults to `[]`.
+    `api_packages` (list[str]):: List of Python package or module names to document. Defaults to `[]`.
+    `api_output_dir` (str):: Output subdirectory within `output_dir` for generated API reference docs. Defaults to `"api"`.
+    `api_docstring_style` (str):: Docstring parser style (`"auto"`, `"asciidoc"`, `"google"`, `"numpy"`, or `"sphinx"`). Defaults to `"auto"`.
+    `config_path` (str | None):: Absolute path to the resolved configuration file used. Defaults to `None`.
+    """
+
     site_title: str = "Golem Docs"
     site_author: str = "Anonymous"
     site_url: str | None = None
@@ -29,6 +81,15 @@ class GolemConfig:
 
 
 def find_default_config_path() -> Path:
+    """Locate the default configuration file path in the workspace.
+
+    Searches for `golem.toml` first, then inspects `pyproject.toml` for a `[tool.golem]`
+    section. If neither file exists or if `pyproject.toml` lacks Golem configuration,
+    defaults to returning `golem.toml`.
+
+    [returns]
+    `Path`:: Path to the discovered `golem.toml` or `pyproject.toml` configuration file.
+    """
     golem_toml = Path("golem.toml")
     if golem_toml.exists():
         return golem_toml
@@ -45,6 +106,16 @@ def find_default_config_path() -> Path:
 
 
 def _parse_nav(raw_nav: Any) -> list[str] | None:
+    """Parse raw navigation configuration into a list of relative page paths.
+
+    Extracts path strings from lists of strings or dictionaries containing a `'path'` key.
+
+    [parameters]
+    `raw_nav` (Any):: Raw navigation data structure loaded from TOML configuration.
+
+    [returns]
+    `list[str] | None`:: List of relative page paths, or `None` if navigation is not specified or invalid.
+    """
     if raw_nav is None:
         return None
     if isinstance(raw_nav, list):
@@ -61,6 +132,16 @@ def _parse_nav(raw_nav: Any) -> list[str] | None:
 
 
 def _parse_plugins(raw_plugins: Any) -> list[str] | None:
+    """Parse raw plugin configuration into a list of plugin module names.
+
+    Extracts plugin identifiers from lists of strings or dictionaries containing a `'name'` key.
+
+    [parameters]
+    `raw_plugins` (Any):: Raw plugin data structure loaded from TOML configuration.
+
+    [returns]
+    `list[str] | None`:: List of plugin module names, or `None` if plugins are not specified or invalid.
+    """
     if raw_plugins is None:
         return None
     if isinstance(raw_plugins, list):
@@ -77,6 +158,16 @@ def _parse_plugins(raw_plugins: Any) -> list[str] | None:
 
 
 def _parse_api_packages(raw_packages: Any) -> list[str]:
+    """Parse raw API package configuration into a list of package or module names.
+
+    Accepts single strings, lists of strings, or lists of dictionaries containing a `'name'` key.
+
+    [parameters]
+    `raw_packages` (Any):: Raw API package configuration loaded from TOML.
+
+    [returns]
+    `list[str]`:: List of normalized package or module names. Defaults to an empty list if unspecified.
+    """
     if raw_packages is None:
         return []
     if isinstance(raw_packages, str):
@@ -95,6 +186,21 @@ def _parse_api_packages(raw_packages: Any) -> list[str]:
 
 
 def load_config(config_path: Path) -> GolemConfig:
+    """Load, parse, and validate Golem site configuration from a TOML file.
+
+    Supports reading configuration from standalone `golem.toml` files or `pyproject.toml`
+    under the `[tool.golem]` table. Validates that `content_dir` and `output_dir` do not
+    overlap or nest inside one another.
+
+    [parameters]
+    `config_path` (Path):: Path to the TOML configuration file to load.
+
+    [returns]
+    `GolemConfig`:: Fully populated configuration dataclass instance with default fallbacks.
+
+    [raises]
+    `ValueError`:: If TOML syntax is invalid or if `content_dir` and `output_dir` paths overlap.
+    """
     if not config_path.exists():
         return GolemConfig()
     try:
