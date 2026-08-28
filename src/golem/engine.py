@@ -481,7 +481,7 @@ class BuildEngine:
         `path` (Path):: Path to the target AsciiDoc document.
 
         [returns]
-        `dict[str, Any]`:: Dictionary containing `"title"`, `"nav_title"`, `"nav_order"`, and `"has_toc"` keys.
+        `dict[str, Any]`:: Dictionary containing `"title"`, `"nav_title"`, `"nav_order"`, `"has_toc"`, `"page_class"`, `"body_class"`, and `"content_class"` keys.
         """
         p_abs = str(path.resolve())
         current_hash = self._get_sha256(path)
