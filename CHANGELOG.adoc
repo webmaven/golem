@@ -10,6 +10,31 @@ and this project adheres to https://semver.org/spec/v2.0.0.html[Semantic Version
 
 toc::[]
 
+== [Unreleased]
+
+=== Added
+
+* *Server-Side Syntax Highlighting:* Pygments-powered syntax highlighting integrated into the build pipeline.
+
+=== Changed
+
+* *Upgraded Dependencies:*
+** Bumped `asciidoctrine` requirement to `>=0.2.0a4` and `asciidoctype` to `>=0.1.0a4`.
+** Added `pygments>=2.18` as a required dependency.
+* *Comprehensive AsciiDoc Docstrings:*
+** All internal modules (`config`, `server`, `plugins`, `engine`, `renderer`) now carry full AsciiDoc-formatted docstrings using `asciidocstring` conventions, replacing prior reST/Sphinx markup.
+* *CSS Visual Hierarchy (Fired Clay Theme):*
+** Fired Clay palette (`FiredClayStyle`) applied to Pygments-highlighted listing blocks.
+** New `body_class`, `page_class`, and `content_class` template context variables for per-page layout control.
+** Table full-bleed breakout, heading scale, description list (`dl`/`dt`/`dd`) spacing, accent rail, and keyboard focus rings.
+** Listing blocks render language badges and callout pills; admonition titles styled as pill labels; inline code within headings uses a muted variant.
+
+=== Fixed
+
+* *Dev Server:* Client socket disconnects now logged at `DEBUG` level instead of raising unhandled exceptions.
+* *Test Coverage:*
+** Modernized test syntax and expanded coverage across `doctest`, `apidoc`, `highlighting`, and `engine` modules.
+
 == [0.1.0a2] - 2026-08-24
 
 === Added

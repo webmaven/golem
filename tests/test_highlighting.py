@@ -94,3 +94,26 @@ def test_pygments_css_constant():
     assert isinstance(PYGMENTS_CSS, str)
     assert len(PYGMENTS_CSS) > 100
     assert ".highlight" in PYGMENTS_CSS
+
+
+def test_make_highlighter_alias_fallback(monkeypatch):
+    """Test alias fallback when aliased lexer name fails."""
+    import golem.highlighting
+
+    monkeypatch.setitem(golem.highlighting.LANGUAGE_ALIASES, "alias_fails", "nonexistent_lexer_xyz")
+    highlighter = make_highlighter()
+    # lookup_lang != raw_lang and raw_lang is also nonexistent
+    assert highlighter("code", "alias_fails") is None
+
+
+def test_make_highlighter_highlight_exception(monkeypatch):
+    """Test graceful handling when pygments.highlight or get_lexer_by_name raises unexpected Exception."""
+    import pygments  # type: ignore[import-untyped]
+
+    highlighter = make_highlighter()
+
+    def fake_highlight(*args, **kwargs):
+        raise RuntimeError("Pygments internal error")
+
+    monkeypatch.setattr(pygments, "highlight", fake_highlight)
+    assert highlighter("x = 1", "python") is None
