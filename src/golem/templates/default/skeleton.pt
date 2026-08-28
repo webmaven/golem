@@ -333,7 +333,19 @@
             border-radius: 3px;
             border: 1px solid var(--golem-border);
         }
+        h1 code, h2 code, h3 code, h4 code, h5 code, h6 code {
+            background: var(--golem-code-bg);
+            padding: 0.1em 0.3em;
+            border-radius: 3px;
+            border: 1px solid var(--golem-border);
+            font-size: 0.85em;
+        }
+        .listingblock {
+            position: relative;
+            margin: 1.25rem 0;
+        }
         pre, .listingblock pre {
+            position: relative;
             background: var(--golem-code-bg);
             border: 1px solid var(--golem-border);
             border-left: 3px solid var(--golem-primary);
@@ -342,12 +354,277 @@
             overflow-x: auto;
             line-height: 1.55;
             margin: 1.25rem 0;
+            cursor: text;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .listingblock:focus-within pre,
+        pre:focus-within {
+            user-select: all;
+            -webkit-user-select: all;
+            border-color: var(--golem-primary);
+            box-shadow: 0 0 0 1px var(--golem-primary);
         }
         pre code {
             background: transparent;
             padding: 0;
             border: none;
             font-size: 0.875rem;
+        }
+
+        /* ── Listing Language & Role Badges ────────────────── */
+        .listingblock pre.highlight::before,
+        pre.highlight[class*="language-"]::before,
+        pre[class*="language-"]::before,
+        .listingblock pre[class*="highlight"] code[class*="language-"]::before,
+        pre.highlight code[class*="language-"]::before,
+        pre.highlight.test::before,
+        pre.highlight.shared::before,
+        pre.highlight.reset::before {
+            position: absolute;
+            top: 0.45rem;
+            right: 0.65rem;
+            font-family: var(--golem-font-ui);
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.15em 0.55em;
+            border-radius: 3px;
+            background: var(--golem-surface);
+            color: var(--golem-text-muted);
+            border: 1px solid var(--golem-border);
+            pointer-events: none;
+            line-height: 1.2;
+            z-index: 2;
+        }
+
+        /* Language Badges */
+        pre.highlight.python::before,
+        pre.highlight.py::before,
+        pre.highlight[class*="language-python"]::before,
+        pre.highlight code.language-python::before,
+        pre.highlight code[data-lang="python"]::before { content: 'python'; }
+
+        pre.highlight.javascript::before,
+        pre.highlight.js::before,
+        pre.highlight[class*="language-javascript"]::before,
+        pre.highlight code.language-javascript::before,
+        pre.highlight code[data-lang="javascript"]::before { content: 'javascript'; }
+
+        pre.highlight.typescript::before,
+        pre.highlight.ts::before,
+        pre.highlight[class*="language-typescript"]::before,
+        pre.highlight code.language-typescript::before,
+        pre.highlight code[data-lang="typescript"]::before { content: 'typescript'; }
+
+        pre.highlight.html::before,
+        pre.highlight[class*="language-html"]::before,
+        pre.highlight code.language-html::before,
+        pre.highlight code[data-lang="html"]::before { content: 'html'; }
+
+        pre.highlight.css::before,
+        pre.highlight[class*="language-css"]::before,
+        pre.highlight code.language-css::before,
+        pre.highlight code[data-lang="css"]::before { content: 'css'; }
+
+        pre.highlight.json::before,
+        pre.highlight[class*="language-json"]::before,
+        pre.highlight code.language-json::before,
+        pre.highlight code[data-lang="json"]::before { content: 'json'; }
+
+        pre.highlight.yaml::before,
+        pre.highlight.yml::before,
+        pre.highlight[class*="language-yaml"]::before,
+        pre.highlight code.language-yaml::before,
+        pre.highlight code[data-lang="yaml"]::before { content: 'yaml'; }
+
+        pre.highlight.toml::before,
+        pre.highlight[class*="language-toml"]::before,
+        pre.highlight code.language-toml::before,
+        pre.highlight code[data-lang="toml"]::before { content: 'toml'; }
+
+        pre.highlight.xml::before,
+        pre.highlight[class*="language-xml"]::before,
+        pre.highlight code.language-xml::before,
+        pre.highlight code[data-lang="xml"]::before { content: 'xml'; }
+
+        pre.highlight.bash::before,
+        pre.highlight.sh::before,
+        pre.highlight.shell::before,
+        pre.highlight.zsh::before,
+        pre.highlight[class*="language-bash"]::before,
+        pre.highlight code.language-bash::before,
+        pre.highlight code.language-sh::before,
+        pre.highlight code[data-lang="bash"]::before { content: 'bash'; }
+
+        pre.highlight.rust::before,
+        pre.highlight.rs::before,
+        pre.highlight[class*="language-rust"]::before,
+        pre.highlight code.language-rust::before,
+        pre.highlight code[data-lang="rust"]::before { content: 'rust'; }
+
+        pre.highlight.go::before,
+        pre.highlight[class*="language-go"]::before,
+        pre.highlight code.language-go::before,
+        pre.highlight code[data-lang="go"]::before { content: 'go'; }
+
+        pre.highlight.c::before,
+        pre.highlight[class*="language-c"]::before,
+        pre.highlight code.language-c::before,
+        pre.highlight code[data-lang="c"]::before { content: 'c'; }
+
+        pre.highlight.cpp::before,
+        pre.highlight.c\\+\\+::before,
+        pre.highlight[class*="language-cpp"]::before,
+        pre.highlight code.language-cpp::before,
+        pre.highlight code[data-lang="cpp"]::before { content: 'c++'; }
+
+        pre.highlight.java::before,
+        pre.highlight[class*="language-java"]::before,
+        pre.highlight code.language-java::before,
+        pre.highlight code[data-lang="java"]::before { content: 'java'; }
+
+        pre.highlight.ruby::before,
+        pre.highlight.rb::before,
+        pre.highlight[class*="language-ruby"]::before,
+        pre.highlight code.language-ruby::before,
+        pre.highlight code[data-lang="ruby"]::before { content: 'ruby'; }
+
+        pre.highlight.sql::before,
+        pre.highlight[class*="language-sql"]::before,
+        pre.highlight code.language-sql::before,
+        pre.highlight code[data-lang="sql"]::before { content: 'sql'; }
+
+        pre.highlight.dockerfile::before,
+        pre.highlight.docker::before,
+        pre.highlight[class*="language-dockerfile"]::before,
+        pre.highlight code.language-dockerfile::before,
+        pre.highlight code[data-lang="dockerfile"]::before { content: 'docker'; }
+
+        pre.highlight.diff::before,
+        pre.highlight[class*="language-diff"]::before,
+        pre.highlight code.language-diff::before,
+        pre.highlight code[data-lang="diff"]::before { content: 'diff'; }
+
+        pre.highlight.asciidoc::before,
+        pre.highlight.adoc::before,
+        pre.highlight[class*="language-asciidoc"]::before,
+        pre.highlight code.language-asciidoc::before,
+        pre.highlight code[data-lang="asciidoc"]::before { content: 'asciidoc'; }
+
+        pre.highlight.text::before,
+        pre.highlight.txt::before,
+        pre.highlight.plain::before,
+        pre.highlight[class*="language-text"]::before,
+        pre.highlight code.language-text::before,
+        pre.highlight code[data-lang="text"]::before { content: 'text'; }
+
+        /* Role Badges */
+        pre.highlight.test::before,
+        pre.highlight code.test::before {
+            content: 'test';
+            color: var(--golem-note);
+            border-color: color-mix(in srgb, var(--golem-note) 40%, var(--golem-border));
+        }
+
+        pre.highlight.shared::before,
+        pre.highlight code.shared::before {
+            content: 'shared';
+            color: var(--golem-tip);
+            border-color: color-mix(in srgb, var(--golem-tip) 40%, var(--golem-border));
+        }
+
+        pre.highlight.reset::before,
+        pre.highlight code.reset::before {
+            content: 'reset';
+            color: var(--golem-warning);
+            border-color: color-mix(in srgb, var(--golem-warning) 40%, var(--golem-border));
+        }
+
+        /* ── Callout Badges (.conum) ───────────────────────── */
+        i.conum {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.25em;
+            height: 1.25em;
+            border-radius: 50%;
+            background: var(--golem-primary);
+            color: #ffffff;
+            font-family: var(--golem-font-mono);
+            font-style: normal;
+            font-size: 0.75em;
+            font-weight: bold;
+            line-height: 1;
+            text-align: center;
+            vertical-align: middle;
+            margin: 0 0.2em;
+            user-select: none;
+        }
+        i.conum[data-value]::after {
+            content: attr(data-value);
+            display: inline-block;
+        }
+        i.conum b {
+            display: none;
+            font-size: 0;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+        }
+        .colist, ol.colist {
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+        ol.colist {
+            list-style: none;
+            counter-reset: colist-counter;
+            padding-left: 0;
+        }
+        ol.colist > li {
+            counter-increment: colist-counter;
+            position: relative;
+            padding-left: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        ol.colist > li::before {
+            content: counter(colist-counter);
+            position: absolute;
+            left: 0;
+            top: 0.2em;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.25em;
+            height: 1.25em;
+            border-radius: 50%;
+            background: var(--golem-primary);
+            color: #ffffff;
+            font-family: var(--golem-font-mono);
+            font-style: normal;
+            font-size: 0.75em;
+            font-weight: bold;
+            line-height: 1;
+        }
+        .colist ol {
+            padding-left: 1.25rem;
+        }
+        .colist ol > li {
+            margin-bottom: 0.5rem;
+        }
+        .colist table {
+            border: none;
+            margin: 0.5rem 0;
+            width: 100%;
+        }
+        .colist table td {
+            border: none;
+            padding: 0.25rem 0.5rem;
+            vertical-align: top;
+        }
+        .colist table td:first-child {
+            width: 2rem;
+            padding-left: 0;
         }
 
         /* ── Admonitions ───────────────────────────────────── */
@@ -366,6 +643,61 @@
         .admonitionblock.important, aside.golem-admonition.important, .admonition.important { border-left-color: var(--golem-important); }
         .admonitionblock.warning, aside.golem-admonition.warning, .admonition.warning { border-left-color: var(--golem-warning); }
         .admonitionblock.caution, aside.golem-admonition.caution, .admonition.caution { border-left-color: var(--golem-caution); }
+
+        .admonitionblock::before,
+        aside.golem-admonition::before,
+        .admonition::before {
+            display: inline-block;
+            font-family: var(--golem-font-ui);
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.4rem;
+            padding: 0.1em 0.45em;
+            border-radius: 3px;
+            line-height: 1.3;
+        }
+        .admonitionblock.note::before,
+        aside.golem-admonition.note::before,
+        .admonition.note::before {
+            content: 'NOTE';
+            color: var(--golem-note);
+            background: color-mix(in srgb, var(--golem-note) 12%, transparent);
+            border: 1px solid color-mix(in srgb, var(--golem-note) 30%, transparent);
+        }
+        .admonitionblock.tip::before,
+        aside.golem-admonition.tip::before,
+        .admonition.tip::before {
+            content: 'TIP';
+            color: var(--golem-tip);
+            background: color-mix(in srgb, var(--golem-tip) 12%, transparent);
+            border: 1px solid color-mix(in srgb, var(--golem-tip) 30%, transparent);
+        }
+        .admonitionblock.important::before,
+        aside.golem-admonition.important::before,
+        .admonition.important::before {
+            content: 'IMPORTANT';
+            color: var(--golem-important);
+            background: color-mix(in srgb, var(--golem-important) 12%, transparent);
+            border: 1px solid color-mix(in srgb, var(--golem-important) 30%, transparent);
+        }
+        .admonitionblock.warning::before,
+        aside.golem-admonition.warning::before,
+        .admonition.warning::before {
+            content: 'WARNING';
+            color: var(--golem-warning);
+            background: color-mix(in srgb, var(--golem-warning) 12%, transparent);
+            border: 1px solid color-mix(in srgb, var(--golem-warning) 30%, transparent);
+        }
+        .admonitionblock.caution::before,
+        aside.golem-admonition.caution::before,
+        .admonition.caution::before {
+            content: 'CAUTION';
+            color: var(--golem-caution);
+            background: color-mix(in srgb, var(--golem-caution) 12%, transparent);
+            border: 1px solid color-mix(in srgb, var(--golem-caution) 30%, transparent);
+        }
 
         /* ── Definition Lists (API Parameters) ─────────────── */
         #golem-content dl {
