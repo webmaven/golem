@@ -33,3 +33,5 @@ If a syntax error is introduced into an AsciiDoc file during live authoring:
 ** Source context snippet showing surrounding lines
 ** Visual caret pointer identifying the invalid token
 * Once the syntax error is corrected, saving the file clears the overlay automatically.
+
+image::../images/dev-server-overlay.png[Golem Live-Reload Error Overlay,width=100%,align=center]

@@ -102,3 +102,5 @@ golem build --strict
 == 4. Development Server Live-Reload Diagnostics
 
 When running `golem serve`, syntax errors do not crash the local server. Instead, Golem injects an interactive error overlay directly into your browser via Server-Sent Events (SSE), displaying the diagnostic traceback until the offending file is saved with valid syntax.
+
+image::../images/dev-server-overlay.png[Development Server Error Overlay,width=100%,align=center]
