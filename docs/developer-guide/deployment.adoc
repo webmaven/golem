@@ -115,7 +115,7 @@ Cloudflare Pages can build and deploy Golem documentation directly from your Git
 
 Configure the build settings in the Cloudflare Pages Dashboard:
 
-[cols="1,2"]
+[%header,cols="1,2"]
 |===
 | Setting | Value
 

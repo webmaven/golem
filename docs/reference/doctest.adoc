@@ -44,11 +44,11 @@ By default or when marked with `[source,python,role="test"]`, blocks run in isol
 [source,asciidoc]
 ----
 [source,python,role="test"]
-----
+....
 >>> a = 10
 >>> a * 2
 20
-----
+....
 ----
 
 === Shared State Timelines
@@ -58,15 +58,15 @@ Use `role="shared"` to retain variable definitions and state across subsequent b
 [source,asciidoc]
 ----
 [source,python,role="shared"]
-----
+....
 base_url = "https://example.com"
-----
+....
 
 [source,python,role="shared test"]
-----
+....
 >>> f"{base_url}/api"
 'https://example.com/api'
-----
+....
 ----
 
 === Section Boundary Scoping
@@ -80,14 +80,14 @@ Manage multiple independent timelines within a single document using named conte
 [source,asciidoc]
 ----
 [source,python,shared="server"]
-----
+....
 port = 8080
-----
+....
 
 [source,python,shared="client"]
-----
+....
 timeout = 30
-----
+....
 ----
 
 === Explicit Reset Markers
