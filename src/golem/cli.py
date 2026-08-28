@@ -430,7 +430,7 @@ body {
                     f"The directory '{content_dir}' is not empty. Scaffold default documentation files?",
                     default=False,
                 )
-            except click.Abort, Exception:
+            except (click.Abort, Exception):
                 scaffold_docs = False
 
         if scaffold_docs:

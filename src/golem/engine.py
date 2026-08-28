@@ -438,7 +438,7 @@ class BuildEngine:
         try:
             lock_fd = open(lock_path, "w")
             fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
-        except ImportError, AttributeError, OSError:
+        except (ImportError, AttributeError, OSError):
             pass
 
         try:
