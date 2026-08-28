@@ -166,3 +166,71 @@ golem:apidoc[target="golem.config.GolemConfig"]
     assert "Golem Config Guide" in out_html
     assert "GolemConfig" in out_html
     assert "site_title" in out_html
+
+
+def test_format_attribute_and_module_attributes(tmp_path):
+    """Verify format_attribute() and format_module() rendering of module-level attributes."""
+    import sys
+    from golem.plugins.apidoc.core.extractor import create_griffe_loader, resolve_symbol
+    from golem.plugins.apidoc.core.formatter import format_attribute, format_module
+
+    mod_dir = tmp_path / "attrs_pkg"
+    mod_dir.mkdir()
+    (mod_dir / "__init__.py").write_text(
+        '''"""Constants and configuration attributes."""
+
+API_VERSION: str = "2.0.0"
+"""Current API version string."""
+
+MAX_RETRIES: int = 5
+"""Maximum number of HTTP retries."""
+
+LONG_DESCRIPTION: str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+"""A very long constant value."""
+
+UNANNOTATED_VAR = "some_val"
+
+EMPTY_DOC_VAR: float = 3.14
+
+class ServiceConfig:
+    """Service configuration class."""
+    timeout: int = 30
+    """Request timeout in seconds."""
+''',
+        encoding="utf-8",
+    )
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        loader = create_griffe_loader([tmp_path])
+        mod_obj = resolve_symbol(loader, "attrs_pkg")
+
+        # Test format_module() output contains Module Attributes heading and description list
+        mod_adoc = format_module(mod_obj, depth="all", heading_level=1)
+        assert "= attrs_pkg" in mod_adoc
+        assert "== Module Attributes" in mod_adoc
+        assert "`API_VERSION`:: (str)" in mod_adoc
+        assert "Current API version string." in mod_adoc
+        assert 'Default value: `"2.0.0"`' in mod_adoc or "2.0.0" in mod_adoc
+
+        assert "`MAX_RETRIES`:: (int)" in mod_adoc
+        assert "Maximum number of HTTP retries." in mod_adoc
+        assert "Default value: `5`" in mod_adoc
+
+        assert "`LONG_DESCRIPTION`:: (str)" in mod_adoc
+        assert "(truncated; see source)" in mod_adoc
+
+        # Test format_attribute() directly on single attribute
+        attr_obj = resolve_symbol(loader, "attrs_pkg.API_VERSION")
+        attr_adoc = format_attribute(attr_obj, heading_level=2)
+        assert "== API_VERSION" in attr_adoc
+        assert '[source,python]\n----\nAPI_VERSION: str = "2.0.0"\n----' in attr_adoc or "API_VERSION: str" in attr_adoc
+        assert "Current API version string." in attr_adoc
+
+        # Test format_attribute without annotation
+        raw_attr = resolve_symbol(loader, "attrs_pkg.UNANNOTATED_VAR")
+        raw_adoc = format_attribute(raw_attr, heading_level=3)
+        assert "=== UNANNOTATED_VAR" in raw_adoc
+        assert "UNANNOTATED_VAR" in raw_adoc
+    finally:
+        sys.path.remove(str(tmp_path))

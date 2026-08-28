@@ -10,7 +10,9 @@ Custom styles aligning with Golem's Fired Clay / Workbench visual palette:
 - `FiredClayDarkStyle` (dark mode): Radiant ember, muted sage, ochre, and warm slate tokens.
 """
 
-from typing import Callable, Optional, Union
+from __future__ import annotations
+
+from collections.abc import Callable
 import pygments  # type: ignore[import-untyped]
 from pygments.formatters.html import HtmlFormatter  # type: ignore[import-untyped]
 from pygments.lexers import get_lexer_by_name  # type: ignore[import-untyped]
@@ -187,20 +189,20 @@ LANGUAGE_ALIASES: dict[str, str] = {
 
 
 def make_highlighter(
-    style: Union[str, type[Style], Style] = FiredClayStyle,
-) -> Callable[[str, str], Optional[str]]:
+    style: str | type[Style] | Style = FiredClayStyle,
+) -> Callable[[str, str], str | None]:
     """Create a syntax highlighter callable compatible with asciidoctype's AsciiDoctypeRenderer.
 
     [parameters]
     `style` (str | type[Style] | Style, optional):: Pygments style class or name to format tokens. Defaults to `FiredClayStyle`.
 
     [returns]
-    `Callable[[str, str], Optional[str]]`:: A highlighter function accepting `(code, lang)` that returns
+    `Callable[[str, str], str | None]`:: A highlighter function accepting `(code, lang)` that returns
     highlighted HTML markup or `None` if the language is unknown or unsupported.
     """
     formatter = HtmlFormatter(nowrap=True, style=style)
 
-    def highlighter(code: str, lang: str) -> Optional[str]:
+    def highlighter(code: str, lang: str) -> str | None:
         if not code:
             return None
         raw_lang = (lang or "").strip().lower()
@@ -231,8 +233,8 @@ def make_highlighter(
 
 
 def get_pygments_css(
-    style: Union[str, type[Style], Style] = FiredClayStyle,
-    dark_style: Union[str, type[Style], Style] = FiredClayDarkStyle,
+    style: str | type[Style] | Style = FiredClayStyle,
+    dark_style: str | type[Style] | Style = FiredClayDarkStyle,
     selector: str = ".highlight",
 ) -> str:
     """Generate combined Pygments CSS rules for light mode with dark mode media query overrides.

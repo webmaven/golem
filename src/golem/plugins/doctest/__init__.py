@@ -14,6 +14,7 @@ from .runner import (
 
 __all__ = [
     "golem_add_subcommands",
+    "run_asciidoc_doctests",
     "run_doctests",
     "run_adoc_file",
     "run_docstring_tests",
@@ -51,7 +52,7 @@ def run_doctests(
             if docs_dir.exists():
                 target_paths.append(docs_dir)
             else:
-                target_paths.append(Path("docs"))
+                return 0
 
     return run_all(
         paths=target_paths,
@@ -60,6 +61,10 @@ def run_doctests(
         verbose=verbose,
         fail_fast=fail_fast,
     )
+
+
+# Alias for backward compatibility / explicit naming
+run_asciidoc_doctests = run_doctests
 
 
 @hookimpl

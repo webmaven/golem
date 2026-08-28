@@ -1193,3 +1193,88 @@ def calculate_area(radius: float) -> float:
     assert '<span class="kn">import</span>' in html
     assert '<span class="nn">math</span>' in html
     assert '<span class="k">def</span>' in html or '<span class="nf">calculate_area</span>' in html
+
+
+def test_engine_clean(tmp_path):
+    """Verify engine.clean() purges output directory, cache file, lockfile, and resets in-memory cache."""
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Index\nContent here.", encoding="utf-8")
+
+    output_dir = tmp_path / "dist"
+    cache_file = tmp_path / ".golem_cache.json"
+    lock_file = tmp_path / "cache.lock"
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(output_dir))
+    engine = BuildEngine(config, cache_file=cache_file)
+
+    # Run build so files and cache are populated
+    engine.build_site()
+    assert output_dir.exists()
+    assert (output_dir / "index.html").exists()
+    assert cache_file.exists()
+    assert len(engine.cache_data["files"]) > 0
+
+    # Create dummy lockfile to verify its removal
+    lock_file.write_text("lock", encoding="utf-8")
+    assert lock_file.exists()
+
+    # Call clean()
+    engine.clean()
+
+    # Verify everything purged and reset
+    assert not output_dir.exists()
+    assert not cache_file.exists()
+    assert not lock_file.exists()
+    assert engine.cache_data == {"files": {}, "dependencies": {}, "metadata": {}}
+    assert engine._sha_cache == {}
+
+    # Calling clean() again on non-existent directories/files should execute without error
+    engine.clean()
+
+
+def test_engine_get_template_files_skipping(tmp_path):
+    """Verify _get_template_files() skips hidden files/dirs and static subdirectories."""
+    templates_dir = tmp_path / "my_templates"
+    templates_dir.mkdir()
+
+    # Valid template files
+    valid_base = templates_dir / "base.html"
+    valid_base.write_text("<html>base</html>", encoding="utf-8")
+    valid_sub = templates_dir / "partials" / "nav.pt"
+    valid_sub.parent.mkdir(parents=True, exist_ok=True)
+    valid_sub.write_text("<nav>nav</nav>", encoding="utf-8")
+
+    # Hidden files and hidden directory files (must be skipped)
+    hidden_file = templates_dir / ".hidden_layout.html"
+    hidden_file.write_text("<!-- hidden -->", encoding="utf-8")
+    hidden_dir = templates_dir / ".theme_cache"
+    hidden_dir.mkdir()
+    (hidden_dir / "cached.html").write_text("<!-- cached -->", encoding="utf-8")
+
+    # Files inside static/ subdirectory (must be skipped)
+    static_dir = templates_dir / "static"
+    static_dir.mkdir()
+    (static_dir / "preview.html").write_text("<!-- static preview -->", encoding="utf-8")
+    (static_dir / "sub" / "style.pt").parent.mkdir(parents=True, exist_ok=True)
+    (static_dir / "sub" / "style.pt").write_text("<!-- static pt -->", encoding="utf-8")
+
+    # Non-template file extensions (must be skipped)
+    (templates_dir / "readme.txt").write_text("Template readme", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(tmp_path / "content"),
+        output_dir=str(tmp_path / "dist"),
+        templates_dir=str(templates_dir),
+    )
+    engine = BuildEngine(config)
+    found_templates = engine._get_template_files()
+
+    found_names = {t.name for t in found_templates}
+    assert "base.html" in found_names
+    assert "nav.pt" in found_names
+    assert ".hidden_layout.html" not in found_names
+    assert "cached.html" not in found_names
+    assert "preview.html" not in found_names
+    assert "style.pt" not in found_names
+    assert "readme.txt" not in found_names
