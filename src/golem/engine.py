@@ -118,19 +118,22 @@ def _extract_metadata_from_doc(path: Path) -> dict[str, Any]:
 
     Reads the leading header section of an AsciiDoc file up to the first section break
     or block delimiter. Parses document title (`= ...`), `:nav_title:`, `:nav_order:`,
-    and `:toc:` attributes. Falls back to filename-derived titles if no header title
-    is present.
+    `:body_class:`, `:page_class:`, `:content_class:`, and `:toc:` attributes.
+    Falls back to filename-derived titles if no header title is present.
 
     [parameters]
     `path` (Path):: Path to the target `.adoc` file on disk.
 
     [returns]
-    `dict[str, Any]`:: Dictionary containing `"title"`, `"nav_title"`, `"nav_order"`, and `"has_toc"` keys.
+    `dict[str, Any]`:: Dictionary containing `"title"`, `"nav_title"`, `"nav_order"`, `"has_toc"`, `"page_class"`, `"body_class"`, and `"content_class"` keys.
     """
     title = None
     nav_title = None
     nav_order: int | None = None
     has_toc = False
+    page_class: str | None = None
+    body_class: str | None = None
+    content_class: str | None = None
     if path.exists() and path.is_file():
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -160,6 +163,30 @@ def _extract_metadata_from_doc(path: Path) -> dict[str, Any]:
                             nav_order = int(val)
                         except ValueError:
                             pass
+                    elif (
+                        line_s.startswith(":page_class:")
+                        or line_s.startswith(":page-class:")
+                        or line_s.startswith(":pageclass:")
+                    ) and page_class is None:
+                        val = line_s.split(":", 2)[2].strip()
+                        if val:
+                            page_class = val
+                    elif (
+                        line_s.startswith(":body_class:")
+                        or line_s.startswith(":body-class:")
+                        or line_s.startswith(":bodyclass:")
+                    ) and body_class is None:
+                        val = line_s.split(":", 2)[2].strip()
+                        if val:
+                            body_class = val
+                    elif (
+                        line_s.startswith(":content_class:")
+                        or line_s.startswith(":content-class:")
+                        or line_s.startswith(":contentclass:")
+                    ) and content_class is None:
+                        val = line_s.split(":", 2)[2].strip()
+                        if val:
+                            content_class = val
                     elif line_s.startswith(":title:") and title is None:
                         val = line_s.split(":", 2)[2].strip()
                         if val:
@@ -177,11 +204,17 @@ def _extract_metadata_from_doc(path: Path) -> dict[str, Any]:
         title = _title_from_filename(path.name)
     if not nav_title:
         nav_title = title
+    resolved_body_class = (body_class or page_class or "").strip()
+    resolved_page_class = (page_class or body_class or "").strip()
+    resolved_content_class = (content_class or "").strip()
     return {
         "title": title,
         "nav_title": nav_title,
         "nav_order": nav_order,
         "has_toc": has_toc,
+        "page_class": resolved_page_class,
+        "body_class": resolved_body_class,
+        "content_class": resolved_content_class,
     }
 
 
@@ -1481,6 +1514,40 @@ class BuildEngine:
                 nav_html = self.generate_nav_html(current_rel_path=rel_path)
                 prev_page, next_page = self.get_page_pagination(current_rel_path=rel_path)
 
+                doc_meta = self.get_file_metadata(doc_path)
+                page_class = doc_meta.get("page_class", "")
+                body_class = doc_meta.get("body_class", "")
+                content_class = doc_meta.get("content_class", "")
+
+                asg_attrs: dict[str, Any] = {}
+                if isinstance(asg, dict):
+                    asg_attrs = asg.get("attributes") or {}
+                    if not isinstance(asg_attrs, dict) and isinstance(asg.get("header"), dict):
+                        asg_attrs = asg["header"].get("attributes") or {}
+                elif hasattr(asg, "attributes"):
+                    asg_attrs = getattr(asg, "attributes") or {}
+
+                if isinstance(asg_attrs, dict):
+                    if not body_class:
+                        body_class = (
+                            asg_attrs.get("body_class") or asg_attrs.get("body-class") or asg_attrs.get("bodyclass") or ""
+                        )
+                    if not page_class:
+                        page_class = (
+                            asg_attrs.get("page_class") or asg_attrs.get("page-class") or asg_attrs.get("pageclass") or ""
+                        )
+                    if not content_class:
+                        content_class = (
+                            asg_attrs.get("content_class")
+                            or asg_attrs.get("content-class")
+                            or asg_attrs.get("contentclass")
+                            or ""
+                        )
+
+                resolved_body_class = (body_class or page_class or "").strip()
+                resolved_page_class = (page_class or body_class or "").strip()
+                resolved_content_class = (content_class or "").strip()
+
                 final_html = self.compiler.compile_page(
                     title=title_str,
                     body_content=body_content,
@@ -1490,6 +1557,9 @@ class BuildEngine:
                     current_path=str(rel_path),
                     prev_page=prev_page,
                     next_page=next_page,
+                    body_class=resolved_body_class,
+                    page_class=resolved_page_class,
+                    content_class=resolved_content_class,
                 )
 
                 # Trigger post-render hooks sequentially (chain modifications)

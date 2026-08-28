@@ -923,7 +923,7 @@
         }
     </style>
 </head>
-<body>
+<body tal:attributes="class body_class or None">
     <a href="#golem-content" class="golem-skip-link">Skip to main content</a>
     <header id="golem-header" class="golem-header">
         <h1><a href="/" tal:attributes="href site_url or '/'">${site_title}</a></h1>
@@ -943,7 +943,7 @@
                 </div>
             </details>
         </aside>
-        <main id="golem-content" class="golem-content">
+        <main id="golem-content" class="golem-content" tal:attributes="class ('golem-content ' + content_class).strip() if content_class else 'golem-content'">
             <h1 tal:condition="page_title">${page_title}</h1>
             <div tal:content="structure body_html" />
             <nav tal:condition="prev_page or next_page" class="golem-pagination" aria-label="Chapter Navigation">

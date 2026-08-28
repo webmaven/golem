@@ -96,7 +96,7 @@ DEFAULT_TEMPLATE = """\
         }
     </style>
 </head>
-<body>
+<body tal:attributes="class body_class or None">
     <header id="golem-header">
         <h1>Golem Documentation</h1>
     </header>
@@ -110,7 +110,7 @@ DEFAULT_TEMPLATE = """\
                 <li><a href="developer_guide.html">Developer Guide</a></li>
             </ul>
         </aside>
-        <main id="golem-content">
+        <main id="golem-content" class="golem-content" tal:attributes="class ('golem-content ' + content_class).strip() if content_class else 'golem-content'">
             <h1>${title}</h1>
             <div tal:content="structure body_content" />
         </main>
@@ -184,6 +184,9 @@ class PageCompiler:
         custom_js: list[str] | None = None,
         prev_page: dict[str, str] | None = None,
         next_page: dict[str, str] | None = None,
+        body_class: str = "",
+        page_class: str = "",
+        content_class: str = "",
     ) -> str:
         """
 
@@ -202,9 +205,14 @@ class PageCompiler:
         - `custom_js`:: Custom JS script links to inject.
         - `prev_page`:: Previous document metadata for pagination.
         - `next_page`:: Next document metadata for pagination.
+        - `body_class` / `page_class`:: CSS classes applied to the `<body>` element.
+        - `content_class`:: Additional CSS classes applied to `<main id="golem-content">`.
         """
         effective_title = page_title if page_title is not None else title
         effective_body = body_html if body_html is not None else body_content
+        effective_body_class = (body_class or page_class or "").strip()
+        effective_page_class = (page_class or body_class or "").strip()
+        effective_content_class = (content_class or "").strip()
 
         import golem
 
@@ -260,4 +268,7 @@ class PageCompiler:
             generator_version=generator_version,
             custom_css=custom_css or [],
             custom_js=custom_js or [],
+            body_class=effective_body_class,
+            page_class=effective_page_class,
+            content_class=effective_content_class,
         )

@@ -268,3 +268,70 @@ def test_chapter_pagination_rendering(tmp_path):
     assert "Configuration Reference" in html
     assert "← Previous" in html
     assert "Next →" in html
+
+
+def test_compile_page_body_class_and_content_class_default_skeleton(tmp_path):
+    """Test body_class, page_class, and content_class rendering in default skeleton."""
+    config = GolemConfig(output_dir=str(tmp_path / "dist"))
+    compiler = PageCompiler(config)
+
+    # 1. Custom body_class and content_class
+    html = compiler.compile_page(
+        title="Landing Page",
+        body_content="<p>Welcome</p>",
+        body_class="landing-page custom-theme",
+        content_class="wide-container full-bleed",
+    )
+    assert '<body class="landing-page custom-theme">' in html
+    assert '<main id="golem-content" class="golem-content wide-container full-bleed">' in html
+
+    # 2. page_class should populate body_class
+    html_page_class = compiler.compile_page(
+        title="Doc Page",
+        body_content="<p>Doc content</p>",
+        page_class="docs-layout",
+    )
+    assert '<body class="docs-layout">' in html_page_class
+    assert '<main id="golem-content" class="golem-content">' in html_page_class
+
+    # 3. Default empty classes should produce clean body tag without class attribute
+    html_default = compiler.compile_page(
+        title="Standard Page",
+        body_content="<p>Standard content</p>",
+    )
+    assert "<body>" in html_default
+    assert '<body class=""' not in html_default
+    assert '<body class="None"' not in html_default
+    assert '<main id="golem-content" class="golem-content">' in html_default
+
+
+def test_rich_structured_context_body_class_and_content_class(tmp_path):
+    """Test that body_class, page_class, and content_class are passed to custom templates."""
+    custom_tpl = tmp_path / "custom_layout.pt"
+    custom_tpl.write_text(
+        """\
+<!DOCTYPE html>
+<html>
+<head><title>${title}</title></head>
+<body class="${body_class}">
+    <main class="${content_class}" data-page="${page_class}">
+        <div tal:content="structure body_content" />
+    </main>
+</body>
+</html>
+""",
+        encoding="utf-8",
+    )
+
+    config = GolemConfig(output_dir=str(tmp_path / "dist"))
+    compiler = PageCompiler(config)
+
+    html = compiler.compile_page(
+        title="Context Test",
+        body_content="<p>Context check</p>",
+        body_class="custom-body",
+        content_class="custom-main",
+        template_path=custom_tpl,
+    )
+    assert '<body class="custom-body">' in html
+    assert '<main class="custom-main" data-page="custom-body">' in html

@@ -1060,3 +1060,98 @@ def test_theme_template_fine_grained_invalidation(tmp_path, monkeypatch):
     outdated = engine_recheck.get_outdated_files(commit=False)
     assert doc1.resolve() in outdated
     assert doc2.resolve() not in outdated
+
+
+def test_extract_metadata_layout_classes(tmp_path):
+    """Test _extract_metadata_from_doc extracts body_class, page_class, and content_class."""
+    from golem.engine import _extract_metadata_from_doc
+
+    doc1 = tmp_path / "doc1.adoc"
+    doc1.write_text(
+        """= Page 1
+:body_class: custom-body-layout
+:content_class: wide-content
+
+Page text.
+""",
+        encoding="utf-8",
+    )
+
+    doc2 = tmp_path / "doc2.adoc"
+    doc2.write_text(
+        """= Page 2
+:page-class: doc-article
+:content-class: prose-narrow
+
+Page text.
+""",
+        encoding="utf-8",
+    )
+
+    meta1 = _extract_metadata_from_doc(doc1)
+    assert meta1["body_class"] == "custom-body-layout"
+    assert meta1["page_class"] == "custom-body-layout"
+    assert meta1["content_class"] == "wide-content"
+
+    meta2 = _extract_metadata_from_doc(doc2)
+    assert meta2["body_class"] == "doc-article"
+    assert meta2["page_class"] == "doc-article"
+    assert meta2["content_class"] == "prose-narrow"
+
+
+def test_build_engine_layout_classes_integration(tmp_path):
+    """Test BuildEngine compiles layout classes from AsciiDoc attributes into HTML."""
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+
+    p1 = content_dir / "landing.adoc"
+    p1.write_text(
+        """= Landing Page
+:body_class: landing-hero
+:content_class: full-width-layout
+
+Welcome to our project.
+""",
+        encoding="utf-8",
+    )
+
+    p2 = content_dir / "guide.adoc"
+    p2.write_text(
+        """= Guide
+:page-class: guide-docs
+:content-class: narrow-column
+
+Guide content.
+""",
+        encoding="utf-8",
+    )
+
+    p3 = content_dir / "plain.adoc"
+    p3.write_text(
+        """= Plain Document
+
+Just plain text.
+""",
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "dist"
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(output_dir))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+    compiled = engine.build_site()
+
+    assert len(compiled) == 3
+
+    html1 = (output_dir / "landing.html").read_text(encoding="utf-8")
+    assert '<body class="landing-hero">' in html1
+    assert '<main id="golem-content" class="golem-content full-width-layout">' in html1
+
+    html2 = (output_dir / "guide.html").read_text(encoding="utf-8")
+    assert '<body class="guide-docs">' in html2
+    assert '<main id="golem-content" class="golem-content narrow-column">' in html2
+
+    html3 = (output_dir / "plain.html").read_text(encoding="utf-8")
+    assert "<body>" in html3
+    assert '<body class=""' not in html3
+    assert '<body class="None"' not in html3
+    assert '<main id="golem-content" class="golem-content">' in html3
