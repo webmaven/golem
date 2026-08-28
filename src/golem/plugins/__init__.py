@@ -40,6 +40,7 @@ When initializing via `get_plugin_manager()`, plugins are discovered and registe
 from __future__ import annotations
 
 import importlib
+import importlib.metadata
 import importlib.util
 import logging
 import os
@@ -251,38 +252,35 @@ class GolemSpecs:
         return []
 
 
-def get_plugin_manager(config: GolemConfig | None = None, plugins_dir: Path | None = None) -> pluggy.PluginManager:
-    """Initialize and configure a Pluggy PluginManager with discovered Golem plugins.
+def get_plugin_manager(
+    config: GolemConfig | None = None,
+    plugins_dir: Path | None = None,
+) -> pluggy.PluginManager:
+    """Initialize and configure a Pluggy PluginManager with plugins from config.plugins.
 
-    Creates a `pluggy.PluginManager` bound to the `"golem"` namespace, registers
-    `GolemSpecs` hook specifications, and discovers plugins across three sequential tiers:
-    1. **Setuptools Entrypoints**: Discovers distributions registered under `"golem.plugins"` and `"golem"`.
-    2. **Configured Plugins**: Imports and registers module or package paths declared in `config.plugins`.
-    3. **Local Plugins Folder**: Scans the designated plugins directory (`plugins_dir`, `config.plugins_dir`, or `"plugins"` default), dynamically loads standalone `*.py` modules (excluding `__init__.py`), and ensures the directory is present on `sys.path`.
+    Uses a two-pass architecture:
+
+    1. **Discovery pass**: Scans entry points (``golem.plugins`` and ``golem`` groups),
+       the local plugins directory, and importlib-importable module paths, building a
+       lookup dict of available plugins. Nothing is registered during this pass.
+    2. **Registration pass**: Iterates ``config.plugins`` in list order, looks up each
+       entry in the discovery map, and registers it. ``config.plugins`` is the sole
+       authority on what runs and in what order — presence in a discovery source alone
+       is never sufficient to activate a plugin.
 
     [parameters]
-    `config` (GolemConfig | None, optional):: Site configuration object providing plugin lists and directory settings. Defaults to `None`.
-    `plugins_dir` (Path | None, optional):: Explicit filesystem path to local plugins directory. Overrides `config.plugins_dir`. Defaults to `None`.
+    `config` (GolemConfig | None, optional):: Site configuration providing ``plugins``
+        list and directory settings.
+    `plugins_dir` (Path | None, optional):: Explicit plugins directory override.
 
     [returns]
-    `pluggy.PluginManager`:: Initialized and configured plugin manager instance with all discovered hooks registered.
-
-    [source,python]
-    ----
-    from pathlib import Path
-    from golem.config import GolemConfig
-    from golem.plugins import get_plugin_manager
-
-    config = GolemConfig(plugins=["my_package.plugin"])
-    pm = get_plugin_manager(config=config, plugins_dir=Path("plugins"))
-    results = pm.hook.on_pre_parse(raw_content="= Page Title")
-    ----
+    `pluggy.PluginManager`:: Configured plugin manager with only listed plugins registered.
     """
     pm = pluggy.PluginManager(HOOK_NAMESPACE)
     pm.hookimpl = hookimpl  # type: ignore[attr-defined]
     pm.add_hookspecs(GolemSpecs)
 
-    # Determine target plugins directory
+    # Resolve local plugins directory
     target_plugins_dir: Path | None = None
     if plugins_dir is not None:
         target_plugins_dir = plugins_dir
@@ -298,34 +296,55 @@ def get_plugin_manager(config: GolemConfig | None = None, plugins_dir: Path | No
         if resolved_path not in sys.path:
             sys.path.insert(0, resolved_path)
 
-    # 1. Entry point discovery
-    pm.load_setuptools_entrypoints("golem.plugins")
-    pm.load_setuptools_entrypoints(HOOK_NAMESPACE)
+    # --- PASS 1: DISCOVERY ---
+    # Build a name → (kind, source) lookup. Nothing is registered here.
+    available: dict[str, tuple[str, Any]] = {}
 
-    # 2. Configured plugins loading (full package strings or module names)
-    if config is not None and getattr(config, "plugins", None):
-        for mod_name in config.plugins:
-            try:
-                mod = importlib.import_module(mod_name)
-                if not pm.is_registered(mod):
-                    pm.register(mod)
-            except Exception as e:
-                logging.warning("Failed to load plugin %s: %s", mod_name, e)
+    for group in ("golem.plugins", HOOK_NAMESPACE):
+        for ep in importlib.metadata.entry_points(group=group):
+            ep_name = getattr(ep, "name", str(ep))
+            ep_value = getattr(ep, "value", "")
+            if ep_name not in available:
+                available[ep_name] = ("entrypoint", ep)
+            if ep_value and ep_value not in available:
+                available[ep_value] = ("entrypoint", ep)
 
-    # 3. Local plugins folder discovery
     if target_plugins_dir and target_plugins_dir.exists() and target_plugins_dir.is_dir():
         for file in target_plugins_dir.glob("*.py"):
             if file.name == "__init__.py":
                 continue
-            module_name = file.stem
-            try:
-                spec = importlib.util.spec_from_file_location(module_name, file)
-                if spec and spec.loader:
-                    module = importlib.util.module_from_spec(spec)
-                    sys.modules[module_name] = module
-                    spec.loader.exec_module(module)
-                    if not pm.is_registered(module):
-                        pm.register(module)
-            except Exception as e:
-                logging.warning("Failed to load local plugin %s: %s", file, e)
+            stem = file.stem
+            rel_path = f"{target_plugins_dir.as_posix()}/{file.name}"
+            for key in (stem, file.name, f"{target_plugins_dir.name}.{stem}", rel_path):
+                if key not in available:
+                    available[key] = ("local_file", file)
+
+    # --- PASS 2: REGISTRATION ---
+    # config.plugins is the sole authority: list order = execution order.
+    configured = list(config.plugins) if (config is not None and config.plugins) else []
+
+    for plugin_name in configured:
+        try:
+            if plugin_name in available:
+                kind, source = available[plugin_name]
+                if kind == "entrypoint":
+                    plugin = source.load()
+                    if not pm.is_registered(plugin):
+                        pm.register(plugin, name=plugin_name)
+                elif kind == "local_file":
+                    spec = importlib.util.spec_from_file_location(source.stem, source)
+                    if spec and spec.loader:
+                        module = importlib.util.module_from_spec(spec)
+                        sys.modules[source.stem] = module
+                        spec.loader.exec_module(module)
+                        if not pm.is_registered(module):
+                            pm.register(module, name=plugin_name)
+            else:
+                # Fall back to importlib for fully-qualified module paths
+                mod = importlib.import_module(plugin_name)
+                if not pm.is_registered(mod):
+                    pm.register(mod)
+        except Exception as e:
+            logging.warning("Failed to load plugin %s: %s", plugin_name, e)
+
     return pm
