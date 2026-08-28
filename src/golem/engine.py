@@ -438,7 +438,7 @@ class BuildEngine:
         try:
             lock_fd = open(lock_path, "w")
             fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
-        except (ImportError, AttributeError, OSError):
+        except ImportError, AttributeError, OSError:
             pass
 
         try:
@@ -1461,23 +1461,86 @@ class BuildEngine:
                     content = f.read()
 
                 # Trigger pre-parse hooks sequentially (chain modifications)
+                _pre_parse_modifiers: list[str] = []
                 for impl in self.pm.hook.on_pre_parse.get_hookimpls():
-                    content = impl.function(raw_content=content)  # type: ignore[assignment]
+                    try:
+                        result = impl.function(raw_content=content)
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_pre_parse for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+                        continue
+                    if result is not None and result != content:
+                        _pre_parse_modifiers.append(impl.plugin_name or str(impl.function))
+                        content = result  # type: ignore[assignment]
+                if len(_pre_parse_modifiers) > 1:
+                    logging.warning(
+                        "[Plugin] Multiple plugins modified raw_content in on_pre_parse for %s: %s. "
+                        "The final result depends on their order in config.plugins. "
+                        "Consider whether your transforms are additive.",
+                        doc_path.name,
+                        _pre_parse_modifiers,
+                    )
 
                 # 1. Parse using asciidoctrine
                 ast = asciidoctrine.parse_to_ast(content, base_dir=str(doc_path.parent))
 
                 # Trigger AST hooks sequentially (chain modifications)
+                _ast_modifiers: list[str] = []
                 for impl in self.pm.hook.on_ast_created.get_hookimpls():
-                    ast = impl.function(ast=ast)  # type: ignore[assignment]
+                    try:
+                        result = impl.function(ast=ast)
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_ast_created for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+                        continue
+                    if result is not None and result is not ast:
+                        _ast_modifiers.append(impl.plugin_name or str(impl.function))
+                        ast = result  # type: ignore[assignment]
+                if len(_ast_modifiers) > 1:
+                    logging.warning(
+                        "[Plugin] Multiple plugins modified ast in on_ast_created for %s: %s. "
+                        "The final result depends on their order in config.plugins. "
+                        "Consider whether your transforms are additive.",
+                        doc_path.name,
+                        _ast_modifiers,
+                    )
 
                 # 2. Resolve AST to ASG
                 resolver = ASGResolver(ast)
                 asg = resolver.resolve(ast)
 
                 # Trigger ASG hooks sequentially (chain modifications)
+                _asg_modifiers: list[str] = []
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
-                    asg = impl.function(asg=asg)  # type: ignore[assignment]
+                    try:
+                        result = impl.function(asg=asg)
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_asg_created for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+                        continue
+                    if result is not None and result is not asg:
+                        _asg_modifiers.append(impl.plugin_name or str(impl.function))
+                        asg = result  # type: ignore[assignment]
+                if len(_asg_modifiers) > 1:
+                    logging.warning(
+                        "[Plugin] Multiple plugins modified asg in on_asg_created for %s: %s. "
+                        "The final result depends on their order in config.plugins. "
+                        "Consider whether your transforms are additive.",
+                        doc_path.name,
+                        _asg_modifiers,
+                    )
 
                 page_node_types = collect_node_types(asg)
 
@@ -1563,8 +1626,29 @@ class BuildEngine:
                 )
 
                 # Trigger post-render hooks sequentially (chain modifications)
+                _post_render_modifiers: list[str] = []
                 for impl in self.pm.hook.on_post_render.get_hookimpls():
-                    final_html = impl.function(html_content=final_html)  # type: ignore[assignment]
+                    try:
+                        result = impl.function(html_content=final_html)
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_post_render for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+                        continue
+                    if result is not None and result != final_html:
+                        _post_render_modifiers.append(impl.plugin_name or str(impl.function))
+                        final_html = result  # type: ignore[assignment]
+                if len(_post_render_modifiers) > 1:
+                    logging.warning(
+                        "[Plugin] Multiple plugins modified html_content in on_post_render for %s: %s. "
+                        "The final result depends on their order in config.plugins. "
+                        "Consider whether your transforms are additive.",
+                        doc_path.name,
+                        _post_render_modifiers,
+                    )
 
                 # 5. Resolve correct output file path
                 out_path = output_dir / rel_path.with_suffix(".html")
