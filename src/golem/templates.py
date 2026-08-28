@@ -7,6 +7,7 @@ from disk, with standard fallback to an integrated HTML5 layout.
 from pathlib import Path
 from chameleon import PageTemplate
 from golem.config import GolemConfig
+from golem.highlighting import PYGMENTS_CSS
 
 DEFAULT_TEMPLATE = """\
 <!DOCTYPE html>
@@ -14,6 +15,7 @@ DEFAULT_TEMPLATE = """\
 <head>
     <meta charset="UTF-8">
     <title>${title}</title>
+    <style tal:condition="pygments_css" tal:content="structure pygments_css"></style>
     <style>
         :root {
             --golem-bg: #0f0f11;
@@ -187,6 +189,7 @@ class PageCompiler:
         body_class: str = "",
         page_class: str = "",
         content_class: str = "",
+        pygments_css: str | None = None,
     ) -> str:
         """
 
@@ -207,12 +210,14 @@ class PageCompiler:
         - `next_page`:: Next document metadata for pagination.
         - `body_class` / `page_class`:: CSS classes applied to the `<body>` element.
         - `content_class`:: Additional CSS classes applied to `<main id="golem-content">`.
+        - `pygments_css`:: Optional custom Pygments CSS string to inject into the template.
         """
         effective_title = page_title if page_title is not None else title
         effective_body = body_html if body_html is not None else body_content
         effective_body_class = (body_class or page_class or "").strip()
         effective_page_class = (page_class or body_class or "").strip()
         effective_content_class = (content_class or "").strip()
+        effective_pygments_css = pygments_css if pygments_css is not None else PYGMENTS_CSS
 
         import golem
 
@@ -271,4 +276,5 @@ class PageCompiler:
             body_class=effective_body_class,
             page_class=effective_page_class,
             content_class=effective_content_class,
+            pygments_css=effective_pygments_css,
         )

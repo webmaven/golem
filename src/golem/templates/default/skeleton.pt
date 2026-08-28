@@ -13,6 +13,7 @@
     <tal:block tal:repeat="css_file custom_css">
         <link rel="stylesheet" href="${css_file}" />
     </tal:block>
+    <style tal:condition="pygments_css" tal:content="structure pygments_css"></style>
     <style>
         :root {
             /* Light Mode Default (Fired Clay / Workbench) */

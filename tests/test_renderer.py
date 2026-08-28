@@ -20,7 +20,9 @@ print(sys.version)
     asg = resolver.resolve(ast)
     html = render_body(asg)
     assert "This is a premier paragraph with <strong>bold</strong> text" in html
-    assert '<code class="language-python">import sys\nprint(sys.version)</code>' in html
+    assert '<pre class="highlight python"><code class="language-python">' in html
+    assert '<span class="kn">import</span>' in html
+    assert '<span class="nn">sys</span>' in html
 
 
 def test_html_listing_escaping():
@@ -300,3 +302,53 @@ def test_collect_node_types_with_ast_node():
     assert "row" in types
     assert "cell" in types
     assert types == sorted(list(set(types)))
+
+
+def test_render_body_pygments_highlighting():
+    adoc_source = """
+[source,toml]
+----
+[site]
+title = "My Site"
+count = 42
+----
+"""
+    ast = asciidoctrine.parse_to_ast(adoc_source)
+    asg = ASGResolver(ast).resolve(ast)
+    html = render_body(asg)
+    assert '<pre class="highlight toml"><code class="language-toml">' in html
+    assert (
+        '<span class="s">' in html or '<span class="s2">' in html or '<span class="mi">' in html or '<span class="m">' in html
+    )
+
+
+def test_render_body_unknown_language_fallback():
+    adoc_source = """
+[source,unknownlang]
+----
+raw unhighlighted code
+----
+"""
+    ast = asciidoctrine.parse_to_ast(adoc_source)
+    asg = ASGResolver(ast).resolve(ast)
+    html = render_body(asg)
+    assert "raw unhighlighted code" in html
+    assert '<pre class="highlight unknownlang">' in html
+    assert "<code" in html
+
+
+def test_render_body_custom_highlighter():
+    adoc_source = """
+[source,python]
+----
+x = 1
+----
+"""
+    ast = asciidoctrine.parse_to_ast(adoc_source)
+    asg = ASGResolver(ast).resolve(ast)
+
+    def custom_highlighter(code: str, lang: str):
+        return f'<pre class="custom-{lang}">{code.strip()}</pre>'
+
+    html = render_body(asg, highlighter=custom_highlighter)
+    assert '<pre class="custom-python">x = 1</pre>' in html

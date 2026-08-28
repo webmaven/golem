@@ -32,14 +32,16 @@ HTML structure that mirrors the hierarchical document outline.
 
 import re
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 import asciidoctype  # type: ignore[import-untyped]
 from asciidoctrine.nodes import Node
+from golem.highlighting import make_highlighter
 
 
 def render_body(
     asg_root: Union[Node, dict[str, Any]],
     search_paths: Optional[List[Path]] = None,
+    highlighter: Optional[Callable[[str, str], Optional[str]]] = None,
 ) -> str:
     """Render an ASG dictionary or AST Node structure into static HTML5 markup.
 
@@ -55,6 +57,7 @@ def render_body(
     [parameters]
     `asg_root` (Node | dict[str, Any]):: AST Node or ASG dictionary representation of the document or fragment.
     `search_paths` (list[Path] | None, optional):: Optional list of directory paths containing custom Chameleon template overrides. Defaults to `None`.
+    `highlighter` (Callable[[str, str], Optional[str]] | None, optional):: Optional syntax highlighter callable. Defaults to default Fired Clay Pygments highlighter.
 
     [returns]
     `str`:: Rendered HTML5 markup string.
@@ -70,7 +73,11 @@ def render_body(
         raise TypeError(f"Expected Node or dict, got {type(asg_root).__name__}")
 
     _ensure_section_ids(node_dict)
-    renderer = asciidoctype.AsciiDoctypeRenderer(search_paths=search_paths)
+    active_highlighter = highlighter if highlighter is not None else make_highlighter()
+    renderer = asciidoctype.AsciiDoctypeRenderer(
+        search_paths=search_paths,
+        highlighter=active_highlighter,
+    )
     if node_dict.get("name") == "document":
         blocks = node_dict.get("blocks", [])
         rendered_blocks = [renderer.render(block) for block in blocks]

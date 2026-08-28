@@ -1155,3 +1155,41 @@ Just plain text.
     assert '<body class=""' not in html3
     assert '<body class="None"' not in html3
     assert '<main id="golem-content" class="golem-content">' in html3
+
+
+def test_build_engine_syntax_highlighting_integration(tmp_path):
+    """Test BuildEngine compiles source listings with Pygments syntax highlighting and embedded CSS."""
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+
+    doc = content_dir / "tutorial.adoc"
+    doc.write_text(
+        """= Python Tutorial
+
+[source,python]
+----
+def calculate_area(radius: float) -> float:
+    import math
+    return math.pi * (radius ** 2)
+----
+""",
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "dist"
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(output_dir))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+    compiled = engine.build_site()
+
+    assert len(compiled) == 1
+    html = (output_dir / "tutorial.html").read_text(encoding="utf-8")
+
+    # Verify Pygments CSS is injected in <head>
+    assert ".highlight" in html
+    assert "@media (prefers-color-scheme: dark)" in html
+
+    # Verify code listing markup and highlighted token spans
+    assert '<pre class="highlight python"><code class="language-python">' in html
+    assert '<span class="kn">import</span>' in html
+    assert '<span class="nn">math</span>' in html
+    assert '<span class="k">def</span>' in html or '<span class="nf">calculate_area</span>' in html

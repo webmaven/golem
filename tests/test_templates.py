@@ -335,3 +335,30 @@ def test_rich_structured_context_body_class_and_content_class(tmp_path):
     )
     assert '<body class="custom-body">' in html
     assert '<main class="custom-main" data-page="custom-body">' in html
+
+
+def test_compile_page_injects_pygments_css(tmp_path):
+    """Test that compile_page includes Pygments CSS rules in compiled HTML."""
+    config = GolemConfig(output_dir=str(tmp_path / "dist"))
+    compiler = PageCompiler(config)
+
+    html = compiler.compile_page(
+        title="Code Page",
+        body_content="<p>Some content</p>",
+    )
+    assert ".highlight" in html
+    assert "@media (prefers-color-scheme: dark)" in html
+
+
+def test_compile_page_custom_pygments_css(tmp_path):
+    """Test that custom pygments_css can be passed to compile_page."""
+    config = GolemConfig(output_dir=str(tmp_path / "dist"))
+    compiler = PageCompiler(config)
+
+    html = compiler.compile_page(
+        title="Custom Highlighting",
+        body_content="<p>Content</p>",
+        pygments_css="/* Custom Pygments CSS */ .highlight { color: red; }",
+    )
+    assert "/* Custom Pygments CSS */" in html
+    assert ".highlight { color: red; }" in html
