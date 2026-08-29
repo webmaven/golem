@@ -43,7 +43,6 @@ import importlib
 import importlib.metadata
 import importlib.util
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -129,7 +128,7 @@ class GolemSpecs:
         return raw_content
 
     @hookspec
-    def on_ast_created(self, ast: os.PathLike[Any] | Any) -> os.PathLike[Any] | Any:
+    def on_ast_created(self, ast: Any) -> Any:
         """Intercept and transform the parsed Abstract Syntax Tree (AST) before semantic resolution.
 
         Executed after Lark parses raw AsciiDoc text into an initial syntax tree.
@@ -137,10 +136,10 @@ class GolemSpecs:
         structure before the AST is passed to the semantic ASG resolver.
 
         [parameters]
-        `ast` (os.PathLike[Any] | Any):: Parsed Abstract Syntax Tree root node produced by the Lark parser.
+        `ast` (Any):: Parsed Abstract Syntax Tree root node produced by the Lark parser.
 
         [returns]
-        `os.PathLike[Any] | Any`:: Mutated or substituted AST structure for semantic resolution.
+        `Any`:: Mutated or substituted AST structure for semantic resolution.
 
         [source,python]
         ----
