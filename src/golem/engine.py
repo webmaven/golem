@@ -1681,17 +1681,18 @@ class BuildEngine:
                 compiled_files.append(out_path)
 
                 # Progress logging
-                try:
-                    rel_doc = doc_path.relative_to(Path.cwd())
-                except ValueError:
-                    rel_doc = doc_path.relative_to(self.content_dir) if self.content_dir in doc_path.parents else doc_path
-                try:
-                    rel_out = out_path.relative_to(Path.cwd())
-                except ValueError:
-                    rel_out = out_path.relative_to(output_dir) if output_dir in out_path.parents else out_path
-                import click
+                if not getattr(self.config, "quiet", False):
+                    try:
+                        rel_doc = doc_path.relative_to(Path.cwd())
+                    except ValueError:
+                        rel_doc = doc_path.relative_to(self.content_dir) if self.content_dir in doc_path.parents else doc_path
+                    try:
+                        rel_out = out_path.relative_to(Path.cwd())
+                    except ValueError:
+                        rel_out = out_path.relative_to(output_dir) if output_dir in out_path.parents else out_path
+                    import click
 
-                click.echo(f"  [COMPILE] {rel_doc} -> {rel_out}")
+                    click.echo(f"  [COMPILE] {rel_doc} -> {rel_out}")
             except Exception as e:
                 error_info = {
                     "file": str(doc_path),

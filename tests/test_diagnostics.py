@@ -134,7 +134,7 @@ def test_cli_build_permissive_mode_emits_diagnostics_and_continues(tmp_path, mon
         assert "Error in " in res.output
         assert "broken.adoc" in res.output
         assert "Unclosed block macro delimiter" in res.output
-        assert "Compilation finished. Built 2 pages." in res.output
+        assert "Compilation finished. Built 2 pages in " in res.output
 
 
 def test_cli_build_strict_flag_fails_on_error(tmp_path, monkeypatch):

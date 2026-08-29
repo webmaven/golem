@@ -48,6 +48,7 @@ class GolemConfig:
     `site_author` (str):: Author or organization name for the site metadata. Defaults to `"Anonymous"`.
     `site_url` (str | None):: Canonical base URL where the site is hosted. Defaults to `None`.
     `strict` (bool):: Whether strict build mode is enabled to fail on warnings. Defaults to `False`.
+    `quiet` (bool):: Whether quiet mode is enabled to suppress progress output. Defaults to `False`.
     `navigation_nav` (list[str] | None):: Ordered list of content page paths for site navigation. Defaults to `None`.
     `content_dir` (str):: Directory path containing source content files. Defaults to `"content"`.
     `output_dir` (str):: Directory path where compiled static output is generated. Defaults to `"dist"`.
@@ -66,6 +67,7 @@ class GolemConfig:
     site_author: str = "Anonymous"
     site_url: str | None = None
     strict: bool = False
+    quiet: bool = False
     navigation_nav: list[str] | None = None
     content_dir: str = "content"
     output_dir: str = "dist"
@@ -225,6 +227,7 @@ def _extract_config_values(section: dict[str, Any], root: dict[str, Any]) -> dic
         "site_author": (site.get("author") or section.get("author") or section.get("site_author") or "Anonymous"),
         "site_url": (site.get("url") or site.get("site_url") or section.get("url") or section.get("site_url") or None),
         "strict": bool(build.get("strict", section.get("strict", False))),
+        "quiet": bool(build.get("quiet", section.get("quiet", False))),
         "content_dir": build.get("content_dir") or section.get("content_dir") or "content",
         "output_dir": build.get("output_dir") or section.get("output_dir") or "dist",
         "theme": build.get("theme") or section.get("theme") or "default",

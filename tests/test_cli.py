@@ -29,6 +29,7 @@ def test_cli_build_help_flags():
     assert result.exit_code == 0
     assert "--strict" in result.output
     assert "--verbose" in result.output or "-v" in result.output
+    assert "--quiet" in result.output or "-q" in result.output
     assert "--directory" in result.output or "-C" in result.output
 
 

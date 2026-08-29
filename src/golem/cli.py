@@ -564,12 +564,19 @@ Welcome to your newly scaffolded {doc_type}: "{name}".
     help="Enable verbose diagnostic output",
 )
 @click.option(
+    "-q",
+    "--quiet",
+    is_flag=True,
+    default=False,
+    help="Silence non-error build output",
+)
+@click.option(
     "-C",
     "--directory",
     type=click.Path(file_okay=False, dir_okay=True),
     help="Change working directory before executing",
 )
-def build(config, clean, strict, verbose, directory=None):
+def build(config, clean, strict, verbose, quiet, directory=None):
     """
 
     Run the incremental compiler, building static pages.
@@ -590,12 +597,17 @@ def build(config, clean, strict, verbose, directory=None):
     ----
     """
     with change_working_dir(directory):
+        import time
+
+        start_time = time.perf_counter()
+
         if verbose:
             import logging
 
             logging.basicConfig(level=logging.DEBUG, force=True)
 
-        click.echo("Building static site...")
+        if not quiet:
+            click.echo("Building static site...")
 
         config_path = Path(config)
         if config == "golem.toml" and not config_path.exists():
@@ -608,6 +620,8 @@ def build(config, clean, strict, verbose, directory=None):
 
         if strict:
             golem_config.strict = True
+        if quiet:
+            golem_config.quiet = True
 
         if clean:
             out_dir = Path(golem_config.output_dir)
@@ -631,7 +645,9 @@ def build(config, clean, strict, verbose, directory=None):
             for err in engine.errors:
                 click.echo(format_diagnostic(err))
 
-        click.echo(f"Compilation finished. Built {len(compiled)} pages.")
+        elapsed = time.perf_counter() - start_time
+        if not quiet:
+            click.echo(f"Compilation finished. Built {len(compiled)} pages in {elapsed:.2f}s.")
 
 
 @main.command()

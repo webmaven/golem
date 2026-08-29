@@ -56,6 +56,34 @@ def test_cli_build_clean_rebuilds_all(tmp_path):
         assert Path("dist/index.html").exists()
 
 
+def test_cli_build_elapsed_time(tmp_path):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        runner.invoke(main, ["init"])
+        res = runner.invoke(main, ["build"])
+        assert res.exit_code == 0
+        import re
+
+        assert re.search(r"Compilation finished\. Built \d+ pages in \d+\.\d+s\.", res.output)
+
+
+def test_cli_build_quiet_flag(tmp_path):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        runner.invoke(main, ["init"])
+        res = runner.invoke(main, ["build", "--quiet"])
+        assert res.exit_code == 0
+        # Output should be completely silent on success
+        assert res.output.strip() == ""
+        assert Path("dist/index.html").exists()
+
+        # Test short option -q with --clean
+        res_short = runner.invoke(main, ["build", "-q", "--clean"])
+        assert res_short.exit_code == 0
+        assert res_short.output.strip() == ""
+        assert Path("dist/index.html").exists()
+
+
 def test_cli_version():
     runner = CliRunner()
     result = runner.invoke(main, ["--version"])
