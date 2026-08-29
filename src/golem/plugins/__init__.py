@@ -76,6 +76,31 @@ class GolemSpecs:
         def on_pre_parse(self, raw_content: str) -> str:
             return raw_content.replace(":custom_tag:", "Expanded Tag")
     ----
+
+    Plugin Activation::
+        Plugins are activated exclusively by listing them in `config.plugins`, regardless of
+        how they are discovered (installed entry points, local `plugins/` directory files, or
+        importlib module paths). Presence alone — being installed or placed in `plugins/` — does
+        not activate a plugin. This ensures reproducible builds and explicit opt-in.
+
+    Hook Execution Order::
+        Transform hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_post_render`)
+        execute in the order plugins appear in `config.plugins`. The first listed plugin runs
+        first; its output becomes the input to the second, and so on. A `logging.WARNING` is
+        emitted at build time when multiple plugins modify the same value in a single hook,
+        since the final result is then dependent on list order.
+
+    Plugin Authoring Best Practice — Additive Transforms::
+        To minimize order-sensitivity, implement transform hooks as additive and commutative
+        operations where possible:
+
+        * Good (additive): Replacing a specific macro token that no other plugin touches,
+          appending a metadata key that doesn't already exist, injecting a script tag before
+          `</body>`.
+        * Risky (order-sensitive): Reordering document sections, overwriting a shared metadata
+          key, making assumptions about what a prior plugin has or has not already done.
+
+        Plugins that are inherently order-sensitive should document that dependency explicitly.
     """
 
     @hookspec
@@ -258,15 +283,12 @@ def get_plugin_manager(
 ) -> pluggy.PluginManager:
     """Initialize and configure a Pluggy PluginManager with plugins from config.plugins.
 
-    Uses a two-pass architecture:
+    Uses a two-pass discovery → registration architecture.
 
-    1. **Discovery pass**: Scans entry points (``golem.plugins`` and ``golem`` groups),
-       the local plugins directory, and importlib-importable module paths, building a
-       lookup dict of available plugins. Nothing is registered during this pass.
-    2. **Registration pass**: Iterates ``config.plugins`` in list order, looks up each
-       entry in the discovery map, and registers it. ``config.plugins`` is the sole
-       authority on what runs and in what order — presence in a discovery source alone
-       is never sufficient to activate a plugin.
+    1. Discovery pass: Scans entry points, the local plugins directory, and importlib-importable
+       module paths, building a lookup map of available plugins. Nothing is registered here.
+    2. Registration pass: Iterates ``config.plugins`` in list order, looks up each entry, and
+       registers it. ``config.plugins`` is the sole authority on enablement and execution order.
 
     [parameters]
     `config` (GolemConfig | None, optional):: Site configuration providing ``plugins``

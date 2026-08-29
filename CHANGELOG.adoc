@@ -29,7 +29,7 @@ toc::[]
 ** New `body_class`, `page_class`, and `content_class` template context variables for per-page layout control.
 ** Table full-bleed breakout, heading scale, description list (`dl`/`dt`/`dd`) spacing, accent rail, and keyboard focus rings.
 ** Listing blocks render language badges and callout pills; admonition titles styled as pill labels; inline code within headings uses a muted variant.
-* *Plugin Activation Gating (`get_plugin_manager()`):* Refactored to a two-pass discovery → registration architecture. `config.plugins` is now the sole authority on which plugins run and in what order — presence in a discovery source (installed entry point or local `plugins/` directory) alone no longer activates a plugin. List order controls execution order.
+* *Plugin Activation Gating (`get_plugin_manager()`):* Refactored to a two-pass discovery → registration architecture. `config.plugins` is now the sole authority on enablement and execution order — presence in a discovery source (installed entry point or local `plugins/` directory) alone no longer activates a plugin.
 * *Plugin Hook Robustness:* All four build lifecycle hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_post_render`) now isolate plugin exceptions — a failing plugin emits a `WARNING` log and processing continues. A `WARNING` is also emitted when multiple plugins modify the same value in a single hook, since the final result is then order-dependent.
 
 === Fixed
