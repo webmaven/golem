@@ -1,7 +1,13 @@
 # tests/test_config.py
 import pytest
 from pathlib import Path
-from golem.config import GolemConfig, load_config, find_default_config_path
+from golem.config import (
+    GolemConfig,
+    _extract_config_values,
+    _resolve_plugins_raw,
+    find_default_config_path,
+    load_config,
+)
 
 
 def test_config_parsing(tmp_path):
@@ -412,3 +418,144 @@ api_docstring_style = "auto"
     assert config_flat.api_packages == ["flat_pkg"]
     assert config_flat.api_output_dir == "flat_api"
     assert config_flat.api_docstring_style == "auto"
+
+
+def test_resolve_plugins_raw():
+    assert _resolve_plugins_raw({}) is None
+    assert _resolve_plugins_raw({"plugins": ["p1", "p2"]}) == ["p1", "p2"]
+    assert _resolve_plugins_raw({"plugins": {"plugins": ["p1"]}}) == ["p1"]
+    assert _resolve_plugins_raw({"plugins": {"enabled": ["p2"]}}) == ["p2"]
+    assert _resolve_plugins_raw({"plugins": "invalid_type"}) == "invalid_type"
+
+
+def test_extract_config_values_defaults():
+    values = _extract_config_values({}, {})
+    assert values == {
+        "site_title": "Golem Docs",
+        "site_author": "Anonymous",
+        "site_url": None,
+        "strict": False,
+        "content_dir": "content",
+        "output_dir": "dist",
+        "theme": "default",
+        "templates_dir": "templates",
+        "static_dir": "static",
+        "plugins_dir": "plugins",
+        "plugins": [],
+        "navigation_nav": None,
+        "api_packages": [],
+        "api_output_dir": "api",
+        "api_docstring_style": "auto",
+    }
+
+
+def test_extract_config_values_precedence():
+    # 1. Section-scoped key beats root/fallback-level key
+    section = {
+        "site": {"title": "Section Title", "author": "Section Author", "url": "https://section.url"},
+        "build": {"strict": False, "content_dir": "section_content", "output_dir": "section_dist", "theme": "sec_theme"},
+        "title": "Root Title",
+        "author": "Root Author",
+        "url": "https://root.url",
+        "strict": True,
+        "content_dir": "root_content",
+        "output_dir": "root_dist",
+        "theme": "root_theme",
+    }
+    values = _extract_config_values(section, section)
+    assert values["site_title"] == "Section Title"
+    assert values["site_author"] == "Section Author"
+    assert values["site_url"] == "https://section.url"
+    assert values["strict"] is False
+    assert values["content_dir"] == "section_content"
+    assert values["output_dir"] == "section_dist"
+    assert values["theme"] == "sec_theme"
+
+    # 2. Canonical key name beats alias at same level
+    section_alias = {
+        "site": {"name": "Site Name", "site_url": "https://alias.url"},
+        "api": {"api_packages": ["pkg1"], "api_output_dir": "out_api", "api_docstring_style": "google"},
+    }
+    values_alias = _extract_config_values(section_alias, section_alias)
+    assert values_alias["site_title"] == "Site Name"
+    assert values_alias["site_url"] == "https://alias.url"
+    assert values_alias["api_packages"] == ["pkg1"]
+    assert values_alias["api_output_dir"] == "out_api"
+    assert values_alias["api_docstring_style"] == "google"
+
+    # Canonical beats alias when both present
+    section_both = {
+        "site": {
+            "title": "Canonical Title",
+            "name": "Alias Name",
+            "url": "https://canonical.url",
+            "site_url": "https://alias.url",
+        },
+        "api": {
+            "packages": ["canonical_pkg"],
+            "api_packages": ["alias_pkg"],
+            "output_dir": "can_out",
+            "api_output_dir": "alias_out",
+        },
+    }
+    values_both = _extract_config_values(section_both, section_both)
+    assert values_both["site_title"] == "Canonical Title"
+    assert values_both["site_url"] == "https://canonical.url"
+    assert values_both["api_packages"] == ["canonical_pkg"]
+    assert values_both["api_output_dir"] == "can_out"
+
+
+def test_config_precedence_in_golem_and_pyproject(tmp_path):
+    # Test identical precedence behavior in golem.toml vs pyproject.toml
+    golem_toml = tmp_path / "golem.toml"
+    golem_toml.write_text("""
+title = "Root Title"
+site_title = "Root Site Title Alias"
+url = "https://root.url"
+
+[site]
+title = "Site Title"
+url = "https://site.url"
+
+[build]
+strict = true
+content_dir = "golem_docs"
+output_dir = "golem_dist"
+
+[api]
+packages = ["pkg_golem"]
+""")
+    golem_cfg = load_config(golem_toml)
+    assert golem_cfg.site_title == "Site Title"
+    assert golem_cfg.site_url == "https://site.url"
+    assert golem_cfg.strict is True
+    assert golem_cfg.content_dir == "golem_docs"
+    assert golem_cfg.output_dir == "golem_dist"
+    assert golem_cfg.api_packages == ["pkg_golem"]
+
+    pyproject_toml = tmp_path / "pyproject.toml"
+    pyproject_toml.write_text("""
+[tool.golem]
+title = "Root Title"
+site_title = "Root Site Title Alias"
+url = "https://root.url"
+
+[tool.golem.site]
+title = "Site Title"
+url = "https://site.url"
+
+[tool.golem.build]
+strict = true
+content_dir = "golem_docs"
+output_dir = "golem_dist"
+
+[tool.golem.api]
+packages = ["pkg_golem"]
+""")
+    pyproject_cfg = load_config(pyproject_toml)
+    assert pyproject_cfg.site_title == "Site Title"
+    assert pyproject_cfg.site_url == "https://site.url"
+    assert pyproject_cfg.strict is True
+    assert pyproject_cfg.content_dir == "golem_docs"
+    assert pyproject_cfg.output_dir == "golem_dist"
+    assert pyproject_cfg.api_packages == ["pkg_golem"]
