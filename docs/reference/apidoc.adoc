@@ -1,0 +1,73 @@
+= API Reference Generator & Inline Macro
+:nav_order: 30
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+Golem includes a built-in API reference documentation generator plugin (`golem.plugins.apidoc`) that inspects Python source modules, extracts type annotations and docstrings, and renders standard AsciiDoc API documentation.
+
+== 1. Generating API Reference Pages (`golem apidoc`)
+
+You can generate comprehensive API reference pages for your Python packages either automatically during build or via the CLI:
+
+[source,bash]
+----
+golem apidoc [PACKAGE] [--output <dir>] [--docstring-style <style>]
+----
+
+=== Configuration via `golem.toml` or `pyproject.toml`
+
+Configure API generation settings in your project configuration:
+
+[source,toml]
+----
+[api]
+packages = ["my_package", "my_package.core"]
+output_dir = "api"
+docstring_style = "auto" # Options: "auto", "google", "numpy", "sphinx", "asciidoc"
+----
+
+During builds or CI/CD pipelines, Golem reads this configuration and generates hierarchical reference pages under `content_dir/api/` matching your package structure.
+
+== 2. Inline Block Macro: `golem:apidoc`
+
+In technical manuals, guides, or tutorials, you often want to splice live API documentation for a specific class or function directly into your narrative prose.
+
+Golem provides the `golem:apidoc[...]` inline block macro:
+
+[source,asciidoc]
+----
+= Engine Architecture Guide
+
+Here is the specification for the primary BuildEngine class:
+
+golem:apidoc[target="golem.engine.BuildEngine", depth="all"]
+----
+
+=== Macro Parameters
+
+[cols="1,1,3"]
+|===
+| Parameter | Default | Description
+
+| `target`
+| *(Required)*
+| Full Python import path of the target module, class, method, or function (e.g. `"golem.config.GolemConfig"`). Can also be passed as the first positional argument.
+
+| `depth`
+| `"all"`
+| Introspection depth: `"all"` (full class with all methods and attributes), `"methods"` (methods only), `"summary"` (class signature and overview docstring).
+
+| `style`
+| `"auto"`
+| Docstring parsing format (`"auto"`, `"google"`, `"numpy"`, `"sphinx"`, `"asciidoc"`).
+|===
+
+=== Macro Pre-Parse Processing
+
+When Golem processes documents containing `golem:apidoc[...]` macros, the `on_pre_parse` plugin hook:
+1. Dynamically resolves the Python target object on `sys.path`.
+2. Inspects object signatures, type annotations, and docstrings.
+3. Formats parameters, return values, exception lists, and examples using `asciidocstring`.
+4. Splices the rendered AsciiDoc section directly into the document stream before syntax parsing and ASG resolution.

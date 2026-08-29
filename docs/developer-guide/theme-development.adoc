@@ -51,6 +51,12 @@ When rendering `skeleton.pt`, Golem passes a comprehensive set of template varia
 | `nav_html` | `str` | Pre-rendered semantic HTML5 navigation list (`<nav class="golem-nav">...`). Also aliased as `navigation_html`.
 | `toc_html` | `str` | Rendered Table of Contents HTML unordered list generated from document headings (`h2`, `h3`, etc.).
 | `current_path` | `str` | Path of the source document relative to the content root directory.
+| `prev_page` | `dict[str, str] \| None` | Previous document in sequential navigation order (`{title, url}`).
+| `next_page` | `dict[str, str] \| None` | Next document in sequential navigation order (`{title, url}`).
+| `pygments_css` | `str \| None` | Server-generated Pygments syntax highlighting CSS rules for light/dark mode.
+| `body_class` | `str` | Class name string extracted from `:body_class:` / `:page_class:` header attribute.
+| `page_class` | `str` | Class name string extracted from `:page_class:` header attribute.
+| `content_class` | `str` | Class name string extracted from `:content_class:` header attribute.
 | `custom_css` | `list[str]` | List of custom stylesheet URLs or paths injected from configuration.
 | `custom_js` | `list[str]` | List of custom script URLs or paths injected from configuration.
 |===

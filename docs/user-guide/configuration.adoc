@@ -31,7 +31,9 @@ output_dir = "dist"
 theme = "default"
 static_dir = "static"
 templates_dir = "templates"
+plugins_dir = "plugins"
 strict = false
+quiet = false
 
 [navigation]
 # Optional explicit sidebar ordering (defaults to automatic directory discovery)
@@ -42,11 +44,17 @@ nav = [
 ]
 
 [plugins]
-# List of installed Pluggy plugin package entry-points
+# List of installed Pluggy plugin package entry-points or local modules
 plugins = [
     "golem.plugins.doctest",
     "golem.plugins.apidoc",
 ]
+
+[api]
+# Packages to scan for API reference documentation generation
+packages = ["golem"]
+output_dir = "api"
+docstring_style = "auto" # Options: "auto", "google", "numpy", "sphinx", "asciidoc"
 ----
 
 == Embedding in `pyproject.toml`
@@ -65,5 +73,13 @@ output_dir = "dist"
 theme = "default"
 
 [tool.golem.plugins]
-plugins = []
+plugins = [
+    "golem.plugins.doctest",
+    "golem.plugins.apidoc",
+]
+
+[tool.golem.api]
+packages = ["my_package"]
+output_dir = "api"
+docstring_style = "auto"
 ----

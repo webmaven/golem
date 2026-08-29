@@ -60,8 +60,6 @@ def hello():
 === 3. Structured Tables
 Tables support explicit column widths, header alignment, and embedded formatting:
 
-[source,asciidoc]
-----
 [cols="1,2,1"]
 |===
 | Command | Purpose | Default Port
@@ -69,7 +67,6 @@ Tables support explicit column widths, header alignment, and embedded formatting
 | `golem serve` | Live-reload development server | `8000`
 | `golem build` | Compile static site to `dist/` | N/A
 |===
-----
 
 === 4. Mathematical Expressions (STEM)
 Inline formulas and block equations:

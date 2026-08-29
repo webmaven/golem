@@ -5,44 +5,58 @@
 :sectanchors:
 :source-highlighter: highlight.js
 
+The `golem` command-line utility provides commands for initializing, authoring, compiling, serving, verifying, and introspecting documentation projects.
+
+== Global Options
+
+* `-C, --directory <dir>`: Change working directory before executing the command.
+* `--version`: Display Golem version information.
+
 == `golem init`
 
 Initialize a new Golem documentation project scaffold.
 
 [source,bash]
 ----
-golem init [NAME] [--template=<site|package|book>] [-C <dir>]
+golem init [--template=<package|site|book|simple>] [--output-dir=<dir>] [-C <dir>]
 ----
 
-* `NAME`: Name of the directory to create (default: current directory).
-* `--template`: Scaffolding template preset (default: `site`).
+* `--template`: Scaffolding template preset (default: `package`; uses `site` if no `pyproject.toml` is found).
+* `--output-dir`: Override output build directory in generated config.
 * `-C, --directory`: Working directory context.
 
 == `golem new`
 
-Generate a new `.adoc` document skeleton.
+Generate a new `.adoc` document skeleton with pre-filled metadata headers (`:golem-type:`, `:author:`, `:date:`).
 
 [source,bash]
 ----
-golem new <chapter|article|section> <TITLE> [-C <dir>]
+golem new <doc_type> <TITLE> [-C <dir>]
 ----
+
+* `doc_type`: Document category or type (e.g. `chapter`, `article`, `post`, `guide`).
+* `TITLE`: Title of the document to create. Converted to a clean kebab-case filename (e.g. `hello-world.adoc`).
+* `-C, --directory`: Working directory context.
 
 == `golem build`
 
-Compile AsciiDoc source files into static HTML.
+Compile AsciiDoc source files into static HTML via incremental DAG caching.
 
 [source,bash]
 ----
-golem build [--clean] [--strict] [-v] [-C <dir>]
+golem build [--config=<path>] [--clean] [--strict] [-v] [-q] [-C <dir>]
 ----
 
+* `--config`: Path to primary configuration file (default: `golem.toml` or `pyproject.toml`).
 * `--clean`: Purge `.golem/cache.json` and output directory prior to building.
 * `--strict`: Treat warnings as fatal errors (exit code 1) for CI pipelines.
-* `-v, --verbose`: Output detailed compilation steps.
+* `-v, --verbose`: Enable verbose debug logging output.
+* `-q, --quiet`: Silence non-error compilation output.
+* `-C, --directory`: Working directory context.
 
 == `golem serve`
 
-Start the multi-threaded live-reload dev server with Server-Sent Events (SSE).
+Start the multi-threaded live-reload dev server with Server-Sent Events (SSE) and in-browser error overlays.
 
 [source,bash]
 ----
@@ -51,15 +65,48 @@ golem serve [--port=<port>] [--host=<host>] [--strict] [-C <dir>]
 
 * `--port`: TCP port to listen on (default: `8000`).
 * `--host`: Host interface address (default: `127.0.0.1`).
+* `--strict`: Fail on syntax errors during serving.
+* `-C, --directory`: Working directory context.
 
-== `golem plugins`
+== `golem doctest`
 
-List and inspect active and installed Pluggy plugin extensions.
+Extract and execute embedded Python code examples from documentation and docstrings using `asciidoctest`.
 
 [source,bash]
 ----
-golem plugins [-v] [-C <dir>]
+golem doctest [paths...] [-m/--mode=<explicit|eager|auto>] [-s/--source=<pkg_or_file>] [-v] [-x]
 ----
+
+* `paths`: Target `.adoc` files or directories (defaults to `content_dir` or `docs/`).
+* `-m, --mode`: Execution mode (`explicit` for `test`-marked blocks, `eager` for all blocks sequentially, `auto`).
+* `-s, --source`: Python module or package path to extract docstring doctests from.
+* `-v, --verbose`: Show detailed per-block test progress and outputs.
+* `-x, --fail-fast`: Stop immediately on the first test failure.
+
+== `golem apidoc`
+
+Generate AsciiDoc API reference documentation from Python packages using static AST analysis and docstring formatting.
+
+[source,bash]
+----
+golem apidoc [PACKAGE] [-o/--output=<dir>] [-s/--docstring-style=<style>]
+----
+
+* `PACKAGE`: Name of the Python package to introspect (defaults to configured `api_packages`).
+* `-o, --output`: Output directory for generated `.adoc` reference files (defaults to `content_dir/api/`).
+* `-s, --docstring-style`: Docstring parsing style (`google`, `numpy`, `sphinx`, `asciidoc`, `auto`).
+
+== `golem plugins`
+
+List and inspect active, built-in, entry-point, and local Pluggy plugin extensions.
+
+[source,bash]
+----
+golem plugins [--json] [-C <dir>]
+----
+
+* `--json`: Output structured JSON listing plugin discovery sources and enabled status.
+* `-C, --directory`: Working directory context.
 
 == `golem themes`
 
@@ -67,5 +114,9 @@ List active and discovered Chameleon theme templates.
 
 [source,bash]
 ----
-golem themes [-v] [-C <dir>]
+golem themes [--json] [-C <dir>]
 ----
+
+* `--json`: Output structured JSON listing active theme and available themes.
+* `-C, --directory`: Working directory context.
+
