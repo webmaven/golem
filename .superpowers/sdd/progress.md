@@ -15,7 +15,7 @@ Tasks:
 - Task 4.3: Fix os.PathLike type annotation on on_ast_created — COMPLETE (commit 1ee9722)
 - Task 5.1: Fix --version to use runtime package metadata — COMPLETE (commit 4062719)
 - Task 5.2: Fix hardcoded author name in golem init — COMPLETE (commit 939fe17)
-- Task 5.3: Add coverage and pytest-cov to dev dependencies — PENDING
+- Task 5.3: Add coverage and pytest-cov to dev dependencies — COMPLETE (commit 7343939)
 - Task 5.4: Remove docs_crit_eval.md from repo — PENDING
 - Task 5.5: Add CONTRIBUTING.adoc — PENDING
 Task 1.2: complete (commits 97a379f..e25b6b8, review clean — AST/tokenize canary in tests/test_syntax_invariants.py)
@@ -28,3 +28,4 @@ Task 4.2: complete (commits dbcb89c..6b25d50, review clean — nav tree cached o
 Task 4.3: complete (commits 6b25d50..1ee9722, review clean — on_ast_created os.PathLike annotation corrected to Any)
 Task 5.1: complete (commits 1ee9722..4062719, review clean — --version dynamically resolved from package metadata)
 Task 5.2: complete (commits 4062719..939fe17, review clean — dynamic git author discovery in golem init scaffolding)
+Task 5.3: complete (commits 939fe17..7343939, review clean — added pytest-cov and coverage[toml] config to pyproject.toml)
