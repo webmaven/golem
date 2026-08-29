@@ -15,6 +15,7 @@ toc::[]
 === Added
 
 * *Test Coverage Configuration:* Added `pytest-cov` and `coverage[toml]` to dev dependencies with configured coverage targets in `pyproject.toml`.
+* *`CONTRIBUTING.adoc`:* Added contributor guide covering development setup, test execution, linting/type-checking, and PR guidelines.
 * *Server-Side Syntax Highlighting:* Pygments-powered syntax highlighting integrated into the build pipeline.
 * *CI Syntax Canary Test (`tests/test_syntax_invariants.py`):* AST-based test that catches Python 2 `except A, B:` forms across all source files at CI time — a class of bug not detected by ruff's default rule set.
 
