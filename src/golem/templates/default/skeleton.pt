@@ -927,7 +927,7 @@
 <body tal:attributes="class body_class or None">
     <a href="#golem-content" class="golem-skip-link">Skip to main content</a>
     <header id="golem-header" class="golem-header">
-        <h1><a href="/" tal:attributes="href site_url or '/'">${site_title}</a></h1>
+        <h1><a href="./" tal:attributes="href site_url or root_path">${site_title}</a></h1>
         <span tal:condition="site_author" class="golem-author">${site_author}</span>
     </header>
     <div id="golem-wrapper">
