@@ -14,6 +14,7 @@ toc::[]
 
 === Added
 
+* *Dev Server Startup & Rebuild Status:* Enhanced `golem serve` to output startup compilation metrics, page build count, elapsed timing, and live rebuild progress with browser reload notifications.
 * *CLI Quiet Flag & Build Elapsed Timing:* Added `-q` / `--quiet` flag to `golem build` command to silence non-error output, and added elapsed build execution duration to the compilation summary line.
 * *Test Coverage Configuration:* Added `pytest-cov` and `coverage[toml]` to dev dependencies with configured coverage targets in `pyproject.toml`.
 * *`CONTRIBUTING.adoc`:* Added contributor guide covering development setup, test execution, linting/type-checking, and PR guidelines.

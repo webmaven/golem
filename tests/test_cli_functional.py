@@ -84,6 +84,36 @@ def test_cli_build_quiet_flag(tmp_path):
         assert Path("dist/index.html").exists()
 
 
+def test_cli_serve_startup_output(tmp_path, monkeypatch):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        runner.invoke(main, ["init"])
+
+        saved_server = []
+
+        class MockServer:
+            def __init__(self, **kwargs):
+                self.rebuild_func = kwargs.get("rebuild_func")
+                saved_server.append(self)
+
+            def run(self):
+                pass
+
+        monkeypatch.setattr("golem.server.LiveReloadServer", MockServer)
+
+        res = runner.invoke(main, ["serve"])
+        assert res.exit_code == 0
+        assert "Building static site before serving..." in res.output
+        assert "Compilation finished." in res.output
+        assert "Ready! Serving 'dist' at http://127.0.0.1:8000" in res.output
+        assert "Press Ctrl+C to stop." in res.output
+
+        # Verify rebuild_func reporting
+        assert saved_server and saved_server[0].rebuild_func is not None
+        # Call rebuild
+        saved_server[0].rebuild_func()
+
+
 def test_cli_version():
     runner = CliRunner()
     result = runner.invoke(main, ["--version"])

@@ -19,6 +19,7 @@ import importlib.metadata
 import json
 import os
 import shutil
+import time
 from typing import Any, Iterator
 import click
 from golem.config import GolemConfig, load_config, find_default_config_path
@@ -710,9 +711,10 @@ def serve(port, host, strict, directory=None, test_only=False):
 
         # Compile the site first
         click.echo("Building static site before serving...")
+        start_time = time.perf_counter()
         try:
             engine = BuildEngine(golem_config)
-            engine.build_site()
+            compiled = engine.build_site()
         except Exception as e:
             if hasattr(engine, "errors") and engine.errors:
                 for err in engine.errors:
@@ -723,11 +725,45 @@ def serve(port, host, strict, directory=None, test_only=False):
             for err in engine.errors:
                 click.echo(format_diagnostic(err))
 
+        elapsed = time.perf_counter() - start_time
+        if compiled:
+            page_word = "page" if len(compiled) == 1 else "pages"
+            click.echo(f"Compilation finished. Built {len(compiled)} {page_word} in {elapsed:.2f}s.")
+        else:
+            click.echo(f"Compilation finished. Built 0 pages (site is up to date) in {elapsed:.2f}s.")
+
+        click.echo(
+            f"Ready! Serving '{golem_config.output_dir}' at http://{host}:{port} "
+            f"(watching '{golem_config.content_dir}' for changes)"
+        )
+        click.echo("Press Ctrl+C to stop.")
+
+        def on_rebuild():
+            t0 = time.perf_counter()
+            click.echo("Changes detected. Rebuilding static site...")
+            try:
+                recompiled = engine.build_site()
+            except Exception:
+                if hasattr(engine, "errors") and engine.errors:
+                    for err in engine.errors:
+                        click.echo(format_diagnostic(err), err=True)
+                raise
+            if engine.errors:
+                for err in engine.errors:
+                    click.echo(format_diagnostic(err))
+            dt = time.perf_counter() - t0
+            if recompiled:
+                p_word = "page" if len(recompiled) == 1 else "pages"
+                click.echo(f"Rebuild finished. Built {len(recompiled)} {p_word} in {dt:.2f}s. Reloading connected tabs...")
+            else:
+                click.echo(f"Rebuild finished (site is up to date) in {dt:.2f}s.")
+            return recompiled
+
         server = LiveReloadServer(
             public_dir=Path(golem_config.output_dir),
             watch_dir=Path(golem_config.content_dir),
             change_detected_func=lambda: bool(engine.get_outdated_files(commit=False)),
-            rebuild_func=lambda: engine.build_site(),
+            rebuild_func=on_rebuild,
             port=port,
             errors_func=lambda: engine.errors,
         )
