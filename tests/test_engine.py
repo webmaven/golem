@@ -1389,3 +1389,34 @@ def test_build_site_passes_cached_nav_tree_to_compiler(tmp_path):
         call_kwargs = mock_compile.call_args.kwargs
         assert "nav_tree" in call_kwargs
         assert call_kwargs["nav_tree"] is engine._nav_tree_cache
+
+
+def test_sync_static_assets_copies_content_dir_media(tmp_path):
+    """Verify that images and media inside content_dir are synchronized to output_dir."""
+    content_dir = tmp_path / "docs"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Home\n", encoding="utf-8")
+
+    images_dir = content_dir / "images"
+    images_dir.mkdir()
+    (images_dir / "diagram.png").write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    (images_dir / "schema.svg").write_text("<svg></svg>", encoding="utf-8")
+
+    sub_dir = content_dir / "nested" / "assets"
+    sub_dir.mkdir(parents=True)
+    (sub_dir / "sample.pdf").write_bytes(b"%PDF-1.4")
+
+    output_dir = tmp_path / "dist"
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(output_dir),
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+    engine.sync_static_assets()
+
+    assert (output_dir / "images" / "diagram.png").exists()
+    assert (output_dir / "images" / "diagram.png").read_bytes() == b"\x89PNG\r\n\x1a\nfake"
+    assert (output_dir / "images" / "schema.svg").exists()
+    assert (output_dir / "images" / "schema.svg").read_text(encoding="utf-8") == "<svg></svg>"
+    assert (output_dir / "nested" / "assets" / "sample.pdf").exists()
+    assert (output_dir / "nested" / "assets" / "sample.pdf").read_bytes() == b"%PDF-1.4"
