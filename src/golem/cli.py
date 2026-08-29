@@ -223,7 +223,11 @@ def main(version: bool = False, directory: str | None = None) -> None:
         pm.hook.golem_add_subcommands(cli=main)
 
         if version:
-            click.echo("Golem static site generator v0.1.0")
+            try:
+                _ver = importlib.metadata.version("golem-docs")
+            except importlib.metadata.PackageNotFoundError:
+                _ver = "dev"
+            click.echo(f"Golem static site generator v{_ver}")
 
 
 @main.command()

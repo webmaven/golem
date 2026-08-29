@@ -17,7 +17,9 @@ toc::[]
 * *Server-Side Syntax Highlighting:* Pygments-powered syntax highlighting integrated into the build pipeline.
 * *CI Syntax Canary Test (`tests/test_syntax_invariants.py`):* AST-based test that catches Python 2 `except A, B:` forms across all source files at CI time — a class of bug not detected by ruff's default rule set.
 
-=== Changed
+=== Fixed
+
+* *CLI Version String:* Updated `--version` option to resolve package version dynamically via `importlib.metadata.version("golem-docs")` with fallback to `dev`, replacing hardcoded string.
 
 * *Build-Cycle Navigation Caching:* Cached `discover_navigation()` tree within `build_site()` cycle to prevent redundant recursive filesystem scans per compiled page, passing optional precomputed `nav_tree` to `generate_nav_html`, `get_ordered_nav_pages`, and `get_page_pagination`.
 * *Cross-platform file locking:* Implemented cross-platform cache file locking using `filelock` replacing `fcntl`.

@@ -56,6 +56,14 @@ def test_cli_build_clean_rebuilds_all(tmp_path):
         assert Path("dist/index.html").exists()
 
 
+def test_cli_version():
+    runner = CliRunner()
+    result = runner.invoke(main, ["--version"])
+    assert result.exit_code == 0
+    # Should contain "Golem static site generator v"
+    assert "Golem static site generator v" in result.output
+
+
 def test_cli_init_with_existing_pyproject_toml(tmp_path):
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):
