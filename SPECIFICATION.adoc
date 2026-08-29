@@ -212,10 +212,12 @@ Every compilation run executes this sequence:
 1.  **Scan Phase:** Golem traverses the `content/` directory and computes the SHA-256 hash of each `.adoc` file.
 2.  **Invalidation Check:**
     *   If the file's computed hash *matches* the hash in the cache, and none of its dependencies have changed, its parsed AST is pulled directly from `.golem/` cache files, bypassing Lark parser execution.
-    *   If a file's hash *differs*, it is schedule for compilation.
+    *   If a file's hash *differs*, it is scheduled for compilation.
     *   **Recursive Invalidation:** If a file `B.adoc` is modified, Golem traverses the dependency DAG upwards, invalidating and scheduling every parent file that includes `B.adoc`.
+    *   **Template Invalidation:** Changes to master layout templates (`skeleton.pt`, `page.pt`, `layout.pt`) or configuration trigger a full site rebuild. Granular component templates only invalidate documents containing matching ASG node types (discovered via `collect_node_types()`).
+    *   **Plugin Invalidation Hooks:** Registered plugins implementing `golem_mark_stale` can evaluate changed files and cache metadata to mark additional dependent files for recompilation.
 3.  **Compilation Execution:** Only scheduled files undergo the parsing, transformation, and resolution pipeline.
-4.  **Save state:** The updated hashes and inclusion dependencies are persisted back to `.golem/cache.json`.
+4.  **Save State:** The updated hashes and inclusion dependencies are persisted back to `.golem/cache.json` using atomic temporary file replacement protected by cross-process file locks (`filelock.FileLock`).
 
 ---
 
@@ -261,6 +263,24 @@ class GolemSpecs:
         """
         Invoked after Chameleon integrates the content into the template.
         Allows rewriting generated HTML (e.g. Pygments class insertions).
+        """
+
+    @hookspec
+    def golem_add_subcommands(self, cli: click.Group) -> None:
+        """
+        Invoked during Click CLI bootstrap.
+        Allows plugins to register custom CLI subcommands (e.g. `doctest`, `apidoc`).
+        """
+
+    @hookspec
+    def golem_mark_stale(
+        self,
+        changed_files: list[Path],
+        cache_metadata: dict[str, dict[str, Any]],
+    ) -> list[Path] | None:
+        """
+        Invoked during incremental build dependency resolution.
+        Allows plugins to analyze changes and flag additional dependent pages as stale.
         """
 ----
 
@@ -380,6 +400,12 @@ To ensure stable cross-references (`inline_xref`), section IDs are generated det
 2.  Replace any non-alphanumeric characters (excluding hyphens) with empty space.
 3.  Replace spaces and underscores with a single hyphen `-`.
 4.  Strip leading/trailing hyphens.
+
+=== 8.4 Server-Side Syntax Highlighting (`golem/highlighting.py`)
+Golem performs zero-JavaScript, server-side syntax highlighting of source code listings via Pygments (`pygments>=2.18`):
+*   **Custom Color Palettes:** Features handcrafted `FiredClayStyle` (light mode) and `FiredClayDarkStyle` (dark mode) matching Golem's workbench aesthetic.
+*   **HTML & CSS Generation:** Generates tokenized HTML blocks (`<pre class="highlight {lang}"><code class="language-{lang}">...</code></pre>`) and injects combined light/dark media-query scoped Pygments CSS (`PYGMENTS_CSS`) into page layouts.
+*   **Language Aliases:** Standardizes aliases (e.g., `py`/`python3` -> `python`, `js`/`ts` -> `javascript`/`typescript`, `sh`/`zsh` -> `bash`, `adoc` -> `asciidoc`).
 
 ---
 
@@ -531,22 +557,33 @@ Golem hosts static files from `build.output_dir` using Python’s built-in `http
 
 == 11. CLI Command Specification
 
-The `golem` command-line utility routes user actions using an intuitive, standard interface.
+The `golem` command-line utility routes user actions using an intuitive, standard interface with global `-C/--directory` and `--version` support.
 
-=== 11.1 Command Interfaces
-*   `golem init [--template=<type>] [--output-dir=<dir>]`
-    *   Creates a standard directory structure and basic `golem.toml`.
-    *   Templates: `library` (configures API scanning defaults), `cli` (setup for single command docs), `book`, `paper`, `blog`.
-*   `golem new <type> <name>`
-    *   Generates a structured `.adoc` file with pre-populated metadata templates.
-    *   Example: `golem new chapter "Advanced Compilation"` creates `content/advanced-compilation.adoc` with header attributes and title pre-filled.
-*   `golem build [--config=<path>] [--clean]`
-    *   Runs the incremental compiler, building static pages under the designated output folder.
-*   `golem serve [--port=<port>] [--host=<host>]`
-    *   Invokes an incremental build, launches the threaded web server, registers SSE hooks, and watches source directories for immediate reloads.
-*   `golem doctest [--mode=<mode>]`
-    *   Walks the document source files, isolates all Python listing blocks, extracts docstring examples using `AsciiDocTest`, and runs them under `pytest`.
-    *   Modes: `explicit` (default, only executes blocks with the `test` attribute/role like `[source,python,test]`), `eager` (executes all python source blocks sequentially top-to-bottom). Shared state is preserved sequentially across a single document.
+=== 11.1 Implemented Core Commands
+*   `golem init [--template=<type>] [--output-dir=<dir>] [-C <dir>]`
+    *   Creates a standard directory structure and basic `golem.toml` (or `[tool.golem]` in `pyproject.toml`).
+    *   Profiles: `package` (default, standard library layout), `site`/`book`/`simple` (scaffolds `templates/` and `static/css/custom.css`).
+*   `golem new <type> <name> [-C <dir>]`
+    *   Generates a structured `.adoc` file with pre-populated header attributes (`:golem-type:`, `:author:`, `:date:`), title, and introduction section.
+    *   Example: `golem new post "Hello World"` creates `content/hello-world.adoc`.
+*   `golem build [--config=<path>] [--clean] [--strict] [-v/--verbose] [-q/--quiet] [-C <dir>]`
+    *   Runs the incremental compiler, building static pages into the configured output folder (`dist/` by default).
+    *   Flags: `--clean` purges the output directory and cache; `--strict` treats warnings as fatal errors; `-v` enables debug logging; `-q` silences non-error output.
+*   `golem serve [--port=<port>] [--host=<host>] [--strict] [-C <dir>]`
+    *   Invokes an initial build, launches the multi-threaded HTTP web server, activates SSE reload streaming, watches source directories, and injects real-time diagnostic error overlays if compilation errors occur.
+*   `golem plugins [--json] [-C <dir>]`
+    *   Inspects and lists all active, built-in, setuptools entrypoint, and local plugins, showing enabled/disabled status and discovery sources. Supports `--json` machine-readable output.
+*   `golem themes [--json] [-C <dir>]`
+    *   Inspects and lists the currently active theme alongside all available built-in, local (`themes/`), and entry point themes. Supports `--json` machine-readable output.
+
+=== 11.2 Plugin-Registered Commands
+*   `golem doctest [paths...] [-m/--mode=<mode>] [-s/--source=<pkg_or_file>] [-v/--verbose] [-x/--fail-fast]`
+    *   Registered via `golem.plugins.doctest`. Walks AsciiDoc source files or Python docstrings, isolates Python code listing blocks, and executes them with sequential state preservation.
+    *   Modes: `explicit` (default, runs blocks marked with `test`), `eager` (runs all Python listing blocks sequentially), `auto`.
+    *   Flags: `-s/--source` to target Python packages/files for docstring testing; `-x/--fail-fast` to stop on first failure; `-v` for verbose output.
+*   `golem apidoc [package] [-o/--output=<dir>] [-s/--docstring-style=<style>]`
+    *   Registered via `golem.plugins.apidoc`. Introspects Python packages and generates standard AsciiDoc API reference documentation pages.
+
+=== 11.3 Planned / Roadmap Commands (Not Yet Implemented)
 *   `golem ingest <source-path-or-url> [--output=<path>]`
-    *   An ingestion helper that ingests raw documents (such as local PDF reference papers, web pages, or raw markdown documentation).
-    *   It hands off the raw content to a configurable LLM processing pipeline (which can be customized via Python scripts or API hooks) that digests the material into clean, semantically structured, standard-compliant AsciiDoc wiki pages (and applies incremental page updates). Golem can then statically compile and publish these pages, or serve them locally as a high-fidelity local viewer.
+    *   *(Planned / Future)* An ingestion helper that ingests raw documents (such as local PDF reference papers, web pages, or raw markdown documentation) and converts them via an LLM processing pipeline into clean, semantically structured, standard-compliant AsciiDoc documentation pages.
