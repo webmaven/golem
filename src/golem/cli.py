@@ -19,6 +19,7 @@ import importlib.metadata
 import json
 import os
 import shutil
+import time
 from typing import Any, Iterator
 import click
 from golem.config import GolemConfig, load_config, find_default_config_path
@@ -223,7 +224,28 @@ def main(version: bool = False, directory: str | None = None) -> None:
         pm.hook.golem_add_subcommands(cli=main)
 
         if version:
-            click.echo("Golem static site generator v0.1.0")
+            try:
+                _ver = importlib.metadata.version("golem-docs")
+            except importlib.metadata.PackageNotFoundError:
+                _ver = "dev"
+            click.echo(f"Golem static site generator v{_ver}")
+
+
+def _get_git_author() -> str:
+    """Read the git global user.name; return a placeholder on failure."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "config", "--global", "user.name"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        name = result.stdout.strip()
+        return name if name else "Your Name"
+    except Exception:
+        return "Your Name"
 
 
 @main.command()
@@ -270,6 +292,7 @@ def init(template, output_dir, directory=None):
     ----
     """
     with change_working_dir(directory):
+        author = _get_git_author()
         click.echo(f"Initializing golem project using template '{template}'...")
 
         pyproject_toml = Path("pyproject.toml")
@@ -284,10 +307,10 @@ def init(template, output_dir, directory=None):
                 if content and not content.endswith("\n"):
                     content += "\n"
                 if is_site_layout:
-                    content += """
+                    content += f"""
 [tool.golem.site]
 title = "Golem Documentation"
-author = "Michael Bernstein"
+author = "{author}"
 
 [tool.golem.build]
 content_dir = "docs"
@@ -297,10 +320,10 @@ static_dir = "docs/static"
 templates_dir = "docs/templates"
 """
                 else:
-                    content += """
+                    content += f"""
 [tool.golem.site]
 title = "Golem Documentation"
-author = "Michael Bernstein"
+author = "{author}"
 
 [tool.golem.build]
 content_dir = "docs"
@@ -316,10 +339,10 @@ theme = "default"
             if not golem_toml.exists():
                 if is_site_layout:
                     golem_toml.write_text(
-                        """\
+                        f"""\
 [site]
 title = "Golem Documentation"
-author = "Michael Bernstein"
+author = "{author}"
 
 [build]
 content_dir = "content"
@@ -332,10 +355,10 @@ templates_dir = "templates"
                     )
                 else:
                     golem_toml.write_text(
-                        """\
+                        f"""\
 [site]
 title = "Golem Documentation"
-author = "Michael Bernstein"
+author = "{author}"
 
 [build]
 content_dir = "content"
@@ -430,16 +453,16 @@ body {
                     f"The directory '{content_dir}' is not empty. Scaffold default documentation files?",
                     default=False,
                 )
-            except click.Abort, Exception:
+            except (click.Abort, Exception):
                 scaffold_docs = False
 
         if scaffold_docs:
             index_adoc = content_dir / "index.adoc"
             if not index_adoc.exists():
                 index_adoc.write_text(
-                    """\
+                    f"""\
 = Welcome to Golem
-Michael Bernstein
+{author}
 
 This is the homepage of your newly initialized Golem static documentation portal.
 """,
@@ -542,12 +565,19 @@ Welcome to your newly scaffolded {doc_type}: "{name}".
     help="Enable verbose diagnostic output",
 )
 @click.option(
+    "-q",
+    "--quiet",
+    is_flag=True,
+    default=False,
+    help="Silence non-error build output",
+)
+@click.option(
     "-C",
     "--directory",
     type=click.Path(file_okay=False, dir_okay=True),
     help="Change working directory before executing",
 )
-def build(config, clean, strict, verbose, directory=None):
+def build(config, clean, strict, verbose, quiet, directory=None):
     """
 
     Run the incremental compiler, building static pages.
@@ -568,12 +598,17 @@ def build(config, clean, strict, verbose, directory=None):
     ----
     """
     with change_working_dir(directory):
+        import time
+
+        start_time = time.perf_counter()
+
         if verbose:
             import logging
 
             logging.basicConfig(level=logging.DEBUG, force=True)
 
-        click.echo("Building static site...")
+        if not quiet:
+            click.echo("Building static site...")
 
         config_path = Path(config)
         if config == "golem.toml" and not config_path.exists():
@@ -586,6 +621,8 @@ def build(config, clean, strict, verbose, directory=None):
 
         if strict:
             golem_config.strict = True
+        if quiet:
+            golem_config.quiet = True
 
         if clean:
             out_dir = Path(golem_config.output_dir)
@@ -609,7 +646,9 @@ def build(config, clean, strict, verbose, directory=None):
             for err in engine.errors:
                 click.echo(format_diagnostic(err))
 
-        click.echo(f"Compilation finished. Built {len(compiled)} pages.")
+        elapsed = time.perf_counter() - start_time
+        if not quiet:
+            click.echo(f"Compilation finished. Built {len(compiled)} pages in {elapsed:.2f}s.")
 
 
 @main.command()
@@ -672,9 +711,10 @@ def serve(port, host, strict, directory=None, test_only=False):
 
         # Compile the site first
         click.echo("Building static site before serving...")
+        start_time = time.perf_counter()
         try:
             engine = BuildEngine(golem_config)
-            engine.build_site()
+            compiled = engine.build_site()
         except Exception as e:
             if hasattr(engine, "errors") and engine.errors:
                 for err in engine.errors:
@@ -685,11 +725,45 @@ def serve(port, host, strict, directory=None, test_only=False):
             for err in engine.errors:
                 click.echo(format_diagnostic(err))
 
+        elapsed = time.perf_counter() - start_time
+        if compiled:
+            page_word = "page" if len(compiled) == 1 else "pages"
+            click.echo(f"Compilation finished. Built {len(compiled)} {page_word} in {elapsed:.2f}s.")
+        else:
+            click.echo(f"Compilation finished. Built 0 pages (site is up to date) in {elapsed:.2f}s.")
+
+        click.echo(
+            f"Ready! Serving '{golem_config.output_dir}' at http://{host}:{port} "
+            f"(watching '{golem_config.content_dir}' for changes)"
+        )
+        click.echo("Press Ctrl+C to stop.")
+
+        def on_rebuild():
+            t0 = time.perf_counter()
+            click.echo("Changes detected. Rebuilding static site...")
+            try:
+                recompiled = engine.build_site()
+            except Exception:
+                if hasattr(engine, "errors") and engine.errors:
+                    for err in engine.errors:
+                        click.echo(format_diagnostic(err), err=True)
+                raise
+            if engine.errors:
+                for err in engine.errors:
+                    click.echo(format_diagnostic(err))
+            dt = time.perf_counter() - t0
+            if recompiled:
+                p_word = "page" if len(recompiled) == 1 else "pages"
+                click.echo(f"Rebuild finished. Built {len(recompiled)} {p_word} in {dt:.2f}s. Reloading connected tabs...")
+            else:
+                click.echo(f"Rebuild finished (site is up to date) in {dt:.2f}s.")
+            return recompiled
+
         server = LiveReloadServer(
             public_dir=Path(golem_config.output_dir),
             watch_dir=Path(golem_config.content_dir),
             change_detected_func=lambda: bool(engine.get_outdated_files(commit=False)),
-            rebuild_func=lambda: engine.build_site(),
+            rebuild_func=on_rebuild,
             port=port,
             errors_func=lambda: engine.errors,
         )

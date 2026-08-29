@@ -24,6 +24,7 @@ dependencies = [
     "asciidoctype>=0.1.0a4",
     "chameleon",
     "click",
+    "filelock",
     "pluggy",
     "pygments>=2.18",
     "griffe>=1.5.0",
@@ -39,6 +40,8 @@ Issues = "https://github.com/webmaven/golem/issues"
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-cov",
+    "coverage[toml]",
     "ruff",
     "mypy",
     "requests",
@@ -78,7 +81,7 @@ addopts = "--ignore=SPECIFICATION.adoc --ignore=docs"
 
 [tool.ruff]
 line-length = 127
-target-version = "py314"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "C90"]
@@ -87,5 +90,13 @@ ignore = ["C901", "E501"]
 [tool.ruff.format]
 quote-style = "double"
 
+[tool.coverage.run]
+source = ["src/golem"]
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 70
 
 

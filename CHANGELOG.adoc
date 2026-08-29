@@ -10,32 +10,34 @@ and this project adheres to https://semver.org/spec/v2.0.0.html[Semantic Version
 
 toc::[]
 
-== [Unreleased]
+== Unreleased
 
 === Added
 
-* *Server-Side Syntax Highlighting:* Pygments-powered syntax highlighting integrated into the build pipeline.
+* *CLI Build & Serve Enhancements:* Added `-q`/`--quiet` flag and elapsed execution timing to `golem build`, along with startup compilation status and live rebuild progress in `golem serve`.
+* *Server-Side Syntax Highlighting:* Pygments-powered syntax highlighting integrated into the build pipeline with Fired Clay styling.
+* *Project Hygiene & CI Checks:* Added `CONTRIBUTING.adoc` contributor guide and AST-based CI canary test (`tests/test_syntax_invariants.py`).
+* *Test Coverage Configuration:* Added `pytest-cov` and `coverage[toml]` to dev dependencies with configured targets in `pyproject.toml`.
 
 === Changed
 
-* *Upgraded Dependencies:*
-** Bumped `asciidoctrine` requirement to `>=0.2.0a4` and `asciidoctype` to `>=0.1.0a4`.
-** Added `pygments>=2.18` as a required dependency.
-* *Comprehensive AsciiDoc Docstrings:*
-** All internal modules (`config`, `server`, `plugins`, `engine`, `renderer`) now carry full AsciiDoc-formatted docstrings using `asciidocstring` conventions, replacing prior reST/Sphinx markup.
-* *CSS Visual Hierarchy (Fired Clay Theme):*
-** Fired Clay palette (`FiredClayStyle`) applied to Pygments-highlighted listing blocks.
-** New `body_class`, `page_class`, and `content_class` template context variables for per-page layout control.
-** Table full-bleed breakout, heading scale, description list (`dl`/`dt`/`dd`) spacing, accent rail, and keyboard focus rings.
-** Listing blocks render language badges and callout pills; admonition titles styled as pill labels; inline code within headings uses a muted variant.
+* *Plugin Execution Gating:* Refactored `get_plugin_manager()` to a two-pass discovery-registration architecture where `config.plugins` is the sole authority for activation and execution order.
+* *Dependency Upgrades:* Bumped `asciidoctrine` to `>=0.2.0a4`, `asciidoctype` to `>=0.1.0a4`, and added `pygments>=2.18`.
+* *AsciiDoc Docstrings:* Standardized docstrings across all internal modules to AsciiDoc format using `asciidocstring` conventions.
+* *CSS Visual Hierarchy:* Enhanced default theme typography, admonition pill labels, code listing language badges, table breakouts, and per-page layout classes.
 
 === Fixed
 
-* *Dev Server:* Client socket disconnects now logged at `DEBUG` level instead of raising unhandled exceptions.
-* *Test Coverage:*
-** Modernized test syntax and expanded coverage across `doctest`, `apidoc`, `highlighting`, and `engine` modules.
+* *Python Exception Handling:* Corrected five occurrences of deprecated Python 2 `except A, B:` syntax to Python 3 `except (A, B):`.
+* *Plugin Hook Robustness:* Isolated plugin exceptions across all build hooks and added conflict warnings when multiple plugins modify the same value.
+* *Cross-Platform File Locking:* Replaced POSIX-only `fcntl` cache locking with cross-platform `filelock`.
+* *Configuration Normalization:* Deduplicated TOML parsing across `golem.toml` and `pyproject.toml` into a centralized normalizer helper.
+* *Navigation & TOC Performance:* Cached `discover_navigation()` tree during build cycles and eliminated duplicated text in TOC anchor generation.
+* *CLI Scaffolding & Metadata:* Dynamically resolved `--version` from package metadata and author name from `git config` in `golem init`.
+* *Repository Cleanliness:* Removed internal review artifacts from tracking and added pattern ignores to `.gitignore`.
+* *Dev Server Disconnects:* Downgraded client socket disconnect exceptions to debug-level logging.
 
-== [0.1.0a2] - 2026-08-24
+== 0.1.0a2 - 2026-08-24
 
 === Added
 
@@ -59,7 +61,7 @@ toc::[]
 ** Truncation of large inline attribute constants (such as HTML templates).
 ** Heading level offset adjustment for docstrings opening with section headings.
 
-== [0.1.0a1] - 2026-08-18
+== 0.1.0a1 - 2026-08-18
 
 === Added
 

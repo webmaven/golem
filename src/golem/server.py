@@ -210,7 +210,7 @@ class LiveReloadServer:
                                 # Send keep-alive comments to prevent socket timeouts
                                 self.wfile.write(b": ping\n\n")
                                 self.wfile.flush()
-                    except ConnectionResetError, BrokenPipeError:
+                    except (ConnectionResetError, BrokenPipeError):
                         pass
                     except Exception as e:
                         logger.debug(f"[LiveReload] SSE connection error: {e}")
@@ -334,7 +334,7 @@ class LiveReloadServer:
         logger.info(f"[LiveReload] DevServer active on http://127.0.0.1:{self.port}...")
         try:
             self.httpd.serve_forever()
-        except KeyboardInterrupt, SystemExit:
+        except (KeyboardInterrupt, SystemExit):
             pass
         finally:
             self.is_running = False

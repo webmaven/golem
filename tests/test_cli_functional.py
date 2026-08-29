@@ -56,6 +56,72 @@ def test_cli_build_clean_rebuilds_all(tmp_path):
         assert Path("dist/index.html").exists()
 
 
+def test_cli_build_elapsed_time(tmp_path):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        runner.invoke(main, ["init"])
+        res = runner.invoke(main, ["build"])
+        assert res.exit_code == 0
+        import re
+
+        assert re.search(r"Compilation finished\. Built \d+ pages in \d+\.\d+s\.", res.output)
+
+
+def test_cli_build_quiet_flag(tmp_path):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        runner.invoke(main, ["init"])
+        res = runner.invoke(main, ["build", "--quiet"])
+        assert res.exit_code == 0
+        # Output should be completely silent on success
+        assert res.output.strip() == ""
+        assert Path("dist/index.html").exists()
+
+        # Test short option -q with --clean
+        res_short = runner.invoke(main, ["build", "-q", "--clean"])
+        assert res_short.exit_code == 0
+        assert res_short.output.strip() == ""
+        assert Path("dist/index.html").exists()
+
+
+def test_cli_serve_startup_output(tmp_path, monkeypatch):
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        runner.invoke(main, ["init"])
+
+        saved_server = []
+
+        class MockServer:
+            def __init__(self, **kwargs):
+                self.rebuild_func = kwargs.get("rebuild_func")
+                saved_server.append(self)
+
+            def run(self):
+                pass
+
+        monkeypatch.setattr("golem.server.LiveReloadServer", MockServer)
+
+        res = runner.invoke(main, ["serve"])
+        assert res.exit_code == 0
+        assert "Building static site before serving..." in res.output
+        assert "Compilation finished." in res.output
+        assert "Ready! Serving 'dist' at http://127.0.0.1:8000" in res.output
+        assert "Press Ctrl+C to stop." in res.output
+
+        # Verify rebuild_func reporting
+        assert saved_server and saved_server[0].rebuild_func is not None
+        # Call rebuild
+        saved_server[0].rebuild_func()
+
+
+def test_cli_version():
+    runner = CliRunner()
+    result = runner.invoke(main, ["--version"])
+    assert result.exit_code == 0
+    # Should contain "Golem static site generator v"
+    assert "Golem static site generator v" in result.output
+
+
 def test_cli_init_with_existing_pyproject_toml(tmp_path):
     runner = CliRunner()
     with runner.isolated_filesystem(temp_dir=tmp_path):
@@ -262,3 +328,66 @@ title = "Malformed
         assert res.exit_code != 0
         assert "Configuration Error" in res.output
         assert "Traceback (most recent call" not in res.output
+
+
+def test_cli_init_author_from_git_config(tmp_path, monkeypatch):
+    import subprocess
+
+    class DummyCompletedProcess:
+        stdout = "Ada Lovelace\n"
+
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: DummyCompletedProcess())
+
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        result = runner.invoke(main, ["init"])
+        assert result.exit_code == 0
+
+        golem_toml = Path("golem.toml").read_text(encoding="utf-8")
+        assert 'author = "Ada Lovelace"' in golem_toml
+
+        index_adoc = Path("content/index.adoc").read_text(encoding="utf-8")
+        assert "Ada Lovelace" in index_adoc
+
+
+def test_cli_init_author_fallback_when_git_fails(tmp_path, monkeypatch):
+    import subprocess
+
+    def mock_run_fail(*args, **kwargs):
+        raise OSError("git not found")
+
+    monkeypatch.setattr(subprocess, "run", mock_run_fail)
+
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        result = runner.invoke(main, ["init"])
+        assert result.exit_code == 0
+
+        golem_toml = Path("golem.toml").read_text(encoding="utf-8")
+        assert 'author = "Your Name"' in golem_toml
+
+        index_adoc = Path("content/index.adoc").read_text(encoding="utf-8")
+        assert "Your Name" in index_adoc
+
+
+def test_cli_init_pyproject_author_from_git_config(tmp_path, monkeypatch):
+    import subprocess
+
+    class DummyCompletedProcess:
+        stdout = "Grace Hopper\n"
+
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: DummyCompletedProcess())
+
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        pyproject = Path("pyproject.toml")
+        pyproject.write_text("[tool.poetry]\nname = 'my_lib'\n", encoding="utf-8")
+
+        result = runner.invoke(main, ["init"])
+        assert result.exit_code == 0
+
+        content = pyproject.read_text(encoding="utf-8")
+        assert 'author = "Grace Hopper"' in content
+
+        index_adoc = Path("docs/index.adoc").read_text(encoding="utf-8")
+        assert "Grace Hopper" in index_adoc

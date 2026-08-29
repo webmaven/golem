@@ -48,6 +48,7 @@ class GolemConfig:
     `site_author` (str):: Author or organization name for the site metadata. Defaults to `"Anonymous"`.
     `site_url` (str | None):: Canonical base URL where the site is hosted. Defaults to `None`.
     `strict` (bool):: Whether strict build mode is enabled to fail on warnings. Defaults to `False`.
+    `quiet` (bool):: Whether quiet mode is enabled to suppress progress output. Defaults to `False`.
     `navigation_nav` (list[str] | None):: Ordered list of content page paths for site navigation. Defaults to `None`.
     `content_dir` (str):: Directory path containing source content files. Defaults to `"content"`.
     `output_dir` (str):: Directory path where compiled static output is generated. Defaults to `"dist"`.
@@ -66,6 +67,7 @@ class GolemConfig:
     site_author: str = "Anonymous"
     site_url: str | None = None
     strict: bool = False
+    quiet: bool = False
     navigation_nav: list[str] | None = None
     content_dir: str = "content"
     output_dir: str = "dist"
@@ -185,6 +187,68 @@ def _parse_api_packages(raw_packages: Any) -> list[str]:
     return []
 
 
+def _resolve_plugins_raw(section: dict[str, Any]) -> Any:
+    """Resolve the raw plugins value from either list or sub-dict form.
+
+    [parameters]
+    `section` (dict[str, Any]):: Golem configuration section or document dictionary.
+
+    [returns]
+    `Any`:: Raw plugins structure (list, dictionary, string, or None).
+    """
+    plugins_data = section.get("plugins")
+    if isinstance(plugins_data, dict):
+        return plugins_data.get("plugins") or plugins_data.get("enabled")
+    return plugins_data
+
+
+def _extract_config_values(section: dict[str, Any], root: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a golem config section into a flat dict for GolemConfig construction.
+
+    `section` is the golem-specific table (`data["tool"]["golem"]` or `data` for `golem.toml`).
+    `root` is the full TOML document (used for root-level key fallbacks in `golem.toml`).
+
+    [parameters]
+    `section` (dict[str, Any]):: Golem-specific configuration dictionary table.
+    `root` (dict[str, Any]):: Full raw TOML document dictionary for root fallback resolution.
+
+    [returns]
+    `dict[str, Any]`:: Flat dictionary containing normalized configuration parameters.
+    """
+    site = section.get("site", {}) if isinstance(section.get("site"), dict) else {}
+    build = section.get("build", {}) if isinstance(section.get("build"), dict) else {}
+    nav = section.get("navigation", {}) if isinstance(section.get("navigation"), dict) else {}
+    api = section.get("api", {}) if isinstance(section.get("api"), dict) else {}
+
+    return {
+        "site_title": (
+            site.get("title") or site.get("name") or section.get("title") or section.get("site_title") or "Golem Docs"
+        ),
+        "site_author": (site.get("author") or section.get("author") or section.get("site_author") or "Anonymous"),
+        "site_url": (site.get("url") or site.get("site_url") or section.get("url") or section.get("site_url") or None),
+        "strict": bool(build.get("strict", section.get("strict", False))),
+        "quiet": bool(build.get("quiet", section.get("quiet", False))),
+        "content_dir": build.get("content_dir") or section.get("content_dir") or "content",
+        "output_dir": build.get("output_dir") or section.get("output_dir") or "dist",
+        "theme": build.get("theme") or section.get("theme") or "default",
+        "templates_dir": build.get("templates_dir") or section.get("templates_dir") or "templates",
+        "static_dir": build.get("static_dir") or section.get("static_dir") or "static",
+        "plugins_dir": build.get("plugins_dir") or section.get("plugins_dir") or "plugins",
+        "plugins": _parse_plugins(_resolve_plugins_raw(section)) or [],
+        "navigation_nav": _parse_nav(nav.get("nav") or section.get("nav")),
+        "api_packages": _parse_api_packages(
+            api.get("packages")
+            or api.get("api_packages")
+            or section.get("api_packages")
+            or (section.get("api") if isinstance(section.get("api"), (list, str)) else None)
+        ),
+        "api_output_dir": (api.get("output_dir") or api.get("api_output_dir") or section.get("api_output_dir") or "api"),
+        "api_docstring_style": (
+            api.get("docstring_style") or api.get("api_docstring_style") or section.get("api_docstring_style") or "auto"
+        ),
+    }
+
+
 def load_config(config_path: Path) -> GolemConfig:
     """Load, parse, and validate Golem site configuration from a TOML file.
 
@@ -211,110 +275,15 @@ def load_config(config_path: Path) -> GolemConfig:
 
     # Check if this is a pyproject.toml file
     if config_path.name == "pyproject.toml" or ("tool" in data and "golem" in data.get("tool", {})):
-        golem_data = data.get("tool", {}).get("golem", {})
-        site_data = golem_data.get("site", {})
-        build_data = golem_data.get("build", {})
-        nav_data = golem_data.get("navigation", {})
-
-        site_title = (
-            site_data.get("title")
-            or site_data.get("name")
-            or golem_data.get("title")
-            or golem_data.get("site_title")
-            or "Golem Docs"
-        )
-        site_author = site_data.get("author") or golem_data.get("author") or golem_data.get("site_author") or "Anonymous"
-        site_url = (
-            site_data.get("url") or golem_data.get("url") or golem_data.get("site_url") or site_data.get("site_url") or None
-        )
-        strict = bool(build_data.get("strict") if "strict" in build_data else golem_data.get("strict", False))
-        content_dir = build_data.get("content_dir") or golem_data.get("content_dir") or "content"
-        output_dir = build_data.get("output_dir") or golem_data.get("output_dir") or "dist"
-        theme = build_data.get("theme") or golem_data.get("theme") or "default"
-
-        templates_dir = build_data.get("templates_dir") or golem_data.get("templates_dir") or "templates"
-        static_dir = build_data.get("static_dir") or golem_data.get("static_dir") or "static"
-        plugins_dir = build_data.get("plugins_dir") or golem_data.get("plugins_dir") or "plugins"
-        plugins_data = golem_data.get("plugins")
-        if isinstance(plugins_data, dict):
-            raw_plugins = plugins_data.get("plugins") if "plugins" in plugins_data else plugins_data.get("enabled")
-        else:
-            raw_plugins = plugins_data
-        parsed_plugins = _parse_plugins(raw_plugins)
-        plugins = parsed_plugins if parsed_plugins is not None else []
-        raw_nav = nav_data.get("nav") if "nav" in nav_data else (golem_data.get("navigation_nav") or golem_data.get("nav"))
-        navigation_nav = _parse_nav(raw_nav)
-
-        api_data = golem_data.get("api", {}) if isinstance(golem_data.get("api"), dict) else {}
-        raw_api_packages = (
-            api_data.get("packages")
-            if "packages" in api_data
-            else (
-                api_data.get("api_packages")
-                if "api_packages" in api_data
-                else (
-                    golem_data.get("api_packages")
-                    or (golem_data.get("api") if isinstance(golem_data.get("api"), (list, str)) else None)
-                )
-            )
-        )
-        api_packages = _parse_api_packages(raw_api_packages)
-        api_output_dir = (
-            api_data.get("output_dir") or api_data.get("api_output_dir") or golem_data.get("api_output_dir") or "api"
-        )
-        api_docstring_style = (
-            api_data.get("docstring_style")
-            or api_data.get("api_docstring_style")
-            or golem_data.get("api_docstring_style")
-            or "auto"
-        )
+        section = data.get("tool", {}).get("golem", {})
     else:
-        site_data = data.get("site", {})
-        build_data = data.get("build", {})
-        nav_data = data.get("navigation", {})
+        section = data
 
-        site_title = site_data.get("title") or site_data.get("name") or "Golem Docs"
-        site_author = site_data.get("author", "Anonymous")
-        site_url = site_data.get("url") or data.get("site_url") or site_data.get("site_url") or data.get("url") or None
-        strict = bool(build_data.get("strict") if "strict" in build_data else data.get("strict", False))
-        content_dir = build_data.get("content_dir", "content")
-        output_dir = build_data.get("output_dir", "dist")
-        theme = build_data.get("theme", "default")
-
-        templates_dir = build_data.get("templates_dir", "templates")
-        static_dir = build_data.get("static_dir") or data.get("static_dir") or "static"
-        plugins_dir = build_data.get("plugins_dir", "plugins")
-        plugins_data = data.get("plugins")
-        if isinstance(plugins_data, dict):
-            raw_plugins = plugins_data.get("plugins") if "plugins" in plugins_data else plugins_data.get("enabled")
-        else:
-            raw_plugins = plugins_data
-        parsed_plugins = _parse_plugins(raw_plugins)
-        plugins = parsed_plugins if parsed_plugins is not None else []
-        raw_nav = (
-            nav_data.get("nav")
-            if "nav" in nav_data
-            else (data.get("navigation_nav") if "navigation_nav" in data else data.get("nav"))
-        )
-        navigation_nav = _parse_nav(raw_nav)
-
-        api_data = data.get("api", {}) if isinstance(data.get("api"), dict) else {}
-        raw_api_packages = (
-            api_data.get("packages")
-            if "packages" in api_data
-            else (
-                api_data.get("api_packages")
-                if "api_packages" in api_data
-                else (data.get("api_packages") or (data.get("api") if isinstance(data.get("api"), (list, str)) else None))
-            )
-        )
-        api_packages = _parse_api_packages(raw_api_packages)
-        api_output_dir = api_data.get("output_dir") or api_data.get("api_output_dir") or data.get("api_output_dir") or "api"
-        api_docstring_style = (
-            api_data.get("docstring_style") or api_data.get("api_docstring_style") or data.get("api_docstring_style") or "auto"
-        )
+    values = _extract_config_values(section, data)
 
     # Ensure resolved content_dir and output_dir do not overlap (identical or nested)
+    content_dir = values["content_dir"]
+    output_dir = values["output_dir"]
     try:
         content_abs = Path(content_dir).resolve()
         output_abs = Path(output_dir).resolve()
@@ -338,20 +307,6 @@ def load_config(config_path: Path) -> GolemConfig:
         )
 
     return GolemConfig(
-        site_title=site_title,
-        site_author=site_author,
-        site_url=site_url,
-        strict=strict,
-        navigation_nav=navigation_nav,
-        content_dir=content_dir,
-        output_dir=output_dir,
-        theme=theme,
-        templates_dir=templates_dir,
-        static_dir=static_dir,
-        plugins_dir=plugins_dir,
-        plugins=plugins,
-        api_packages=api_packages,
-        api_output_dir=api_output_dir,
-        api_docstring_style=api_docstring_style,
+        **values,
         config_path=str(config_path.resolve()),
     )

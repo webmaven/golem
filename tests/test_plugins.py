@@ -17,6 +17,8 @@ def test_plugin_hook_trigger():
 
 
 def test_local_plugin_discovery(tmp_path):
+    from golem.config import GolemConfig
+
     # Create a dynamic plugin file in the temporary directory
     plugin_content = """
 from golem.plugins import hookimpl
@@ -28,8 +30,9 @@ def on_pre_parse(raw_content: str) -> str:
     plugin_file = tmp_path / "my_test_plugin.py"
     plugin_file.write_text(plugin_content, encoding="utf-8")
 
-    # Load plugin manager passing the temporary path
-    pm = get_plugin_manager(plugins_dir=tmp_path)
+    # Load plugin manager passing the temporary path and config
+    config = GolemConfig(plugins=["my_test_plugin"])
+    pm = get_plugin_manager(config=config, plugins_dir=tmp_path)
 
     # Verify hook can be triggered and the dynamic plugin worked
     res = pm.hook.on_pre_parse(raw_content="hello")
@@ -37,6 +40,8 @@ def on_pre_parse(raw_content: str) -> str:
 
 
 def test_local_plugin_error_isolation(tmp_path):
+    from golem.config import GolemConfig
+
     # Create a broken plugin file (has runtime syntax/execution error)
     plugin_content = """
 raise ValueError("Plugin failed intentionally during import!")
@@ -45,7 +50,8 @@ raise ValueError("Plugin failed intentionally during import!")
     plugin_file.write_text(plugin_content, encoding="utf-8")
 
     # Loading plugins should not raise an exception, just skip broken ones
-    pm = get_plugin_manager(plugins_dir=tmp_path)
+    config = GolemConfig(plugins=["broken_plugin"])
+    pm = get_plugin_manager(config=config, plugins_dir=tmp_path)
     assert pm is not None
 
 
@@ -74,8 +80,12 @@ def on_post_render(html_content: str) -> str:
 """
     (plugins_dir / "test_hook.py").write_text(plugin_code, encoding="utf-8")
 
-    # Configure Golem to load from this plugins directory
-    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    # Configure Golem to load from this plugins directory and enable the plugin
+    config = GolemConfig(
+        content_dir=str(content),
+        output_dir=str(tmp_path / "dist"),
+        plugins=["test_hook"],
+    )
     setattr(config, "plugins_dir", str(plugins_dir))
 
     engine = BuildEngine(config)
@@ -175,6 +185,13 @@ def golem_add_subcommands(cli: click.Group) -> None:
 """,
             encoding="utf-8",
         )
+        Path("golem.toml").write_text(
+            """\
+[plugins]
+plugins = ["custom_cli_plugin"]
+""",
+            encoding="utf-8",
+        )
 
         help_result = runner.invoke(main, ["--help"])
         assert help_result.exit_code == 0
@@ -230,3 +247,94 @@ plugins = ["custom_cli_pkg.plugin"]
         cmd_result = runner.invoke(main, ["package-cmd"])
         assert cmd_result.exit_code == 0
         assert "Executed package subcommand!" in cmd_result.output
+
+
+def test_unconfigured_local_plugin_is_not_registered(tmp_path):
+    from golem.config import GolemConfig
+
+    plugin_content = """\
+from golem.plugins import hookimpl
+
+@hookimpl
+def on_pre_parse(raw_content: str) -> str:
+    return f"Dynamic: {raw_content}"
+"""
+    plugin_file = tmp_path / "unconfigured_plugin.py"
+    plugin_file.write_text(plugin_content, encoding="utf-8")
+
+    # Without config or with empty config.plugins, the plugin should NOT be registered
+    pm1 = get_plugin_manager(plugins_dir=tmp_path)
+    res1 = pm1.hook.on_pre_parse(raw_content="hello")
+    assert res1 == []
+
+    config = GolemConfig(plugins=[])
+    pm2 = get_plugin_manager(config=config, plugins_dir=tmp_path)
+    res2 = pm2.hook.on_pre_parse(raw_content="hello")
+    assert res2 == []
+
+
+def test_local_plugin_lookup_keys(tmp_path):
+    from golem.config import GolemConfig
+
+    plugin_content = """\
+from golem.plugins import hookimpl
+
+@hookimpl
+def on_pre_parse(raw_content: str) -> str:
+    return f"Processed: {raw_content}"
+"""
+    plugin_file = tmp_path / "custom_tool.py"
+    plugin_file.write_text(plugin_content, encoding="utf-8")
+
+    # Test all 4 lookup key formats
+    keys_to_test = [
+        "custom_tool",
+        "custom_tool.py",
+        f"{tmp_path.name}.custom_tool",
+        f"{tmp_path.as_posix()}/custom_tool.py",
+    ]
+
+    for key in keys_to_test:
+        config = GolemConfig(plugins=[key])
+        pm = get_plugin_manager(config=config, plugins_dir=tmp_path)
+        res = pm.hook.on_pre_parse(raw_content="test")
+        assert "Processed: test" in res, f"Failed for key: {key}"
+
+
+def test_plugin_registration_order_follows_config(tmp_path):
+    from golem.config import GolemConfig
+
+    # Create two plugins that modify raw content
+    (tmp_path / "plugin_a.py").write_text(
+        """\
+from golem.plugins import hookimpl
+
+@hookimpl
+def on_pre_parse(raw_content: str) -> str:
+    return raw_content + " -> [A]"
+""",
+        encoding="utf-8",
+    )
+
+    (tmp_path / "plugin_b.py").write_text(
+        """\
+from golem.plugins import hookimpl
+
+@hookimpl
+def on_pre_parse(raw_content: str) -> str:
+    return raw_content + " -> [B]"
+""",
+        encoding="utf-8",
+    )
+
+    # config.plugins in order A, then B -> Pluggy registers A then B (so B hook runs first, A second)
+    config_ab = GolemConfig(plugins=["plugin_a", "plugin_b"])
+    pm_ab = get_plugin_manager(config=config_ab, plugins_dir=tmp_path)
+    res_ab = pm_ab.hook.on_pre_parse(raw_content="start")
+    assert res_ab == ["start -> [B]", "start -> [A]"]
+
+    # config.plugins in order B, then A -> Pluggy registers B then A (so A hook runs first, B second)
+    config_ba = GolemConfig(plugins=["plugin_b", "plugin_a"])
+    pm_ba = get_plugin_manager(config=config_ba, plugins_dir=tmp_path)
+    res_ba = pm_ba.hook.on_pre_parse(raw_content="start")
+    assert res_ba == ["start -> [A]", "start -> [B]"]

@@ -1278,3 +1278,114 @@ def test_engine_get_template_files_skipping(tmp_path):
     assert "preview.html" not in found_names
     assert "style.pt" not in found_names
     assert "readme.txt" not in found_names
+
+
+def test_build_site_caches_discover_navigation_single_call(tmp_path):
+    """Verify discover_navigation is called exactly once during build_site with multiple pages."""
+    from unittest.mock import patch
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Home\n\nWelcome home.", encoding="utf-8")
+    (content_dir / "page1.adoc").write_text("= Page 1\n\nPage 1 body.", encoding="utf-8")
+    (content_dir / "page2.adoc").write_text("= Page 2\n\nPage 2 body.", encoding="utf-8")
+    (content_dir / "page3.adoc").write_text("= Page 3\n\nPage 3 body.", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(tmp_path / "dist"),
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    original_discover = engine.discover_navigation
+    call_count = 0
+
+    def spied_discover():
+        nonlocal call_count
+        call_count += 1
+        return original_discover()
+
+    with patch.object(engine, "discover_navigation", side_effect=spied_discover):
+        engine.build_site()
+
+    # With 4 pages, undiscovered navigation would call discover_navigation at least 3*4=12 times.
+    # With build cycle caching, it must be called exactly once.
+    assert call_count == 1
+
+
+def test_nav_methods_accept_and_use_explicit_nav_tree(tmp_path):
+    """Verify generate_nav_html, get_ordered_nav_pages, and get_page_pagination use supplied nav_tree."""
+    from unittest.mock import patch
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    custom_tree = [
+        {"title": "Custom Home", "path": "index.adoc", "url": "index.html", "children": []},
+        {"title": "Custom Page", "path": "page.adoc", "url": "page.html", "children": []},
+    ]
+
+    with patch.object(engine, "discover_navigation", side_effect=AssertionError("discover_navigation should not be called")):
+        # 1. generate_nav_html
+        html = engine.generate_nav_html(current_rel_path=Path("page.adoc"), nav_tree=custom_tree)
+        assert "Custom Home" in html
+        assert "Custom Page" in html
+        assert 'class="golem-nav-item active"' in html
+
+        # 2. get_ordered_nav_pages
+        ordered = engine.get_ordered_nav_pages(nav_tree=custom_tree)
+        assert len(ordered) == 2
+        assert ordered[0]["title"] == "Custom Home"
+        assert ordered[1]["title"] == "Custom Page"
+
+        # 3. get_page_pagination
+        prev_p, next_p = engine.get_page_pagination(current_rel_path=Path("page.adoc"), nav_tree=custom_tree)
+        assert prev_p is not None
+        assert prev_p["title"] == "Custom Home"
+        assert next_p is None
+
+
+def test_get_cached_nav_tree_resets_per_build(tmp_path):
+    """Verify _get_cached_nav_tree populates cache and build_site resets it."""
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Home\n\nContent.", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    tree1 = engine._get_cached_nav_tree()
+    assert tree1 is not None
+    assert engine._nav_tree_cache is tree1
+
+    # Adding a new file without build_site won't change cached tree
+    (content_dir / "about.adoc").write_text("= About\n\nAbout us.", encoding="utf-8")
+    assert len(engine._get_cached_nav_tree()) == 1
+
+    # build_site resets cache and refreshes
+    engine.build_site()
+    assert len(engine._get_cached_nav_tree()) == 2
+
+
+def test_build_site_passes_cached_nav_tree_to_compiler(tmp_path):
+    """Verify compile_page receives the exact cached nav_tree instance."""
+    from unittest.mock import patch
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Home\n\nWelcome.", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(tmp_path / "dist"),
+    )
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    with patch.object(engine.compiler, "compile_page", wraps=engine.compiler.compile_page) as mock_compile:
+        engine.build_site()
+        assert mock_compile.called
+        call_kwargs = mock_compile.call_args.kwargs
+        assert "nav_tree" in call_kwargs
+        assert call_kwargs["nav_tree"] is engine._nav_tree_cache

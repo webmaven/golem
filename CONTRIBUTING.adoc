@@ -1,0 +1,51 @@
+= Contributing to Golem
+:toc: macro
+:idprefix:
+:idseparator: -
+
+toc::[]
+
+== Development Setup
+
+[source,bash]
+----
+git clone https://github.com/webmaven/golem.git
+cd golem
+python3 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+pre-commit install
+----
+
+== Running Tests
+
+[source,bash]
+----
+# Full suite
+pytest
+
+# With coverage report
+pytest --cov=src/golem --cov-report=term-missing
+
+# Single module
+pytest tests/test_engine.py -v
+----
+
+== Linting & Type Checking
+
+[source,bash]
+----
+ruff check src/
+ruff format --check src/
+mypy src/golem/
+----
+
+Pre-commit hooks run ruff and mypy automatically on every commit.
+
+== Pull Request Guidelines
+
+* Branch from `main`.
+* Include tests for any new behavior or bug fix.
+* Run `pytest` and `ruff check` locally before pushing.
+* Reference the relevant issue in the PR description.
+* All CI checks (tests, ruff, mypy) must pass before merge.

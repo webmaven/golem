@@ -18,7 +18,7 @@ Template & Configuration Invalidation:: Modifications to global configuration (`
 master layout templates (`skeleton.pt`, `page.pt`, `layout.pt`) trigger full-site rebuilds.
 Modifications to granular component templates only invalidate documents containing matching ASG node types.
 Atomic Persistence & Locking:: Cache records are written atomically using a temporary file replacement
-strategy and cross-process advisory locks (`fcntl.flock`) on a dedicated lockfile to prevent corruption
+strategy and cross-process advisory locks (`filelock.FileLock`) on a dedicated lockfile to prevent corruption
 during concurrent builds.
 
 == Build Pipeline Lifecycle
@@ -307,6 +307,7 @@ class BuildEngine:
         self.compiler = PageCompiler(config)
         self.errors: list[dict[str, Any]] = []
         self.diagnostics: list[dict[str, Any]] = self.errors
+        self._nav_tree_cache: list[dict[str, Any]] | None = None
 
         # Load Pluggy Plugin Manager
         from golem.plugins import get_plugin_manager
@@ -418,38 +419,24 @@ class BuildEngine:
 
         self.cache_data = {"files": {}, "dependencies": {}, "metadata": {}}
         self._sha_cache = {}
+        self._nav_tree_cache = None
 
     @contextmanager
     def _cache_lock(self):
         """Acquire an advisory cross-process lock on the cache lockfile.
 
-        Obtains an exclusive lock (`fcntl.flock`) on `<cache_file_dir>/cache.lock`
-        to coordinate concurrent cache access across processes.
+        Uses `filelock.FileLock` for cross-platform compatibility (POSIX and Windows).
+        Creates the lock file under `<cache_file_dir>/cache.lock`.
 
         [yields]
         `None`:: Yields control while holding the exclusive lock.
         """
-        import fcntl
+        from filelock import FileLock
 
-        lock_path = self.cache_file.parent / "cache.lock"
         self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-
-        lock_fd = None
-        try:
-            lock_fd = open(lock_path, "w")
-            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
-        except ImportError, AttributeError, OSError:
-            pass
-
-        try:
+        lock_path = self.cache_file.parent / "cache.lock"
+        with FileLock(str(lock_path)):
             yield
-        finally:
-            if lock_fd:
-                try:
-                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
-                    lock_fd.close()
-                except Exception:
-                    pass
 
     def is_partial(self, path: Path) -> bool:
         """Check whether a file or directory is designated as a partial content unit.
@@ -841,6 +828,19 @@ class BuildEngine:
         p = Path(rel_path)
         return _clean_index_url(p.with_suffix(".html").as_posix())
 
+    def _get_cached_nav_tree(self) -> list[dict[str, Any]]:
+        """Return nav tree, computing once per build cycle.
+
+        The cache is set to `None` at the start of `build_site()` and populated
+        on the first call, preventing redundant filesystem scans per compiled page.
+
+        [returns]
+        `list[dict[str, Any]]`:: Hierarchical list of navigation item dictionaries.
+        """
+        if not hasattr(self, "_nav_tree_cache") or self._nav_tree_cache is None:
+            self._nav_tree_cache = self.discover_navigation()
+        return self._nav_tree_cache
+
     def discover_navigation(self) -> list[dict[str, Any]]:
         """Discover and assemble the hierarchical site navigation tree from content files.
 
@@ -1019,7 +1019,11 @@ class BuildEngine:
 
         return build_tree(self.content_dir)
 
-    def generate_nav_html(self, current_rel_path: Path | None = None) -> str:
+    def generate_nav_html(
+        self,
+        current_rel_path: Path | None = None,
+        nav_tree: list[dict[str, Any]] | None = None,
+    ) -> str:
         """Render the hierarchical site navigation tree into semantic HTML with contextual active states.
 
         Converts the navigation tree from `discover_navigation()` into nested `<ul class="golem-nav-list">`
@@ -1029,6 +1033,7 @@ class BuildEngine:
 
         [parameters]
         `current_rel_path` (Path | None, optional):: Path of the currently compiling document relative to `content_dir`, used to compute relative URL depth and highlight active items. Defaults to `None`.
+        `nav_tree` (list[dict[str, Any]] | None, optional):: Pre-computed navigation tree. If `None`, calls `discover_navigation()`. Defaults to `None`.
 
         [returns]
         `str`:: Rendered semantic HTML string for the navigation menu, or empty string `""` if navigation is empty.
@@ -1047,8 +1052,8 @@ class BuildEngine:
         assert '<nav class="golem-nav">' in nav_html
         ----
         """
-        nav_tree = self.discover_navigation()
-        if not nav_tree:
+        resolved_tree = nav_tree if nav_tree is not None else self.discover_navigation()
+        if not resolved_tree:
             return ""
 
         prefix = ""
@@ -1099,16 +1104,22 @@ class BuildEngine:
             return out
 
         res = ['<nav class="golem-nav">\n']
-        res.extend(render_list(nav_tree, is_nested=False))
+        res.extend(render_list(resolved_tree, is_nested=False))
         res.append("</nav>")
         return "".join(res)
 
-    def get_ordered_nav_pages(self) -> list[dict[str, Any]]:
+    def get_ordered_nav_pages(
+        self,
+        nav_tree: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
         """Flatten the hierarchical site navigation tree into a linear sequence of pages.
 
         Performs a depth-first traversal of `discover_navigation()` to produce an ordered
         linear sequence of navigable document entries. Used by `get_page_pagination()` to
         calculate previous and next sequential reading links.
+
+        [parameters]
+        `nav_tree` (list[dict[str, Any]] | None, optional):: Pre-computed navigation tree. If `None`, calls `discover_navigation()`. Defaults to `None`.
 
         [returns]
         `list[dict[str, Any]]`:: Linear list of page dictionaries containing `"title"`, `"url"`, and `"path"`.
@@ -1125,7 +1136,7 @@ class BuildEngine:
         pages = engine.get_ordered_nav_pages()
         ----
         """
-        nav_tree = self.discover_navigation()
+        resolved_tree = nav_tree if nav_tree is not None else self.discover_navigation()
         pages: list[dict[str, Any]] = []
 
         def _flatten(items: list[dict[str, Any]]) -> None:
@@ -1140,10 +1151,14 @@ class BuildEngine:
                 if children:
                     _flatten(children)
 
-        _flatten(nav_tree)
+        _flatten(resolved_tree)
         return pages
 
-    def get_page_pagination(self, current_rel_path: Path | None = None) -> tuple[dict[str, str] | None, dict[str, str] | None]:
+    def get_page_pagination(
+        self,
+        current_rel_path: Path | None = None,
+        nav_tree: list[dict[str, Any]] | None = None,
+    ) -> tuple[dict[str, str] | None, dict[str, str] | None]:
         """Calculate previous and next sequential pagination links for a given document.
 
         Locates `current_rel_path` within the linear sequence produced by `get_ordered_nav_pages()`
@@ -1152,6 +1167,7 @@ class BuildEngine:
 
         [parameters]
         `current_rel_path` (Path | None, optional):: Relative path of the active document within `content_dir`. Defaults to `None`.
+        `nav_tree` (list[dict[str, Any]] | None, optional):: Pre-computed navigation tree. If `None`, calls `get_ordered_nav_pages()` which discovers navigation. Defaults to `None`.
 
         [returns]
         `tuple[dict[str, str] | None, dict[str, str] | None]`:: A 2-tuple `(prev_page, next_page)`. Each element is either a dictionary containing `"title"`, `"url"`, and `"path"`, or `None` if at the start/end of the sequence.
@@ -1172,7 +1188,7 @@ class BuildEngine:
         if current_rel_path is None:
             return None, None
 
-        pages = self.get_ordered_nav_pages()
+        pages = self.get_ordered_nav_pages(nav_tree=nav_tree)
         if not pages:
             return None, None
 
@@ -1420,6 +1436,7 @@ class BuildEngine:
 
         self.errors = []
         self.diagnostics = self.errors
+        self._nav_tree_cache = None
         compiled_files = []
 
         # Automated API doc generation when api_packages is configured
@@ -1461,23 +1478,86 @@ class BuildEngine:
                     content = f.read()
 
                 # Trigger pre-parse hooks sequentially (chain modifications)
+                _pre_parse_modifiers: list[str] = []
                 for impl in self.pm.hook.on_pre_parse.get_hookimpls():
-                    content = impl.function(raw_content=content)  # type: ignore[assignment]
+                    try:
+                        result = impl.function(raw_content=content)
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_pre_parse for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+                        continue
+                    if result is not None and result != content:
+                        _pre_parse_modifiers.append(impl.plugin_name or str(impl.function))
+                        content = result  # type: ignore[assignment]
+                if len(_pre_parse_modifiers) > 1:
+                    logging.warning(
+                        "[Plugin] Multiple plugins modified raw_content in on_pre_parse for %s: %s. "
+                        "The final result depends on their order in config.plugins. "
+                        "Consider whether your transforms are additive.",
+                        doc_path.name,
+                        _pre_parse_modifiers,
+                    )
 
                 # 1. Parse using asciidoctrine
                 ast = asciidoctrine.parse_to_ast(content, base_dir=str(doc_path.parent))
 
                 # Trigger AST hooks sequentially (chain modifications)
+                _ast_modifiers: list[str] = []
                 for impl in self.pm.hook.on_ast_created.get_hookimpls():
-                    ast = impl.function(ast=ast)  # type: ignore[assignment]
+                    try:
+                        result = impl.function(ast=ast)
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_ast_created for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+                        continue
+                    if result is not None and result is not ast:
+                        _ast_modifiers.append(impl.plugin_name or str(impl.function))
+                        ast = result  # type: ignore[assignment]
+                if len(_ast_modifiers) > 1:
+                    logging.warning(
+                        "[Plugin] Multiple plugins modified ast in on_ast_created for %s: %s. "
+                        "The final result depends on their order in config.plugins. "
+                        "Consider whether your transforms are additive.",
+                        doc_path.name,
+                        _ast_modifiers,
+                    )
 
                 # 2. Resolve AST to ASG
                 resolver = ASGResolver(ast)
                 asg = resolver.resolve(ast)
 
                 # Trigger ASG hooks sequentially (chain modifications)
+                _asg_modifiers: list[str] = []
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
-                    asg = impl.function(asg=asg)  # type: ignore[assignment]
+                    try:
+                        result = impl.function(asg=asg)
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_asg_created for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+                        continue
+                    if result is not None and result is not asg:
+                        _asg_modifiers.append(impl.plugin_name or str(impl.function))
+                        asg = result  # type: ignore[assignment]
+                if len(_asg_modifiers) > 1:
+                    logging.warning(
+                        "[Plugin] Multiple plugins modified asg in on_asg_created for %s: %s. "
+                        "The final result depends on their order in config.plugins. "
+                        "Consider whether your transforms are additive.",
+                        doc_path.name,
+                        _asg_modifiers,
+                    )
 
                 page_node_types = collect_node_types(asg)
 
@@ -1511,8 +1591,9 @@ class BuildEngine:
 
                 # Generate dynamic navigation HTML and chapter pagination for this page
                 rel_path = doc_path.relative_to(self.content_dir)
-                nav_html = self.generate_nav_html(current_rel_path=rel_path)
-                prev_page, next_page = self.get_page_pagination(current_rel_path=rel_path)
+                _nav_tree = self._get_cached_nav_tree()
+                nav_html = self.generate_nav_html(current_rel_path=rel_path, nav_tree=_nav_tree)
+                prev_page, next_page = self.get_page_pagination(current_rel_path=rel_path, nav_tree=_nav_tree)
 
                 doc_meta = self.get_file_metadata(doc_path)
                 page_class = doc_meta.get("page_class", "")
@@ -1553,7 +1634,7 @@ class BuildEngine:
                     body_content=body_content,
                     toc_html=toc_html,
                     nav_html=nav_html,
-                    nav_tree=self.discover_navigation(),
+                    nav_tree=_nav_tree,
                     current_path=str(rel_path),
                     prev_page=prev_page,
                     next_page=next_page,
@@ -1563,8 +1644,29 @@ class BuildEngine:
                 )
 
                 # Trigger post-render hooks sequentially (chain modifications)
+                _post_render_modifiers: list[str] = []
                 for impl in self.pm.hook.on_post_render.get_hookimpls():
-                    final_html = impl.function(html_content=final_html)  # type: ignore[assignment]
+                    try:
+                        result = impl.function(html_content=final_html)
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_post_render for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+                        continue
+                    if result is not None and result != final_html:
+                        _post_render_modifiers.append(impl.plugin_name or str(impl.function))
+                        final_html = result  # type: ignore[assignment]
+                if len(_post_render_modifiers) > 1:
+                    logging.warning(
+                        "[Plugin] Multiple plugins modified html_content in on_post_render for %s: %s. "
+                        "The final result depends on their order in config.plugins. "
+                        "Consider whether your transforms are additive.",
+                        doc_path.name,
+                        _post_render_modifiers,
+                    )
 
                 # 5. Resolve correct output file path
                 out_path = output_dir / rel_path.with_suffix(".html")
@@ -1579,17 +1681,18 @@ class BuildEngine:
                 compiled_files.append(out_path)
 
                 # Progress logging
-                try:
-                    rel_doc = doc_path.relative_to(Path.cwd())
-                except ValueError:
-                    rel_doc = doc_path.relative_to(self.content_dir) if self.content_dir in doc_path.parents else doc_path
-                try:
-                    rel_out = out_path.relative_to(Path.cwd())
-                except ValueError:
-                    rel_out = out_path.relative_to(output_dir) if output_dir in out_path.parents else out_path
-                import click
+                if not getattr(self.config, "quiet", False):
+                    try:
+                        rel_doc = doc_path.relative_to(Path.cwd())
+                    except ValueError:
+                        rel_doc = doc_path.relative_to(self.content_dir) if self.content_dir in doc_path.parents else doc_path
+                    try:
+                        rel_out = out_path.relative_to(Path.cwd())
+                    except ValueError:
+                        rel_out = out_path.relative_to(output_dir) if output_dir in out_path.parents else out_path
+                    import click
 
-                click.echo(f"  [COMPILE] {rel_doc} -> {rel_out}")
+                    click.echo(f"  [COMPILE] {rel_doc} -> {rel_out}")
             except Exception as e:
                 error_info = {
                     "file": str(doc_path),

@@ -209,9 +209,9 @@ def _extract_plain_text(node: Any) -> str:
     res = []
     if hasattr(node, "inlines") and node.inlines:
         res.append(_extract_plain_text(node.inlines))
-    if hasattr(node, "title") and node.title:
+    elif hasattr(node, "title") and node.title:
         res.append(_extract_plain_text(node.title))
-    if hasattr(node, "get_child_collections"):
+    elif hasattr(node, "get_child_collections"):
         for collection in node.get_child_collections().values():
             for child in collection:
                 res.append(_extract_plain_text(child))

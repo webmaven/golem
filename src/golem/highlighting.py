@@ -216,7 +216,7 @@ def make_highlighter(
             if lookup_lang != raw_lang:
                 try:
                     lexer = get_lexer_by_name(raw_lang, stripall=False)
-                except ClassNotFound, Exception:
+                except (ClassNotFound, Exception):
                     return None
             else:
                 return None
