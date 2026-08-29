@@ -18,7 +18,7 @@ Template & Configuration Invalidation:: Modifications to global configuration (`
 master layout templates (`skeleton.pt`, `page.pt`, `layout.pt`) trigger full-site rebuilds.
 Modifications to granular component templates only invalidate documents containing matching ASG node types.
 Atomic Persistence & Locking:: Cache records are written atomically using a temporary file replacement
-strategy and cross-process advisory locks (`fcntl.flock`) on a dedicated lockfile to prevent corruption
+strategy and cross-process advisory locks (`filelock.FileLock`) on a dedicated lockfile to prevent corruption
 during concurrent builds.
 
 == Build Pipeline Lifecycle
@@ -307,6 +307,7 @@ class BuildEngine:
         self.compiler = PageCompiler(config)
         self.errors: list[dict[str, Any]] = []
         self.diagnostics: list[dict[str, Any]] = self.errors
+        self._nav_tree_cache: list[dict[str, Any]] | None = None
 
         # Load Pluggy Plugin Manager
         from golem.plugins import get_plugin_manager
@@ -418,6 +419,7 @@ class BuildEngine:
 
         self.cache_data = {"files": {}, "dependencies": {}, "metadata": {}}
         self._sha_cache = {}
+        self._nav_tree_cache = None
 
     @contextmanager
     def _cache_lock(self):
@@ -826,6 +828,19 @@ class BuildEngine:
         p = Path(rel_path)
         return _clean_index_url(p.with_suffix(".html").as_posix())
 
+    def _get_cached_nav_tree(self) -> list[dict[str, Any]]:
+        """Return nav tree, computing once per build cycle.
+
+        The cache is set to `None` at the start of `build_site()` and populated
+        on the first call, preventing redundant filesystem scans per compiled page.
+
+        [returns]
+        `list[dict[str, Any]]`:: Hierarchical list of navigation item dictionaries.
+        """
+        if not hasattr(self, "_nav_tree_cache") or self._nav_tree_cache is None:
+            self._nav_tree_cache = self.discover_navigation()
+        return self._nav_tree_cache
+
     def discover_navigation(self) -> list[dict[str, Any]]:
         """Discover and assemble the hierarchical site navigation tree from content files.
 
@@ -1004,7 +1019,11 @@ class BuildEngine:
 
         return build_tree(self.content_dir)
 
-    def generate_nav_html(self, current_rel_path: Path | None = None) -> str:
+    def generate_nav_html(
+        self,
+        current_rel_path: Path | None = None,
+        nav_tree: list[dict[str, Any]] | None = None,
+    ) -> str:
         """Render the hierarchical site navigation tree into semantic HTML with contextual active states.
 
         Converts the navigation tree from `discover_navigation()` into nested `<ul class="golem-nav-list">`
@@ -1014,6 +1033,7 @@ class BuildEngine:
 
         [parameters]
         `current_rel_path` (Path | None, optional):: Path of the currently compiling document relative to `content_dir`, used to compute relative URL depth and highlight active items. Defaults to `None`.
+        `nav_tree` (list[dict[str, Any]] | None, optional):: Pre-computed navigation tree. If `None`, calls `discover_navigation()`. Defaults to `None`.
 
         [returns]
         `str`:: Rendered semantic HTML string for the navigation menu, or empty string `""` if navigation is empty.
@@ -1032,8 +1052,8 @@ class BuildEngine:
         assert '<nav class="golem-nav">' in nav_html
         ----
         """
-        nav_tree = self.discover_navigation()
-        if not nav_tree:
+        resolved_tree = nav_tree if nav_tree is not None else self.discover_navigation()
+        if not resolved_tree:
             return ""
 
         prefix = ""
@@ -1084,16 +1104,22 @@ class BuildEngine:
             return out
 
         res = ['<nav class="golem-nav">\n']
-        res.extend(render_list(nav_tree, is_nested=False))
+        res.extend(render_list(resolved_tree, is_nested=False))
         res.append("</nav>")
         return "".join(res)
 
-    def get_ordered_nav_pages(self) -> list[dict[str, Any]]:
+    def get_ordered_nav_pages(
+        self,
+        nav_tree: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
         """Flatten the hierarchical site navigation tree into a linear sequence of pages.
 
         Performs a depth-first traversal of `discover_navigation()` to produce an ordered
         linear sequence of navigable document entries. Used by `get_page_pagination()` to
         calculate previous and next sequential reading links.
+
+        [parameters]
+        `nav_tree` (list[dict[str, Any]] | None, optional):: Pre-computed navigation tree. If `None`, calls `discover_navigation()`. Defaults to `None`.
 
         [returns]
         `list[dict[str, Any]]`:: Linear list of page dictionaries containing `"title"`, `"url"`, and `"path"`.
@@ -1110,7 +1136,7 @@ class BuildEngine:
         pages = engine.get_ordered_nav_pages()
         ----
         """
-        nav_tree = self.discover_navigation()
+        resolved_tree = nav_tree if nav_tree is not None else self.discover_navigation()
         pages: list[dict[str, Any]] = []
 
         def _flatten(items: list[dict[str, Any]]) -> None:
@@ -1125,10 +1151,14 @@ class BuildEngine:
                 if children:
                     _flatten(children)
 
-        _flatten(nav_tree)
+        _flatten(resolved_tree)
         return pages
 
-    def get_page_pagination(self, current_rel_path: Path | None = None) -> tuple[dict[str, str] | None, dict[str, str] | None]:
+    def get_page_pagination(
+        self,
+        current_rel_path: Path | None = None,
+        nav_tree: list[dict[str, Any]] | None = None,
+    ) -> tuple[dict[str, str] | None, dict[str, str] | None]:
         """Calculate previous and next sequential pagination links for a given document.
 
         Locates `current_rel_path` within the linear sequence produced by `get_ordered_nav_pages()`
@@ -1137,6 +1167,7 @@ class BuildEngine:
 
         [parameters]
         `current_rel_path` (Path | None, optional):: Relative path of the active document within `content_dir`. Defaults to `None`.
+        `nav_tree` (list[dict[str, Any]] | None, optional):: Pre-computed navigation tree. If `None`, calls `get_ordered_nav_pages()` which discovers navigation. Defaults to `None`.
 
         [returns]
         `tuple[dict[str, str] | None, dict[str, str] | None]`:: A 2-tuple `(prev_page, next_page)`. Each element is either a dictionary containing `"title"`, `"url"`, and `"path"`, or `None` if at the start/end of the sequence.
@@ -1157,7 +1188,7 @@ class BuildEngine:
         if current_rel_path is None:
             return None, None
 
-        pages = self.get_ordered_nav_pages()
+        pages = self.get_ordered_nav_pages(nav_tree=nav_tree)
         if not pages:
             return None, None
 
@@ -1405,6 +1436,7 @@ class BuildEngine:
 
         self.errors = []
         self.diagnostics = self.errors
+        self._nav_tree_cache = None
         compiled_files = []
 
         # Automated API doc generation when api_packages is configured
@@ -1559,8 +1591,9 @@ class BuildEngine:
 
                 # Generate dynamic navigation HTML and chapter pagination for this page
                 rel_path = doc_path.relative_to(self.content_dir)
-                nav_html = self.generate_nav_html(current_rel_path=rel_path)
-                prev_page, next_page = self.get_page_pagination(current_rel_path=rel_path)
+                _nav_tree = self._get_cached_nav_tree()
+                nav_html = self.generate_nav_html(current_rel_path=rel_path, nav_tree=_nav_tree)
+                prev_page, next_page = self.get_page_pagination(current_rel_path=rel_path, nav_tree=_nav_tree)
 
                 doc_meta = self.get_file_metadata(doc_path)
                 page_class = doc_meta.get("page_class", "")
@@ -1601,7 +1634,7 @@ class BuildEngine:
                     body_content=body_content,
                     toc_html=toc_html,
                     nav_html=nav_html,
-                    nav_tree=self.discover_navigation(),
+                    nav_tree=_nav_tree,
                     current_path=str(rel_path),
                     prev_page=prev_page,
                     next_page=next_page,

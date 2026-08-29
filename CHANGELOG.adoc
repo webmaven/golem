@@ -19,6 +19,7 @@ toc::[]
 
 === Changed
 
+* *Build-Cycle Navigation Caching:* Cached `discover_navigation()` tree within `build_site()` cycle to prevent redundant recursive filesystem scans per compiled page, passing optional precomputed `nav_tree` to `generate_nav_html`, `get_ordered_nav_pages`, and `get_page_pagination`.
 * *Cross-platform file locking:* Implemented cross-platform cache file locking using `filelock` replacing `fcntl`.
 * *Upgraded Dependencies:*
 ** Bumped `asciidoctrine` requirement to `>=0.2.0a4` and `asciidoctype` to `>=0.1.0a4`.
