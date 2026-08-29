@@ -39,12 +39,12 @@ my-docs-project/
     └── logo.png
 ----
 
-During build, Golem outputs to a distribution directory (default: `_build/`) and manages state inside a hidden directory:
+During build, Golem outputs to a distribution directory (default: `dist/`) and manages state inside a hidden directory:
 
 [source,text]
 ----
 my-docs-project/
-├── _build/             # Compiled HTML/CSS/JS output
+├── dist/              # Compiled HTML/CSS/JS output
 └── .golem/             # Caching, hashes, and incremental compile state
     └── cache.json      # Maps file paths to SHA-256 hashes & inclusion edges
 ----
@@ -67,7 +67,7 @@ default_language = "en"
 
 [build]
 content_dir = "content"
-output_dir = "_build"
+output_dir = "dist"
 theme = "default"         # Built-in, or absolute/relative path to local theme
 clean = true              # Empty output directory before building
 toc_levels = 3            # TOC depth (1 to 6)
@@ -612,7 +612,7 @@ The `golem` command-line utility routes user actions using a standard Click-base
     *   Generates a structured `.adoc` file with pre-populated header attributes (`:golem-type:`, `:author:`, `:date:`), title, and introduction section.
     *   Example: `golem new post "Hello World"` creates `content/hello-world.adoc`.
 *   `golem build [--config=<path>] [--clean] [--strict] [-v/--verbose] [-q/--quiet] [-C <dir>]`
-    *   Runs the incremental compiler, building static pages into the configured output folder (`_build/` by default).
+    *   Runs the incremental compiler, building static pages into the configured output folder (`dist/` by default).
     *   Flags: `--clean` purges the output directory and cache; `--strict` treats warnings as fatal errors; `-v` enables debug logging; `-q` silences non-error output.
 *   `golem serve [--port=<port>] [--host=<host>] [--strict] [-C <dir>]`
     *   Invokes an initial build, launches the multi-threaded HTTP web server, activates SSE reload streaming, watches source directories, and injects real-time diagnostic error overlays if compilation errors occur.
