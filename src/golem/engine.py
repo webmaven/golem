@@ -1264,6 +1264,14 @@ class BuildEngine:
             theme_path = Path("themes") / self.config.theme
             paths.append(theme_path.resolve() if theme_path.exists() else theme_path)
 
+        # 3. Built-in package templates (e.g. src/golem/templates/<theme> and src/golem/templates/default)
+        pkg_theme = Path(__file__).parent / "templates" / getattr(self.config, "theme", "default")
+        if pkg_theme.exists() and pkg_theme.is_dir():
+            paths.append(pkg_theme.resolve())
+        pkg_default = Path(__file__).parent / "templates" / "default"
+        if pkg_default != pkg_theme and pkg_default.exists() and pkg_default.is_dir():
+            paths.append(pkg_default.resolve())
+
         return paths
 
     def _get_template_files(self) -> list[Path]:

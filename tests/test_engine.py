@@ -1420,3 +1420,27 @@ def test_sync_static_assets_copies_content_dir_media(tmp_path):
     assert (output_dir / "images" / "schema.svg").read_text(encoding="utf-8") == "<svg></svg>"
     assert (output_dir / "nested" / "assets" / "sample.pdf").exists()
     assert (output_dir / "nested" / "assets" / "sample.pdf").read_bytes() == b"%PDF-1.4"
+
+
+def test_package_template_modification_invalidates_cache(tmp_path):
+    """Verify modifying a built-in package template invalidates all pages."""
+    content_dir = tmp_path / "docs"
+    content_dir.mkdir()
+    doc_path = content_dir / "index.adoc"
+    doc_path.write_text("= Home\n\nPage text", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(tmp_path / "dist"),
+    )
+    cache_file = tmp_path / "cache.json"
+    engine = BuildEngine(config, cache_file=cache_file)
+    engine.build_site()
+
+    # When no files changed, outdated should be empty
+    assert len(engine.get_outdated_files()) == 0
+
+    # Simulate modifying a package template hash in cache
+    engine.cache_data["meta"]["theme_templates"]["skeleton.pt"] = "old_stale_hash"
+    outdated = engine.get_outdated_files(commit=False)
+    assert doc_path.resolve() in outdated

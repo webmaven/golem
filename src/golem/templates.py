@@ -264,7 +264,7 @@ class PageCompiler:
                     except Exception:
                         template = self.default_template
                 else:
-                    template = self.default_template
+                    template = self._load_builtin_template() or self.default_template
 
         return template(
             title=effective_title,
