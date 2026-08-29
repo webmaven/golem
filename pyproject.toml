@@ -24,6 +24,7 @@ dependencies = [
     "asciidoctype>=0.1.0a4",
     "chameleon",
     "click",
+    "filelock",
     "pluggy",
     "pygments>=2.18",
     "griffe>=1.5.0",

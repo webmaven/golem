@@ -423,33 +423,18 @@ class BuildEngine:
     def _cache_lock(self):
         """Acquire an advisory cross-process lock on the cache lockfile.
 
-        Obtains an exclusive lock (`fcntl.flock`) on `<cache_file_dir>/cache.lock`
-        to coordinate concurrent cache access across processes.
+        Uses `filelock.FileLock` for cross-platform compatibility (POSIX and Windows).
+        Creates the lock file under `<cache_file_dir>/cache.lock`.
 
         [yields]
         `None`:: Yields control while holding the exclusive lock.
         """
-        import fcntl
+        from filelock import FileLock
 
-        lock_path = self.cache_file.parent / "cache.lock"
         self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-
-        lock_fd = None
-        try:
-            lock_fd = open(lock_path, "w")
-            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX)
-        except (ImportError, AttributeError, OSError):
-            pass
-
-        try:
+        lock_path = self.cache_file.parent / "cache.lock"
+        with FileLock(str(lock_path)):
             yield
-        finally:
-            if lock_fd:
-                try:
-                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
-                    lock_fd.close()
-                except Exception:
-                    pass
 
     def is_partial(self, path: Path) -> bool:
         """Check whether a file or directory is designated as a partial content unit.
