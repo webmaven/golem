@@ -435,6 +435,7 @@ def test_extract_config_values_defaults():
         "site_author": "Anonymous",
         "site_url": None,
         "strict": False,
+        "quiet": False,
         "content_dir": "content",
         "output_dir": "dist",
         "theme": "default",
