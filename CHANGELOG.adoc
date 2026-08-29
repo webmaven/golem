@@ -10,7 +10,7 @@ and this project adheres to https://semver.org/spec/v2.0.0.html[Semantic Version
 
 toc::[]
 
-== [Unreleased]
+== Unreleased
 
 === Added
 
@@ -28,6 +28,8 @@ toc::[]
 * *Cross-platform file locking:* Implemented cross-platform cache file locking using `filelock` replacing `fcntl`.
 * *Configuration Normalization and Precedence Deduplication:* Deduplicated `load_config()` parsing into a centralized `_extract_config_values` normalizer helper, ensuring consistent canonical key precedence (section-scoped > root-level, canonical > alias) across `golem.toml` and `pyproject.toml`.
 * *Build-Cycle Navigation Caching:* Cached `discover_navigation()` tree within `build_site()` cycle to prevent redundant recursive filesystem scans per compiled page, passing optional precomputed `nav_tree` to `generate_nav_html`, `get_ordered_nav_pages`, and `get_page_pagination`.
+* *TOC Plain-Text Extraction & Heading Anchors:* Fixed duplicate inline text extraction in `_extract_plain_text()` that duplicated section titles and slug anchor IDs in generated Table of Contents navigation.
+* *Changelog Section Headings:* Updated release headings in `CHANGELOG.adoc` from Markdown bracketed syntax (`== [0.1.0a2]`) to standard AsciiDoc section headings (`== 0.1.0a2`), preventing parser interpretation as block attribute lists.
 * *CLI Version String:* Updated `--version` option to resolve package version dynamically via `importlib.metadata.version("golem-docs")` with fallback to `dev`, replacing hardcoded string.
 * *Project Scaffolding Author:* `golem init` now dynamically discovers the author name from `git config --global user.name` with a fallback to `Your Name`, replacing hardcoded author name.
 * *Repository Cleanliness:* Removed internal review artifact `docs_crit_eval.md` and added `*_crit_eval.md` pattern to `.gitignore` to prevent future tracking of review artifacts.
@@ -45,7 +47,7 @@ toc::[]
 * *Test Coverage:*
 ** Modernized test syntax and expanded coverage across `doctest`, `apidoc`, `highlighting`, and `engine` modules.
 
-== [0.1.0a2] - 2026-08-24
+== 0.1.0a2 - 2026-08-24
 
 === Added
 
@@ -69,7 +71,7 @@ toc::[]
 ** Truncation of large inline attribute constants (such as HTML templates).
 ** Heading level offset adjustment for docstrings opening with section headings.
 
-== [0.1.0a1] - 2026-08-18
+== 0.1.0a1 - 2026-08-18
 
 === Added
 

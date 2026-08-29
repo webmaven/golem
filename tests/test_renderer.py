@@ -352,3 +352,41 @@ x = 1
 
     html = render_body(asg, highlighter=custom_highlighter)
     assert '<pre class="custom-python">x = 1</pre>' in html
+
+
+def test_extract_plain_text_no_duplication():
+    from golem.renderer import _extract_plain_text
+
+    adoc_source = """= Document Title
+
+== Section Heading
+
+=== Sub Section
+"""
+    ast = asciidoctrine.parse_to_ast(adoc_source)
+    assert _extract_plain_text(ast.blocks[0].title) == "Section Heading"
+    assert _extract_plain_text(ast.blocks[0].blocks[0].title) == "Sub Section"
+
+
+def test_toc_html_no_duplicate_titles():
+    adoc_source = """= Changelog
+
+== Unreleased
+
+=== Added
+
+=== Fixed
+
+== 0.1.0a2 - 2026-08-24
+
+=== Added
+
+=== Fixed
+"""
+    ast = asciidoctrine.parse_to_ast(adoc_source)
+    toc_html = generate_toc_html(ast)
+    assert '<li class="toc-item level-1"><a href="#unreleased">Unreleased</a>' in toc_html
+    assert '<li class="toc-item level-2"><a href="#added">Added</a></li>' in toc_html
+    assert '<li class="toc-item level-1"><a href="#0-1-0a2-2026-08-24">0.1.0a2 - 2026-08-24</a>' in toc_html
+    assert "UnreleasedUnreleased" not in toc_html
+    assert "AddedAdded" not in toc_html
