@@ -1,4 +1,5 @@
 """Canary tests for Python 3 syntax invariants that static linters miss."""
+
 import ast
 import io
 import token
@@ -35,11 +36,7 @@ def find_except_comma_violations(source_code: str, filename: str = "<string>") -
     except tokenize.TokenError:
         return violations
 
-    tok_list = [
-        t
-        for t in tokens
-        if t.type not in (tokenize.COMMENT, tokenize.NL, tokenize.INDENT, tokenize.DEDENT)
-    ]
+    tok_list = [t for t in tokens if t.type not in (tokenize.COMMENT, tokenize.NL, tokenize.INDENT, tokenize.DEDENT)]
 
     i = 0
     while i < len(tok_list):
@@ -80,9 +77,7 @@ def test_no_python2_except_comma_syntax():
         file_violations = find_except_comma_violations(source, filename=str(src_file))
         violations.extend(file_violations)
 
-    assert not violations, (
-        "Python 2-style `except A, B:` forms detected:\n" + "\n".join(violations)
-    )
+    assert not violations, "Python 2-style `except A, B:` forms detected:\n" + "\n".join(violations)
 
 
 def test_except_comma_detector_valid_and_invalid_cases():

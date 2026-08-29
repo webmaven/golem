@@ -338,4 +338,3 @@ def on_pre_parse(raw_content: str) -> str:
     pm_ba = get_plugin_manager(config=config_ba, plugins_dir=tmp_path)
     res_ba = pm_ba.hook.on_pre_parse(raw_content="start")
     assert res_ba == ["start -> [A]", "start -> [B]"]
-

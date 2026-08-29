@@ -78,7 +78,7 @@ addopts = "--ignore=SPECIFICATION.adoc --ignore=docs"
 
 [tool.ruff]
 line-length = 127
-target-version = "py314"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "C90"]
