@@ -270,3 +270,66 @@ title = "Malformed
         assert res.exit_code != 0
         assert "Configuration Error" in res.output
         assert "Traceback (most recent call" not in res.output
+
+
+def test_cli_init_author_from_git_config(tmp_path, monkeypatch):
+    import subprocess
+
+    class DummyCompletedProcess:
+        stdout = "Ada Lovelace\n"
+
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: DummyCompletedProcess())
+
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        result = runner.invoke(main, ["init"])
+        assert result.exit_code == 0
+
+        golem_toml = Path("golem.toml").read_text(encoding="utf-8")
+        assert 'author = "Ada Lovelace"' in golem_toml
+
+        index_adoc = Path("content/index.adoc").read_text(encoding="utf-8")
+        assert "Ada Lovelace" in index_adoc
+
+
+def test_cli_init_author_fallback_when_git_fails(tmp_path, monkeypatch):
+    import subprocess
+
+    def mock_run_fail(*args, **kwargs):
+        raise OSError("git not found")
+
+    monkeypatch.setattr(subprocess, "run", mock_run_fail)
+
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        result = runner.invoke(main, ["init"])
+        assert result.exit_code == 0
+
+        golem_toml = Path("golem.toml").read_text(encoding="utf-8")
+        assert 'author = "Your Name"' in golem_toml
+
+        index_adoc = Path("content/index.adoc").read_text(encoding="utf-8")
+        assert "Your Name" in index_adoc
+
+
+def test_cli_init_pyproject_author_from_git_config(tmp_path, monkeypatch):
+    import subprocess
+
+    class DummyCompletedProcess:
+        stdout = "Grace Hopper\n"
+
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: DummyCompletedProcess())
+
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        pyproject = Path("pyproject.toml")
+        pyproject.write_text("[tool.poetry]\nname = 'my_lib'\n", encoding="utf-8")
+
+        result = runner.invoke(main, ["init"])
+        assert result.exit_code == 0
+
+        content = pyproject.read_text(encoding="utf-8")
+        assert 'author = "Grace Hopper"' in content
+
+        index_adoc = Path("docs/index.adoc").read_text(encoding="utf-8")
+        assert "Grace Hopper" in index_adoc

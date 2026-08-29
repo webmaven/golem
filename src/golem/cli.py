@@ -230,6 +230,23 @@ def main(version: bool = False, directory: str | None = None) -> None:
             click.echo(f"Golem static site generator v{_ver}")
 
 
+def _get_git_author() -> str:
+    """Read the git global user.name; return a placeholder on failure."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "config", "--global", "user.name"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        name = result.stdout.strip()
+        return name if name else "Your Name"
+    except Exception:
+        return "Your Name"
+
+
 @main.command()
 @click.option("--template", default="package", help="Project template type")
 @click.option("--output-dir", help="Override build output directory")
@@ -274,6 +291,7 @@ def init(template, output_dir, directory=None):
     ----
     """
     with change_working_dir(directory):
+        author = _get_git_author()
         click.echo(f"Initializing golem project using template '{template}'...")
 
         pyproject_toml = Path("pyproject.toml")
@@ -288,10 +306,10 @@ def init(template, output_dir, directory=None):
                 if content and not content.endswith("\n"):
                     content += "\n"
                 if is_site_layout:
-                    content += """
+                    content += f"""
 [tool.golem.site]
 title = "Golem Documentation"
-author = "Michael Bernstein"
+author = "{author}"
 
 [tool.golem.build]
 content_dir = "docs"
@@ -301,10 +319,10 @@ static_dir = "docs/static"
 templates_dir = "docs/templates"
 """
                 else:
-                    content += """
+                    content += f"""
 [tool.golem.site]
 title = "Golem Documentation"
-author = "Michael Bernstein"
+author = "{author}"
 
 [tool.golem.build]
 content_dir = "docs"
@@ -320,10 +338,10 @@ theme = "default"
             if not golem_toml.exists():
                 if is_site_layout:
                     golem_toml.write_text(
-                        """\
+                        f"""\
 [site]
 title = "Golem Documentation"
-author = "Michael Bernstein"
+author = "{author}"
 
 [build]
 content_dir = "content"
@@ -336,10 +354,10 @@ templates_dir = "templates"
                     )
                 else:
                     golem_toml.write_text(
-                        """\
+                        f"""\
 [site]
 title = "Golem Documentation"
-author = "Michael Bernstein"
+author = "{author}"
 
 [build]
 content_dir = "content"
@@ -441,9 +459,9 @@ body {
             index_adoc = content_dir / "index.adoc"
             if not index_adoc.exists():
                 index_adoc.write_text(
-                    """\
+                    f"""\
 = Welcome to Golem
-Michael Bernstein
+{author}
 
 This is the homepage of your newly initialized Golem static documentation portal.
 """,
