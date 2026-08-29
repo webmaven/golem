@@ -1,4 +1,4 @@
-= Technical Specification: Golem (`golem-docs`) Static Site Generator
+= Architecture Reference: Golem (`golem-docs`) Static Site Generator
 Michael Bernstein <zopemaven@gmail.com>
 v0.1.0
 :toc: left
@@ -9,7 +9,10 @@ v0.1.0
 :sectlinks:
 :source-highlighter: highlight.js
 
-This document serves as the official technical specification for Golem, a Python-native static site generator (SSG) built for highly technical, interactive documentation using *AsciiDoc* as its primary source format.
+This document is a contributor-facing architectural reference describing Golem's
+internal design and implementation as it currently exists.
+For user-facing documentation see `docs/`.
+For planned future work see the project's https://github.com/webmaven/golem/issues[GitHub issue tracker].
 
 ---
 
@@ -32,7 +35,7 @@ my-docs-project/
 │   └── custom-theme/
 │       ├── skeleton.pt # Chameleon TAL template
 │       └── theme.css   # Custom CSS property overrides
-└── static/             # Static assets (images, web WebGPU assets, custom JS)
+└── static/             # Static assets (images, WebGPU assets, custom JS)
     └── logo.png
 ----
 
@@ -48,9 +51,9 @@ my-docs-project/
 
 ---
 
-== 2. Project Configuration Spec (`golem.toml`)
+== 2. Project Configuration (`golem.toml`)
 
-Golem uses TOML for project configurations. Alternatively, for Python software projects, configuration can be embedded inside `pyproject.toml` under the `[tool.golem]` section.
+Golem uses TOML for project configuration. Alternatively, for Python software projects, configuration can be embedded inside `pyproject.toml` under the `[tool.golem]` section.
 
 === 2.1 Configuration Schema
 
@@ -68,6 +71,9 @@ output_dir = "_build"
 theme = "default"         # Built-in, or absolute/relative path to local theme
 clean = true              # Empty output directory before building
 toc_levels = 3            # TOC depth (1 to 6)
+plugins_dir = "plugins"   # Directory of local project-specific plugins
+quiet = false             # Suppress non-error output
+strict = false            # Treat warnings as fatal errors
 
 [navigation]
 mode = "auto"             # Modes: "auto", "manual", "hybrid"
@@ -89,10 +95,13 @@ enabled = [
 packages = [
     "golem"
 ]
+output_dir = "api"
+docstring_style = "google"  # "google", "numpy", or "plain"
 ----
 
 === 2.2 Configuration Resolution
 When Golem compiles, it merges configurations in this order of precedence (highest to lowest):
+
 1.  Command-line arguments (e.g. `--output-dir dist`).
 2.  `golem.toml` (or `[tool.golem]` in `pyproject.toml`).
 3.  Golem internal package defaults.
@@ -130,6 +139,7 @@ nav = [
 
 === 3.3 Tier 3: Filesystem Auto-Discovery (The Fallback)
 If no inclusion tree is defined in the root document and no manual `nav` array is present in the configuration, Golem falls back to traversing the `content/` directory recursively:
+
 1.  **Sorting Order:** Subfolders and files are sorted. If prefixes like `01-`, `02-` are found, Golem strips the prefix from the user-facing title but preserves the numerical sorting order (e.g., `01-getting-started` is displayed as "Getting Started" but sorted first).
 2.  **Homepages:** Any file named `index.adoc` or `README.adoc` inside a folder is designated as the parent homepage of that folder node.
 
@@ -150,7 +160,7 @@ flowchart TD
 
 === 4.1 Phase 1: Native Include Preprocessing & Lark Parsing
 *   **Action:** Executes `asciidoctrine.parse_to_ast(source, base_dir)`.
-*   **Include-Tree Tracking:** Since `asciidoctrine` natively includes nested files, we bypass manual file scanning. After Lark completes parsing, Golem extracts `ast.included_files` (pre-sorted absolute paths populated by the preprocessor) to establish inclusion edges in Golem’s dependency DAG.
+*   **Include-Tree Tracking:** Since `asciidoctrine` natively includes nested files, Golem bypasses manual file scanning. After Lark completes parsing, Golem extracts `ast.included_files` (pre-sorted absolute paths populated by the preprocessor) to establish inclusion edges in Golem's dependency DAG.
 *   **Plugin Hooks:** Triggers `on_pre_parse(raw_content: str) -> str` to allow text-level replacements before parsing (such as custom preprocessor macros).
 
 === 4.2 Phase 2: Lark Syntax Parsing & Error Interception
@@ -173,7 +183,7 @@ flowchart TD
 === 4.5 Phase 5: HTML Rendering & Template Layout Assembly
 *   **Action:** Combines fine-grained recursive translation and layout framing:
     1. **Recursive HTML Translation (`HtmlRenderer`):** Since recursive document node structures (such as lists nested inside sidebars or inline formatting) are complex and inefficient to map in HTML template files, Golem's pure-Python walker traverses the ASG and compiles the recursive document body into a clean, flat HTML content segment.
-    2. **Layout Framing (Chameleon):** The compiled HTML content segment is passed to Golem's Chameleon templates along with Resolved ASG attributes, sidebar navigation maps, and the active TOC tree. Chameleon TAL integrates these variables into the main layout slots using standard structure assignment (e.g., `<metal:use-slot name="content" tal:content="structure body_content" />`).
+    2. **Layout Framing (Chameleon):** The compiled HTML content segment is passed to Golem's Chameleon templates along with resolved ASG attributes, sidebar navigation maps, and the active TOC tree. Chameleon TAL integrates these variables into the main layout slots using standard structure assignment.
 *   **Plugin Hooks:** Triggers `on_post_render(html_content: str) -> str` on the final compiled page.
 *   **Output:** Writes the optimized HTML file to the target output directory.
 
@@ -209,10 +219,11 @@ The cache state tracks document hashes and inclusion dependencies:
 
 === 5.2 Compilation and Cache Invalidation Protocol
 Every compilation run executes this sequence:
+
 1.  **Scan Phase:** Golem traverses the `content/` directory and computes the SHA-256 hash of each `.adoc` file.
 2.  **Invalidation Check:**
-    *   If the file's computed hash *matches* the hash in the cache, and none of its dependencies have changed, its parsed AST is pulled directly from `.golem/` cache files, bypassing Lark parser execution.
-    *   If a file's hash *differs*, it is scheduled for compilation.
+    *   If the file's computed hash _matches_ the hash in the cache, and none of its dependencies have changed, its parsed AST is pulled directly from `.golem/` cache files, bypassing Lark parser execution.
+    *   If a file's hash _differs_, it is scheduled for compilation.
     *   **Recursive Invalidation:** If a file `B.adoc` is modified, Golem traverses the dependency DAG upwards, invalidating and scheduling every parent file that includes `B.adoc`.
     *   **Template Invalidation:** Changes to master layout templates (`skeleton.pt`, `page.pt`, `layout.pt`) or configuration trigger a full site rebuild. Granular component templates only invalidate documents containing matching ASG node types (discovered via `collect_node_types()`).
     *   **Plugin Invalidation Hooks:** Registered plugins implementing `golem_mark_stale` can evaluate changed files and cache metadata to mark additional dependent files for recompilation.
@@ -223,14 +234,17 @@ Every compilation run executes this sequence:
 
 == 6. Pluggy-Based Plugin System
 
-Golem’s extensibility is driven by `pluggy`, the industry-standard plugin management framework.
+Golem's extensibility is driven by `pluggy`, the industry-standard plugin management framework.
 
 === 6.1 Hook Specifications
-All plugins hook into the core pipeline by implementing one or more of these hooks defined under `golem/plugins.py`:
+All plugins hook into the core pipeline by implementing one or more of these hooks defined in `golem/plugins/__init__.py`:
 
 [source,python]
 ----
 import pluggy
+import click
+from pathlib import Path
+from typing import Any
 from asciidoctrine.nodes import Document
 
 hookspec = pluggy.HookspecMarker("golem")
@@ -241,7 +255,7 @@ class GolemSpecs:
     def on_pre_parse(self, raw_content: str) -> str:
         """
         Invoked before the source is parsed by Lark.
-        Allows global text-level replacements.
+        Allows global text-level replacements (e.g. custom macro expansion).
         """
 
     @hookspec
@@ -262,7 +276,7 @@ class GolemSpecs:
     def on_post_render(self, html_content: str) -> str:
         """
         Invoked after Chameleon integrates the content into the template.
-        Allows rewriting generated HTML (e.g. Pygments class insertions).
+        Allows rewriting generated HTML (e.g. injecting Pygments class names).
         """
 
     @hookspec
@@ -280,7 +294,7 @@ class GolemSpecs:
     ) -> list[Path] | None:
         """
         Invoked during incremental build dependency resolution.
-        Allows plugins to analyze changes and flag additional dependent pages as stale.
+        Allows plugins to analyze changes and flag additional pages as stale.
         """
 ----
 
@@ -289,7 +303,7 @@ class GolemSpecs:
 Golem automatically initializes both packaged and project-specific plugins:
 
 1.  **Project-Specific Local Plugins:**
-    *   During initialization, Golem appends `plugins/` in the project root to `sys.path`.
+    *   During initialization, Golem appends the `plugins_dir` (default: `plugins/`) in the project root to `sys.path`.
     *   It scans the directory for Python files (e.g. `plugins/my_macro.py`).
     *   It imports them using `importlib.import_module` and registers them with the `pluggy` manager.
 2.  **Packaged Plugins:**
@@ -303,33 +317,39 @@ Golem automatically initializes both packaged and project-specific plugins:
 Golem blends hand-written prose with autogenerated module, class, and method references.
 
 === 7.1 Static Extraction via `pdoc` and `asciidocstring`
-Golem implements a dedicated extractor (`golem/api.py`) to generate API reference modules:
+Golem implements a dedicated extractor (`golem/plugins/apidoc/`) to generate API reference modules:
+
 1.  Golem runs `pdoc.doc.Module.from_name("package_name")` to inspect the target codebases.
-2.  It walks the returned module, class, and function nodes tree recursively.
+2.  It walks the returned module, class, and function node tree recursively.
 3.  For each object with a docstring:
     *   It strips common docstring indentation.
     *   It calls `asciidocstring.parse(docstring)` which returns a structured `Document` containing the docstring's parsed AST.
-4.  Golem compiles these ASTs into standard, hyperlinked AsciiDoc reference subpages saved inside `content/api/`.
+4.  Golem compiles these ASTs into standard, hyperlinked AsciiDoc reference subpages saved inside the configured `[api] output_dir` (default: `content/api/`).
 
 === 7.2 Inline Block Macro: `golem:apidoc`
 To splice API references directly into technical books or guides, Golem implements a custom block macro:
 
 [source,asciidoc]
 ----
-golem:apidoc[target="golem.engine.Engine", depth="methods"]
+golem:apidoc[target="golem.engine.BuildEngine", depth="methods"]
 ----
 
-When Golem's AST normalization transformer encounters a `BlockNode` where `name == "golem"` and `attributes["target"]` is present:
-1.  It programmatically resolves the package path `golem.engine.Engine`.
-2.  It extracts the object's signature and cleans its docstring.
-3.  It parses the docstring using `asciidocstring.parse()`.
-4.  It constructs a structured AST `Section` representing the class, injecting signature tables and docstring blocks, and *splices* this sub-tree directly into the primary document's AST, replacing the macro node before final HTML compilation!
+The macro is implemented via the `on_pre_parse` hook in `golem/plugins/apidoc/__init__.py`.
+Before the document is parsed by Lark, the plugin performs a regex search over the raw
+AsciiDoc source for `golem:apidoc[...]` occurrences, resolves the target symbol via
+`AsciiDocApi.render_symbol()`, and replaces the macro text with the rendered AsciiDoc
+fragment in-place. The patched source is then passed to the standard parse pipeline.
+
+NOTE: This text-substitution approach means injected content is re-parsed in the context
+of the outer document. A deeper AST-level implementation (splicing pre-built ASG nodes
+via a `NodeTransformer` after parsing) is tracked in
+https://github.com/webmaven/golem/issues/10[GitHub issue #10].
 
 ---
 
 == 8. HTML ASG Rendering Engine (`golem/renderer.py`)
 
-Golem’s `HtmlRenderer` translates `asciidoctrine` ASG structures directly into HTML5. Since the resolved ASG returned by `ASGResolver().resolve()` is structured as a nested Python dictionary representation of the AST nodes, Golem’s renderer implements a robust recursive dictionary walker that mirrors `NodeVisitor`.
+Golem's `HtmlRenderer` translates `asciidoctrine` ASG structures directly into HTML5. Since the resolved ASG returned by `ASGResolver().resolve()` is structured as a nested Python dictionary representation of the AST nodes, Golem's renderer implements a robust recursive dictionary walker that mirrors `NodeVisitor`.
 
 === 8.1 Node to HTML Tag Mappings
 
@@ -388,7 +408,7 @@ Golem's `HtmlRenderer` collects and resolves footnotes dynamically across each d
     <li id="_footnote_1" role="doc-endnote">
       <span class="golem-footnote-num">1.</span>
       <span class="golem-footnote-body">This is the footnote content.</span>
-      <a href="#_footnote_ref_1" role="doc-backlink" class="golem-footnote-backlink" title="Jump back to reference">↩</a>
+      <a href="#_footnote_ref_1" role="doc-backlink" class="golem-footnote-backlink" title="Jump back to reference">&#x21A9;</a>
     </li>
   </ol>
 </section>
@@ -396,6 +416,7 @@ Golem's `HtmlRenderer` collects and resolves footnotes dynamically across each d
 
 === 8.3 Slugification Protocol
 To ensure stable cross-references (`inline_xref`), section IDs are generated deterministically:
+
 1.  Convert title string to lowercase.
 2.  Replace any non-alphanumeric characters (excluding hyphens) with empty space.
 3.  Replace spaces and underscores with a single hyphen `-`.
@@ -403,18 +424,19 @@ To ensure stable cross-references (`inline_xref`), section IDs are generated det
 
 === 8.4 Server-Side Syntax Highlighting (`golem/highlighting.py`)
 Golem performs zero-JavaScript, server-side syntax highlighting of source code listings via Pygments (`pygments>=2.18`):
-*   **Custom Color Palettes:** Features handcrafted `FiredClayStyle` (light mode) and `FiredClayDarkStyle` (dark mode) matching Golem's workbench aesthetic.
-*   **HTML & CSS Generation:** Generates tokenized HTML blocks (`<pre class="highlight {lang}"><code class="language-{lang}">...</code></pre>`) and injects combined light/dark media-query scoped Pygments CSS (`PYGMENTS_CSS`) into page layouts.
+
+*   **Custom Color Palettes:** Handcrafted `FiredClayStyle` (light mode) and `FiredClayDarkStyle` (dark mode) matching Golem's workbench aesthetic.
+*   **HTML & CSS Generation:** Generates tokenized HTML blocks and injects combined light/dark media-query scoped Pygments CSS (`PYGMENTS_CSS`) into page layouts.
 *   **Language Aliases:** Standardizes aliases (e.g., `py`/`python3` -> `python`, `js`/`ts` -> `javascript`/`typescript`, `sh`/`zsh` -> `bash`, `adoc` -> `asciidoc`).
 
 ---
 
 == 9. Chameleon Templates & Layout Skeletons
 
-Golem coordinates structure and layouts using the *Chameleon* templating engine, which executes compiled TAL (Template Attribute Language) templates at high speed.
+Golem coordinates structure and layouts using the _Chameleon_ templating engine, which executes compiled TAL (Template Attribute Language) templates at high speed.
 
 === 9.1 Base Layout Slots
-The standard premium skeleton template (`golem/templates/skeleton.pt`) exposes these slots:
+The standard skeleton template (`golem/templates/default/skeleton.pt`) exposes these slots:
 
 [source,xml]
 ----
@@ -435,32 +457,25 @@ The standard premium skeleton template (`golem/templates/skeleton.pt`) exposes t
       <div class="header-logo" tal:content="site_name">Golem</div>
       <metal:define-slot name="header" />
     </header>
-
     <div id="golem-body">
       <aside id="golem-sidebar-left">
-        <!-- Renders hierarchical documentation navigation tree -->
         <nav class="golem-nav">
           <metal:define-slot name="navigation" />
         </nav>
       </aside>
-
       <main id="golem-content">
-        <!-- Primary rendered AsciiDoc body content -->
         <article class="golem-doc">
           <metal:define-slot name="content" />
         </article>
       </main>
-
       <aside id="golem-sidebar-right">
-        <!-- Dynamic in-page Table of Contents generated from sections -->
         <nav class="golem-toc">
           <metal:define-slot name="table-of-contents" />
         </nav>
       </aside>
     </div>
-
     <footer id="golem-footer">
-      <p>&copy; <span tal:replace="site_author">Author</span>. Built with Golem.</p>
+      <p>&#169; <span tal:replace="site_author">Author</span>. Built with Golem.</p>
       <metal:define-slot name="footer" />
     </footer>
   </div>
@@ -468,8 +483,36 @@ The standard premium skeleton template (`golem/templates/skeleton.pt`) exposes t
 </html>
 ----
 
-=== 9.2 CSS Theme Variables
-Golem enforces a premium aesthetic standard out of the box through curated HSL/hex themes configured with CSS Custom Properties, featuring a warm, handcrafted "Fired Clay / Workbench" baseline with automatic light/dark mode support (`prefers-color-scheme`):
+=== 9.2 Template Context Variables
+The following variables are passed to `skeleton.pt` during rendering:
+
+[cols="1,1,3"]
+|===
+| Variable | Type | Description
+
+| `site_title` | `str` | Title of the website (`[site] name` in config).
+| `site_name` | `str` | Alias for `site_title`.
+| `page_title` | `str` | Title of the current document (from the top-level AsciiDoc header). Also aliased as `title`.
+| `site_author` | `str` | Configured site author name or organization.
+| `site_url` | `str \| None` | Base URL of the website if configured.
+| `generator_version` | `str` | Active version string of the Golem engine.
+| `body_html` | `str` | Pre-rendered HTML5 content from the AsciiDoc document body. Also aliased as `body_content` and `body`.
+| `nav_tree` | `list[dict]` | Hierarchical site map (`{title, url, path, children}` nodes).
+| `nav_html` | `str` | Pre-rendered `<nav class="golem-nav">` HTML. Also aliased as `navigation_html`.
+| `toc_html` | `str` | Rendered Table of Contents HTML generated from document headings.
+| `current_path` | `str` | Path of the source document relative to the content root.
+| `prev_page` | `dict[str, str] \| None` | Previous document in sequential navigation (`{title, url}`).
+| `next_page` | `dict[str, str] \| None` | Next document in sequential navigation (`{title, url}`).
+| `pygments_css` | `str \| None` | Pygments syntax-highlighting CSS (light + dark media queries).
+| `body_class` | `str` | Class string from `:body_class:` header attribute.
+| `page_class` | `str` | Class string from `:page_class:` header attribute.
+| `content_class` | `str` | Class string from `:content_class:` header attribute.
+| `custom_css` | `list[str]` | Custom stylesheet URLs injected from configuration.
+| `custom_js` | `list[str]` | Custom script URLs injected from configuration.
+|===
+
+=== 9.3 CSS Theme Variables
+Golem enforces a premium aesthetic out of the box through curated HSL/hex themes configured with CSS Custom Properties, featuring a warm "Fired Clay / Workbench" baseline with automatic light/dark mode support (`prefers-color-scheme`):
 
 [source,css]
 ----
@@ -534,56 +577,55 @@ Golem enforces a premium aesthetic standard out of the box through curated HSL/h
 Golem serves compiled document folders via `golem serve` to enable real-time local authoring.
 
 === 10.1 Multi-Threaded HTTP Server
-Golem hosts static files from `build.output_dir` using Python’s built-in `http.server.ThreadingHTTPServer` bound to a custom request handler. This permits concurrent handling of static asset transfers and Server-Sent Events (SSE) reload connections.
+Golem hosts static files from `build.output_dir` using Python's built-in `http.server.ThreadingHTTPServer` bound to a custom request handler. This permits concurrent handling of static asset transfers and Server-Sent Events (SSE) reload connections.
 
 === 10.2 Server-Sent Events Reload Loop
 *   **The Endpoint:** The dev server hosts an SSE endpoint under `/golem-reload`.
-*   **Client Script:** During serving, Golem’s build engine automatically injects a tiny Javascript listener snippet into the compiled skeleton head:
-    ```javascript
-    (function() {
-      const sse = new EventSource('/golem-reload');
-      sse.onmessage = function(event) {
-        if (event.data === 'reload') {
-          console.log('[Golem] File change detected. Reloading...');
-          window.location.reload();
-        }
-      };
-    })();
-    ```
+*   **Client Script:** During serving, Golem's build engine automatically injects a tiny Javascript listener snippet into the compiled skeleton head:
++
+[source,javascript]
+----
+(function() {
+  const sse = new EventSource('/golem-reload');
+  sse.onmessage = function(event) {
+    if (event.data === 'reload') {
+      console.log('[Golem] File change detected. Reloading...');
+      window.location.reload();
+    }
+  };
+})();
+----
 *   **Server Watcher:** The dev server maintains a list of open SSE socket connections. In the background, a file-system monitor polls files inside `content/` for SHA-256 or timestamp updates.
 *   **Trigger:** Once a change is found, Golem launches an incremental rebuild of invalidated compilation DAG nodes and immediately writes `data: reload\n\n` to all active SSE streams, causing browser tabs to refresh instantly.
 
 ---
 
-== 11. CLI Command Specification
+== 11. CLI Commands
 
-The `golem` command-line utility routes user actions using an intuitive, standard interface with global `-C/--directory` and `--version` support.
+The `golem` command-line utility routes user actions using a standard Click-based interface with global `-C/--directory` and `--version` support.
 
-=== 11.1 Implemented Core Commands
+=== 11.1 Core Commands
 *   `golem init [--template=<type>] [--output-dir=<dir>] [-C <dir>]`
     *   Creates a standard directory structure and basic `golem.toml` (or `[tool.golem]` in `pyproject.toml`).
-    *   Profiles: `package` (default, standard library layout), `site`/`book`/`simple` (scaffolds `templates/` and `static/css/custom.css`).
+    *   Profiles: `package` (default, standard library layout), `site` / `book` / `simple` (scaffolds `templates/` and `static/css/custom.css`).
+    *   NOTE: Named profiles `library`, `cli`, `paper`, and `blog` currently map to the generic package or site skeleton. Differentiated scaffolding is tracked in https://github.com/webmaven/golem/issues/9[GitHub issue #9].
 *   `golem new <type> <name> [-C <dir>]`
     *   Generates a structured `.adoc` file with pre-populated header attributes (`:golem-type:`, `:author:`, `:date:`), title, and introduction section.
     *   Example: `golem new post "Hello World"` creates `content/hello-world.adoc`.
 *   `golem build [--config=<path>] [--clean] [--strict] [-v/--verbose] [-q/--quiet] [-C <dir>]`
-    *   Runs the incremental compiler, building static pages into the configured output folder (`dist/` by default).
+    *   Runs the incremental compiler, building static pages into the configured output folder (`_build/` by default).
     *   Flags: `--clean` purges the output directory and cache; `--strict` treats warnings as fatal errors; `-v` enables debug logging; `-q` silences non-error output.
 *   `golem serve [--port=<port>] [--host=<host>] [--strict] [-C <dir>]`
     *   Invokes an initial build, launches the multi-threaded HTTP web server, activates SSE reload streaming, watches source directories, and injects real-time diagnostic error overlays if compilation errors occur.
 *   `golem plugins [--json] [-C <dir>]`
-    *   Inspects and lists all active, built-in, setuptools entrypoint, and local plugins, showing enabled/disabled status and discovery sources. Supports `--json` machine-readable output.
+    *   Inspects and lists all active built-in, setuptools entrypoint, and local plugins, showing enabled/disabled status and discovery sources. Supports `--json` machine-readable output.
 *   `golem themes [--json] [-C <dir>]`
     *   Inspects and lists the currently active theme alongside all available built-in, local (`themes/`), and entry point themes. Supports `--json` machine-readable output.
 
 === 11.2 Plugin-Registered Commands
 *   `golem doctest [paths...] [-m/--mode=<mode>] [-s/--source=<pkg_or_file>] [-v/--verbose] [-x/--fail-fast]`
     *   Registered via `golem.plugins.doctest`. Walks AsciiDoc source files or Python docstrings, isolates Python code listing blocks, and executes them with sequential state preservation.
-    *   Modes: `explicit` (default, runs blocks marked with `test`), `eager` (runs all Python listing blocks sequentially), `auto`.
+    *   Modes: `explicit` (default, runs blocks marked with `role="test"`), `eager` (runs all Python listing blocks sequentially), `auto`.
     *   Flags: `-s/--source` to target Python packages/files for docstring testing; `-x/--fail-fast` to stop on first failure; `-v` for verbose output.
 *   `golem apidoc [package] [-o/--output=<dir>] [-s/--docstring-style=<style>]`
     *   Registered via `golem.plugins.apidoc`. Introspects Python packages and generates standard AsciiDoc API reference documentation pages.
-
-=== 11.3 Planned / Roadmap Commands (Not Yet Implemented)
-*   `golem ingest <source-path-or-url> [--output=<path>]`
-    *   *(Planned / Future)* An ingestion helper that ingests raw documents (such as local PDF reference papers, web pages, or raw markdown documentation) and converts them via an LLM processing pipeline into clean, semantically structured, standard-compliant AsciiDoc documentation pages.
