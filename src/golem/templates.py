@@ -83,6 +83,10 @@ DEFAULT_TEMPLATE = """\
             max-width: 800px;
             line-height: 1.6;
         }
+        #golem-content img {
+            max-width: 100%;
+            height: auto;
+        }
         #golem-sidebar-right {
             width: 200px;
             padding: 20px;

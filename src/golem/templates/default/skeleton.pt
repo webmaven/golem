@@ -750,6 +750,26 @@
             -webkit-overflow-scrolling: touch;
         }
 
+        /* ── Images & Media ────────────────────────────────── */
+        #golem-content img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 6px;
+            border: 1px solid var(--golem-border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        #golem-content .imageblock {
+            margin: 1.5rem 0;
+        }
+        #golem-content .imageblock .title {
+            font-family: var(--golem-font-ui);
+            font-size: 0.85rem;
+            color: var(--golem-text-muted);
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+
         /* ── Focus Rings (Accessibility) ───────────────────── */
         a:focus-visible,
         button:focus-visible,
