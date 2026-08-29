@@ -37,8 +37,8 @@ class FiredClayStyle(Style):
     """Light mode syntax highlighting style for Golem (Fired Clay palette)."""
 
     name = "firedclay"
-    background_color = "#f7f4ef"
-    highlight_color = "#ece7de"
+    background_color = "#faf9f5"
+    highlight_color = "#ede8df"
 
     styles = {
         Text: "#1e1a16",

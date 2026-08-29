@@ -17,14 +17,14 @@
     <style>
         :root {
             /* Light Mode Default (Fired Clay / Workbench) */
-            --golem-bg: #f7f4ef;
-            --golem-surface: #f2ede8;
-            --golem-code-bg: #ece7de;
+            --golem-bg: #faf9f5;
+            --golem-surface: #f3f0e8;
+            --golem-code-bg: #ede8df;
             --golem-text: #1e1a16;
             --golem-text-muted: #6b5d52;
             --golem-primary: #8b3a12;
             --golem-primary-hover: #6b2a08;
-            --golem-border: #cec8bf;
+            --golem-border: #dfdbd2;
             --golem-link: #8b3a12;
             --golem-link-visited: #3e2518;
             --golem-link-hover: #6b2a08;
