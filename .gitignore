@@ -17,3 +17,6 @@ docs/superpowers/
 
 # Generated API reference docs — rebuilt fresh from source on every deploy via `golem apidoc`
 docs/api/
+
+# Internal review artifacts
+*_crit_eval.md

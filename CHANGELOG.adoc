@@ -22,6 +22,7 @@ toc::[]
 
 * *Project Scaffolding Author:* `golem init` now dynamically discovers the author name from `git config --global user.name` with a fallback to `Your Name`, replacing hardcoded author name.
 * *CLI Version String:* Updated `--version` option to resolve package version dynamically via `importlib.metadata.version("golem-docs")` with fallback to `dev`, replacing hardcoded string.
+* *Repository Cleanliness:* Removed internal review artifact `docs_crit_eval.md` and added `*_crit_eval.md` pattern to `.gitignore` to prevent future tracking of review artifacts.
 
 * *Build-Cycle Navigation Caching:* Cached `discover_navigation()` tree within `build_site()` cycle to prevent redundant recursive filesystem scans per compiled page, passing optional precomputed `nav_tree` to `generate_nav_html`, `get_ordered_nav_pages`, and `get_page_pagination`.
 * *Cross-platform file locking:* Implemented cross-platform cache file locking using `filelock` replacing `fcntl`.
