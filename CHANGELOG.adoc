@@ -14,40 +14,28 @@ toc::[]
 
 === Added
 
-* *Dev Server Startup & Rebuild Status:* Enhanced `golem serve` to output startup compilation metrics, page build count, elapsed timing, and live rebuild progress with browser reload notifications.
-* *CLI Quiet Flag & Build Elapsed Timing:* Added `-q` / `--quiet` flag to `golem build` command to silence non-error output, and added elapsed build execution duration to the compilation summary line.
-* *Test Coverage Configuration:* Added `pytest-cov` and `coverage[toml]` to dev dependencies with configured coverage targets in `pyproject.toml`.
-* *`CONTRIBUTING.adoc`:* Added contributor guide covering development setup, test execution, linting/type-checking, and PR guidelines.
-* *Server-Side Syntax Highlighting:* Pygments-powered syntax highlighting integrated into the build pipeline.
-* *CI Syntax Canary Test (`tests/test_syntax_invariants.py`):* AST-based test that catches Python 2 `except A, B:` forms across all source files at CI time — a class of bug not detected by ruff's default rule set.
+* *CLI Build & Serve Enhancements:* Added `-q`/`--quiet` flag and elapsed execution timing to `golem build`, along with startup compilation status and live rebuild progress in `golem serve`.
+* *Server-Side Syntax Highlighting:* Pygments-powered syntax highlighting integrated into the build pipeline with Fired Clay styling.
+* *Project Hygiene & CI Checks:* Added `CONTRIBUTING.adoc` contributor guide and AST-based CI canary test (`tests/test_syntax_invariants.py`).
+* *Test Coverage Configuration:* Added `pytest-cov` and `coverage[toml]` to dev dependencies with configured targets in `pyproject.toml`.
+
+=== Changed
+
+* *Plugin Execution Gating:* Refactored `get_plugin_manager()` to a two-pass discovery-registration architecture where `config.plugins` is the sole authority for activation and execution order.
+* *Dependency Upgrades:* Bumped `asciidoctrine` to `>=0.2.0a4`, `asciidoctype` to `>=0.1.0a4`, and added `pygments>=2.18`.
+* *AsciiDoc Docstrings:* Standardized docstrings across all internal modules to AsciiDoc format using `asciidocstring` conventions.
+* *CSS Visual Hierarchy:* Enhanced default theme typography, admonition pill labels, code listing language badges, table breakouts, and per-page layout classes.
 
 === Fixed
 
-* *Python 2 Syntax (`except A, B:`):* Corrected five occurrences across `engine.py`, `server.py`, `highlighting.py`, and `cli.py` where the Python 2 multi-exception form was used. In Python 3, `except A, B:` catches only `A` and silently binds the exception to the name `B` — not the intended multi-catch behavior. All corrected to `except (A, B):`.
-* *Plugin Activation Gating (`get_plugin_manager()`):* Refactored to a two-pass discovery → registration architecture. `config.plugins` is now the sole authority on enablement and execution order — presence in a discovery source (installed entry point or local `plugins/` directory) alone no longer activates a plugin.
-* *Plugin Hook Robustness:* All four build lifecycle hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_post_render`) now isolate plugin exceptions — a failing plugin emits a `WARNING` log and processing continues. A `WARNING` is also emitted when multiple plugins modify the same value in a single hook, since the final result is then order-dependent.
-* *Hookspec Type Annotations:* Corrected `on_ast_created` hook specification type annotation from `os.PathLike[Any] | Any` to `Any`.
-* *Cross-platform file locking:* Implemented cross-platform cache file locking using `filelock` replacing `fcntl`.
-* *Configuration Normalization and Precedence Deduplication:* Deduplicated `load_config()` parsing into a centralized `_extract_config_values` normalizer helper, ensuring consistent canonical key precedence (section-scoped > root-level, canonical > alias) across `golem.toml` and `pyproject.toml`.
-* *Build-Cycle Navigation Caching:* Cached `discover_navigation()` tree within `build_site()` cycle to prevent redundant recursive filesystem scans per compiled page, passing optional precomputed `nav_tree` to `generate_nav_html`, `get_ordered_nav_pages`, and `get_page_pagination`.
-* *TOC Plain-Text Extraction & Heading Anchors:* Fixed duplicate inline text extraction in `_extract_plain_text()` that duplicated section titles and slug anchor IDs in generated Table of Contents navigation.
-* *Changelog Section Headings:* Updated release headings in `CHANGELOG.adoc` from Markdown bracketed syntax (`== [0.1.0a2]`) to standard AsciiDoc section headings (`== 0.1.0a2`), preventing parser interpretation as block attribute lists.
-* *CLI Version String:* Updated `--version` option to resolve package version dynamically via `importlib.metadata.version("golem-docs")` with fallback to `dev`, replacing hardcoded string.
-* *Project Scaffolding Author:* `golem init` now dynamically discovers the author name from `git config --global user.name` with a fallback to `Your Name`, replacing hardcoded author name.
-* *Repository Cleanliness:* Removed internal review artifact `docs_crit_eval.md` and added `*_crit_eval.md` pattern to `.gitignore` to prevent future tracking of review artifacts.
-* *Upgraded Dependencies:*
-** Bumped `asciidoctrine` requirement to `>=0.2.0a4` and `asciidoctype` to `>=0.1.0a4`.
-** Added `pygments>=2.18` as a required dependency.
-* *Comprehensive AsciiDoc Docstrings:*
-** All internal modules (`config`, `server`, `plugins`, `engine`, `renderer`) now carry full AsciiDoc-formatted docstrings using `asciidocstring` conventions, replacing prior reST/Sphinx markup.
-* *CSS Visual Hierarchy (Fired Clay Theme):*
-** Fired Clay palette (`FiredClayStyle`) applied to Pygments-highlighted listing blocks.
-** New `body_class`, `page_class`, and `content_class` template context variables for per-page layout control.
-** Table full-bleed breakout, heading scale, description list (`dl`/`dt`/`dd`) spacing, accent rail, and keyboard focus rings.
-** Listing blocks render language badges and callout pills; admonition titles styled as pill labels; inline code within headings uses a muted variant.
-* *Dev Server:* Client socket disconnects now logged at `DEBUG` level instead of raising unhandled exceptions.
-* *Test Coverage:*
-** Modernized test syntax and expanded coverage across `doctest`, `apidoc`, `highlighting`, and `engine` modules.
+* *Python Exception Handling:* Corrected five occurrences of deprecated Python 2 `except A, B:` syntax to Python 3 `except (A, B):`.
+* *Plugin Hook Robustness:* Isolated plugin exceptions across all build hooks and added conflict warnings when multiple plugins modify the same value.
+* *Cross-Platform File Locking:* Replaced POSIX-only `fcntl` cache locking with cross-platform `filelock`.
+* *Configuration Normalization:* Deduplicated TOML parsing across `golem.toml` and `pyproject.toml` into a centralized normalizer helper.
+* *Navigation & TOC Performance:* Cached `discover_navigation()` tree during build cycles and eliminated duplicated text in TOC anchor generation.
+* *CLI Scaffolding & Metadata:* Dynamically resolved `--version` from package metadata and author name from `git config` in `golem init`.
+* *Repository Cleanliness:* Removed internal review artifacts from tracking and added pattern ignores to `.gitignore`.
+* *Dev Server Disconnects:* Downgraded client socket disconnect exceptions to debug-level logging.
 
 == 0.1.0a2 - 2026-08-24
 
