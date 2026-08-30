@@ -15,7 +15,49 @@ __all__ = ["AsciiDocApi", "ApiGenOptions", "on_pre_parse", "golem_add_subcommand
 
 logger = logging.getLogger("golem.plugins.apidoc")
 
-_MACRO_PATTERN = re.compile(r"golem:apidoc\[(.*?)\]", re.DOTALL)
+_MACRO_TOKEN_PATTERN = re.compile(
+    r"(`[^`\n]+`)|"  # 1: Inline backtick code span
+    r"(\\golem:apidoc\[.*?\])|"  # 2: Escaped macro (\golem:apidoc[...])
+    r"(golem:apidoc\[(.*?)\])",  # 3: Active macro (group 4 is args)
+    re.DOTALL,
+)
+
+
+def _split_verbatim_blocks(content: str) -> list[tuple[bool, str]]:
+    """Split AsciiDoc content into tuples of (is_verbatim, text_chunk).
+
+    Verbatim delimited blocks (----, ...., ++++) are protected from macro expansion.
+    """
+    lines = content.splitlines(keepends=True)
+    chunks: list[tuple[bool, str]] = []
+    current_chunk: list[str] = []
+    in_verbatim = False
+    verbatim_delim = ""
+
+    for line in lines:
+        stripped = line.strip()
+        is_delim = bool(re.match(r"^(-{4,}|\.{4,}|\+{4,})$", stripped))
+        if is_delim:
+            if in_verbatim and stripped == verbatim_delim:
+                current_chunk.append(line)
+                chunks.append((True, "".join(current_chunk)))
+                current_chunk = []
+                in_verbatim = False
+                verbatim_delim = ""
+                continue
+            elif not in_verbatim:
+                if current_chunk:
+                    chunks.append((False, "".join(current_chunk)))
+                    current_chunk = []
+                in_verbatim = True
+                verbatim_delim = stripped
+                current_chunk.append(line)
+                continue
+        current_chunk.append(line)
+
+    if current_chunk:
+        chunks.append((in_verbatim, "".join(current_chunk)))
+    return chunks
 
 
 def _parse_macro_args(args_str: str) -> dict[str, str]:
@@ -43,12 +85,11 @@ def on_pre_parse(raw_content: str) -> str:
     if "golem:apidoc[" not in raw_content:
         return raw_content
 
-    def _replace(match: re.Match[str]) -> str:
-        args_str = match.group(1)
+    def _expand_macro(args_str: str) -> str:
         kwargs = _parse_macro_args(args_str)
         target = kwargs.get("target")
         if not target:
-            return match.group(0)
+            return f"golem:apidoc[{args_str}]"
 
         depth = kwargs.get("depth", "all")
         style = kwargs.get("style", "auto")
@@ -61,7 +102,28 @@ def on_pre_parse(raw_content: str) -> str:
             logger.warning("Golem ApiDoc macro error for target '%s': %s", target, e)
             return f"[WARNING]\n====\nGolem ApiDoc: Could not resolve target '{target}': {e}\n====\n"
 
-    return _MACRO_PATTERN.sub(_replace, raw_content)
+    def _replace_in_chunk(text: str) -> str:
+        def _sub(match: re.Match[str]) -> str:
+            # 1. Inline backtick span -> preserve untouched
+            if match.group(1):
+                return match.group(1)
+            # 2. Escaped macro -> unescape leading backslash
+            if match.group(2):
+                return match.group(2)[1:]
+            # 3. Active macro -> expand
+            return _expand_macro(match.group(4))
+
+        return _MACRO_TOKEN_PATTERN.sub(_sub, text)
+
+    chunks = _split_verbatim_blocks(raw_content)
+    result_parts: list[str] = []
+    for is_verbatim, chunk_text in chunks:
+        if is_verbatim:
+            result_parts.append(chunk_text)
+        else:
+            result_parts.append(_replace_in_chunk(chunk_text))
+
+    return "".join(result_parts)
 
 
 def generate_api_docs(
