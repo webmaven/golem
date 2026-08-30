@@ -1,0 +1,21 @@
+<figure class="listingblock"
+        tal:attributes="id python:node.get('attributes', {}).get('id') if isinstance(node.get('attributes'), dict) else (node.get('id') or None)"
+        tal:define="highlighted python:renderer.highlight_code(node, ctx);
+                    lang python:node.get('attributes', {}).get('language') if isinstance(node.get('attributes'), dict) and node.get('attributes', {}).get('language') else (node.get('attributes', {}).get('lang') if isinstance(node.get('attributes'), dict) and node.get('attributes', {}).get('lang') else (node.get('language') or ''));
+                    role_attr python:node.get('attributes', {}).get('role') if isinstance(node.get('attributes'), dict) else node.get('role');
+                    roles python:role_attr.split() if isinstance(role_attr, str) else (list(role_attr) if role_attr else [])">
+  <header class="listing-header">
+    <span tal:condition="node.get('title')" class="listing-title"><tal:block tal:condition="python:isinstance(node.get('title'), list)" tal:repeat="inline node.get('title', [])" tal:replace="structure renderer.render(inline, ctx)" /><tal:block tal:condition="python:isinstance(node.get('title'), dict)" tal:replace="structure renderer.render(node.get('title'), ctx)" /><tal:block tal:condition="python:isinstance(node.get('title'), str)" tal:content="node.get('title')" /></span>
+    <div class="listing-actions">
+      <span tal:repeat="r roles" tal:attributes="class python:f'badge badge-{r}'" tal:content="r"></span>
+      <span tal:condition="lang" class="badge badge-lang" tal:content="python:lang.upper()"></span>
+      <button type="button" class="listing-copy-btn" aria-label="Copy code">Copy</button>
+    </div>
+  </header>
+  <div class="listing-content">
+    <tal:block tal:condition="highlighted" tal:replace="structure python:highlighted if highlighted is not None else renderer.render(node, ctx)" />
+    <tal:block tal:condition="not:highlighted">
+      <pre class="highlight" tal:attributes="class python:'highlight' + ((' ' + lang) if lang else '')"><code tal:attributes="class python:('language-' + lang) if lang else None"><tal:block tal:repeat="inline node.get('inlines', [])" tal:replace="structure renderer.render(inline, ctx)" /><tal:block tal:condition="not:node.get('inlines')" tal:content="node.get('value', '')" /></code></pre>
+    </tal:block>
+  </div>
+</figure>

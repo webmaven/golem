@@ -341,11 +341,22 @@
             border: 1px solid var(--golem-border);
             font-size: 0.85em;
         }
+        /* ── Code Blocks & Listings ────────────────────────── */
         .listingblock {
             position: relative;
             margin: 1.25rem 0;
+            border: 1px solid var(--golem-border);
+            border-left: 3px solid var(--golem-primary);
+            border-radius: 4px;
+            background: var(--golem-code-bg);
+            overflow: hidden;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
-        pre, .listingblock pre {
+        .listingblock:focus-within {
+            border-color: var(--golem-primary);
+            box-shadow: 0 0 0 1px var(--golem-primary);
+        }
+        pre {
             position: relative;
             background: var(--golem-code-bg);
             border: 1px solid var(--golem-border);
@@ -358,12 +369,24 @@
             cursor: text;
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
-        .listingblock:focus-within pre,
         pre:focus-within {
             user-select: all;
             -webkit-user-select: all;
             border-color: var(--golem-primary);
             box-shadow: 0 0 0 1px var(--golem-primary);
+        }
+        .listingblock pre {
+            margin: 0;
+            border: none;
+            border-left: none;
+            border-radius: 0;
+            background: transparent;
+            padding: 1rem 1.25rem;
+            box-shadow: none;
+        }
+        .listingblock:focus-within pre {
+            box-shadow: none;
+            border-color: transparent;
         }
         pre code {
             background: transparent;
@@ -372,18 +395,35 @@
             font-size: 0.875rem;
         }
 
-        /* ── Listing Language & Role Badges ────────────────── */
-        .listingblock pre.highlight::before,
-        pre.highlight[class*="language-"]::before,
-        pre[class*="language-"]::before,
-        .listingblock pre[class*="highlight"] code[class*="language-"]::before,
-        pre.highlight code[class*="language-"]::before,
-        pre.highlight.test::before,
-        pre.highlight.shared::before,
-        pre.highlight.reset::before {
-            position: absolute;
-            top: 0.45rem;
-            right: 0.65rem;
+        /* ── Listing Header & Actions ──────────────────────── */
+        .listing-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            padding: 0.45rem 0.75rem;
+            background: var(--golem-surface);
+            border-bottom: 1px solid var(--golem-border);
+            font-family: var(--golem-font-ui);
+            font-size: 0.8rem;
+        }
+        .listing-title {
+            font-weight: 600;
+            color: var(--golem-text);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-right: auto;
+        }
+        .listing-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-left: auto;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
             font-family: var(--golem-font-ui);
             font-size: 0.68rem;
             font-weight: 700;
@@ -394,153 +434,54 @@
             background: var(--golem-surface);
             color: var(--golem-text-muted);
             border: 1px solid var(--golem-border);
-            pointer-events: none;
             line-height: 1.2;
-            z-index: 2;
         }
-
-        /* Language Badges */
-        pre.highlight.python::before,
-        pre.highlight.py::before,
-        pre.highlight[class*="language-python"]::before,
-        pre.highlight code.language-python::before,
-        pre.highlight code[data-lang="python"]::before { content: 'python'; }
-
-        pre.highlight.javascript::before,
-        pre.highlight.js::before,
-        pre.highlight[class*="language-javascript"]::before,
-        pre.highlight code.language-javascript::before,
-        pre.highlight code[data-lang="javascript"]::before { content: 'javascript'; }
-
-        pre.highlight.typescript::before,
-        pre.highlight.ts::before,
-        pre.highlight[class*="language-typescript"]::before,
-        pre.highlight code.language-typescript::before,
-        pre.highlight code[data-lang="typescript"]::before { content: 'typescript'; }
-
-        pre.highlight.html::before,
-        pre.highlight[class*="language-html"]::before,
-        pre.highlight code.language-html::before,
-        pre.highlight code[data-lang="html"]::before { content: 'html'; }
-
-        pre.highlight.css::before,
-        pre.highlight[class*="language-css"]::before,
-        pre.highlight code.language-css::before,
-        pre.highlight code[data-lang="css"]::before { content: 'css'; }
-
-        pre.highlight.json::before,
-        pre.highlight[class*="language-json"]::before,
-        pre.highlight code.language-json::before,
-        pre.highlight code[data-lang="json"]::before { content: 'json'; }
-
-        pre.highlight.yaml::before,
-        pre.highlight.yml::before,
-        pre.highlight[class*="language-yaml"]::before,
-        pre.highlight code.language-yaml::before,
-        pre.highlight code[data-lang="yaml"]::before { content: 'yaml'; }
-
-        pre.highlight.toml::before,
-        pre.highlight[class*="language-toml"]::before,
-        pre.highlight code.language-toml::before,
-        pre.highlight code[data-lang="toml"]::before { content: 'toml'; }
-
-        pre.highlight.xml::before,
-        pre.highlight[class*="language-xml"]::before,
-        pre.highlight code.language-xml::before,
-        pre.highlight code[data-lang="xml"]::before { content: 'xml'; }
-
-        pre.highlight.bash::before,
-        pre.highlight.sh::before,
-        pre.highlight.shell::before,
-        pre.highlight.zsh::before,
-        pre.highlight[class*="language-bash"]::before,
-        pre.highlight code.language-bash::before,
-        pre.highlight code.language-sh::before,
-        pre.highlight code[data-lang="bash"]::before { content: 'bash'; }
-
-        pre.highlight.rust::before,
-        pre.highlight.rs::before,
-        pre.highlight[class*="language-rust"]::before,
-        pre.highlight code.language-rust::before,
-        pre.highlight code[data-lang="rust"]::before { content: 'rust'; }
-
-        pre.highlight.go::before,
-        pre.highlight[class*="language-go"]::before,
-        pre.highlight code.language-go::before,
-        pre.highlight code[data-lang="go"]::before { content: 'go'; }
-
-        pre.highlight.c::before,
-        pre.highlight[class*="language-c"]::before,
-        pre.highlight code.language-c::before,
-        pre.highlight code[data-lang="c"]::before { content: 'c'; }
-
-        pre.highlight.cpp::before,
-        pre.highlight.c\\+\\+::before,
-        pre.highlight[class*="language-cpp"]::before,
-        pre.highlight code.language-cpp::before,
-        pre.highlight code[data-lang="cpp"]::before { content: 'c++'; }
-
-        pre.highlight.java::before,
-        pre.highlight[class*="language-java"]::before,
-        pre.highlight code.language-java::before,
-        pre.highlight code[data-lang="java"]::before { content: 'java'; }
-
-        pre.highlight.ruby::before,
-        pre.highlight.rb::before,
-        pre.highlight[class*="language-ruby"]::before,
-        pre.highlight code.language-ruby::before,
-        pre.highlight code[data-lang="ruby"]::before { content: 'ruby'; }
-
-        pre.highlight.sql::before,
-        pre.highlight[class*="language-sql"]::before,
-        pre.highlight code.language-sql::before,
-        pre.highlight code[data-lang="sql"]::before { content: 'sql'; }
-
-        pre.highlight.dockerfile::before,
-        pre.highlight.docker::before,
-        pre.highlight[class*="language-dockerfile"]::before,
-        pre.highlight code.language-dockerfile::before,
-        pre.highlight code[data-lang="dockerfile"]::before { content: 'docker'; }
-
-        pre.highlight.diff::before,
-        pre.highlight[class*="language-diff"]::before,
-        pre.highlight code.language-diff::before,
-        pre.highlight code[data-lang="diff"]::before { content: 'diff'; }
-
-        pre.highlight.asciidoc::before,
-        pre.highlight.adoc::before,
-        pre.highlight[class*="language-asciidoc"]::before,
-        pre.highlight code.language-asciidoc::before,
-        pre.highlight code[data-lang="asciidoc"]::before { content: 'asciidoc'; }
-
-        pre.highlight.text::before,
-        pre.highlight.txt::before,
-        pre.highlight.plain::before,
-        pre.highlight[class*="language-text"]::before,
-        pre.highlight code.language-text::before,
-        pre.highlight code[data-lang="text"]::before { content: 'text'; }
-
-        /* Role Badges */
-        pre.highlight.test::before,
-        pre.highlight code.test::before {
-            content: 'test';
+        .badge-lang {
+            color: var(--golem-text-muted);
+            border-color: var(--golem-border);
+            background: var(--golem-bg);
+        }
+        .badge-test {
             color: var(--golem-note);
             border-color: color-mix(in srgb, var(--golem-note) 40%, var(--golem-border));
+            background: color-mix(in srgb, var(--golem-note) 10%, transparent);
         }
-
-        pre.highlight.shared::before,
-        pre.highlight code.shared::before {
-            content: 'shared';
+        .badge-shared {
             color: var(--golem-tip);
             border-color: color-mix(in srgb, var(--golem-tip) 40%, var(--golem-border));
+            background: color-mix(in srgb, var(--golem-tip) 10%, transparent);
         }
-
-        pre.highlight.reset::before,
-        pre.highlight code.reset::before {
-            content: 'reset';
+        .badge-reset {
             color: var(--golem-warning);
             border-color: color-mix(in srgb, var(--golem-warning) 40%, var(--golem-border));
+            background: color-mix(in srgb, var(--golem-warning) 10%, transparent);
         }
+        .listing-copy-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--golem-font-ui);
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.15em 0.55em;
+            border-radius: 3px;
+            background: var(--golem-surface);
+            color: var(--golem-text-muted);
+            border: 1px solid var(--golem-border);
+            cursor: pointer;
+            line-height: 1.2;
+            transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+        }
+        .listing-copy-btn:hover {
+            color: var(--golem-text);
+            border-color: var(--golem-primary);
+            background: var(--golem-bg);
+        }
+        .listing-copy-btn:focus-visible {
+            outline: 2px solid var(--golem-primary);
+            outline-offset: 1px;
+        }
+
 
         /* ── Callout Badges (.conum) ───────────────────────── */
         i.conum {

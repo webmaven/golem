@@ -390,3 +390,25 @@ def test_toc_html_no_duplicate_titles():
     assert '<li class="toc-item level-1"><a href="#0-1-0a2-2026-08-24">0.1.0a2 - 2026-08-24</a>' in toc_html
     assert "UnreleasedUnreleased" not in toc_html
     assert "AddedAdded" not in toc_html
+
+
+def test_render_listing_header_structure():
+    """Verify listing rendering generates semantic listing-header with title, badges, and copy button."""
+    asg = {
+        "name": "listing",
+        "type": "block",
+        "title": "sample.py",
+        "value": "print('hello')",
+        "attributes": {
+            "language": "python",
+            "role": "test shared",
+        },
+    }
+    html = render_body(asg)
+    assert '<figure class="listingblock"' in html
+    assert '<header class="listing-header">' in html
+    assert '<span class="listing-title">sample.py</span>' in html
+    assert 'class="badge badge-test"' in html
+    assert 'class="badge badge-shared"' in html
+    assert 'class="badge badge-lang">PYTHON</span>' in html
+    assert 'class="listing-copy-btn"' in html

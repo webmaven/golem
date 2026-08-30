@@ -38,6 +38,9 @@ from asciidoctrine.nodes import Node
 from golem.highlighting import make_highlighter
 
 
+DEFAULT_TEMPLATES_DIR: Path = Path(__file__).parent / "templates" / "default"
+
+
 def render_body(
     asg_root: Union[Node, dict[str, Any]],
     search_paths: Optional[List[Path]] = None,
@@ -56,7 +59,7 @@ def render_body(
 
     [parameters]
     `asg_root` (Node | dict[str, Any]):: AST Node or ASG dictionary representation of the document or fragment.
-    `search_paths` (list[Path] | None, optional):: Optional list of directory paths containing custom Chameleon template overrides. Defaults to `None`.
+    `search_paths` (list[Path] | None, optional):: Optional list of directory paths containing custom Chameleon template overrides. Defaults to including `src/golem/templates/default`.
     `highlighter` (Callable[[str, str], Optional[str]] | None, optional):: Optional syntax highlighter callable. Defaults to default Fired Clay Pygments highlighter.
 
     [returns]
@@ -74,8 +77,14 @@ def render_body(
 
     _ensure_section_ids(node_dict)
     active_highlighter = highlighter if highlighter is not None else make_highlighter()
+    active_search_paths: list[Path] = []
+    if search_paths:
+        active_search_paths.extend(search_paths)
+    if DEFAULT_TEMPLATES_DIR.exists() and DEFAULT_TEMPLATES_DIR not in active_search_paths:
+        active_search_paths.append(DEFAULT_TEMPLATES_DIR)
+
     renderer = asciidoctype.AsciiDoctypeRenderer(
-        search_paths=search_paths,
+        search_paths=active_search_paths,
         highlighter=active_highlighter,
     )
     if node_dict.get("name") == "document":
