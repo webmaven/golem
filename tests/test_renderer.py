@@ -1,3 +1,4 @@
+from pathlib import Path
 import asciidoctrine
 from asciidoctrine.resolver import ASGResolver
 from golem.renderer import render_body, generate_toc_html
@@ -420,3 +421,67 @@ def test_listing_copy_button_markup():
     html = render_body(asg)
     assert 'aria-label="Copy code to clipboard"' in html
     assert 'class="icon-copy"' in html
+
+
+def test_listing_role_attribute_sanitization():
+    """Verify malformed and malicious role attributes are sanitized to safe CSS class tokens."""
+    asg = {
+        "name": "listing",
+        "type": "block",
+        "title": "secure.py",
+        "value": "x = 1",
+        "attributes": {
+            "language": "python",
+            "role": 'valid-role safe_role_1 test" onclick="alert(1)" <script>bad</script>',
+        },
+    }
+    html = render_body(asg)
+    assert 'class="badge badge-valid-role"' in html
+    assert 'class="badge badge-safe_role_1"' in html
+    assert "<script>" not in html
+    assert 'onclick="alert(1)"' not in html
+    assert 'test" onclick="alert(1)"' not in html
+
+
+def test_golem_renderer_get_listing_roles():
+    """Verify GolemRenderer.get_listing_roles returns sanitized tokens."""
+    from golem.renderer import GolemRenderer
+
+    renderer = GolemRenderer()
+    node = {
+        "attributes": {
+            "role": 'good-badge bad/badge! other$tag" test_1',
+        }
+    }
+    roles = renderer.get_listing_roles(node)
+    assert "good-badge" in roles
+    assert "test_1" in roles
+    for r in roles:
+        assert all(c.isalnum() or c in "-_" for c in r)
+
+
+def test_listing_template_has_no_dynamic_imports():
+    """Verify listing.html template does not use __import__ or eval."""
+    template_path = Path("src/golem/templates/default/listing.html")
+    content = template_path.read_text()
+    assert "__import__" not in content
+    assert "eval(" not in content
+
+
+def test_copy_button_falls_back_to_source_pane():
+    """Verify client JS has fallback to source pane for clipboard copy."""
+    content = Path("src/golem/templates/default/skeleton.pt").read_text()
+    assert 'data-tab="source"' in content  # fallback selector present
+
+
+def test_role_badge_sanitizes_class_names():
+    """Verify role names with special characters do not produce injected class attributes."""
+    asg = {
+        "name": "listing",
+        "type": "block",
+        "value": "x",
+        "attributes": {"language": "python", "role": 'evil" class="injected'},
+    }
+    html = render_body(asg)
+    assert 'class="injected"' not in html
+    assert "badge-evil" not in html or 'badge-evil" class="injected"' not in html

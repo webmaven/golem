@@ -211,3 +211,74 @@ def test_extract_listing_views():
         "value": "plain text",
     }
     assert extract_listing_views(plain_node) == []
+
+
+def test_snippet_parsing_file_inclusion_safety():
+    """Verify AsciiDoc snippet containing include directives is parsed safely without file inclusion."""
+    snippet_missing = "include::nonexistent_file_xyz_123.adoc[]\n\nNOTE: Safe text."
+    views_missing = generate_asciidoc_views(snippet_missing, ["source", "asg", "html", "preview"])
+    assert len(views_missing) == 4
+    # Ensure ASG dict does not contain an inclusion failure / crash error
+    asg_view = next(v for v in views_missing if v["id"] == "asg")
+    assert "error" not in asg_view["content"].lower() or "include" not in asg_view["content"].lower()
+    # Preview should render without crashing
+    preview_view = next(v for v in views_missing if v["id"] == "preview")
+    assert "Safe text." in preview_view["content"]
+
+    snippet_passwd = "include::/etc/passwd[]\n\nWARNING: Security check."
+    views_passwd = generate_asciidoc_views(snippet_passwd, ["source", "asg", "html", "preview"])
+    assert len(views_passwd) == 4
+    preview_passwd = next(v for v in views_passwd if v["id"] == "preview")
+    # Must not contain contents of /etc/passwd (e.g. root:x:0:0)
+    assert "root:x:0:0" not in preview_passwd["content"]
+    assert "root:*:" not in preview_passwd["content"]
+
+
+def test_nested_rendered_listings_recursion_guard():
+    """Verify nested listings with render attributes do not trigger infinite recursion."""
+    nested_adoc = '[source,asciidoc]\n[render="source,preview"]\n----\nNOTE: Inner note\n----\n'
+    asg = {
+        "name": "listing",
+        "type": "block",
+        "title": "Outer Listing",
+        "value": nested_adoc,
+        "attributes": {
+            "language": "asciidoc",
+            "render": "source,preview",
+        },
+    }
+    # Should render cleanly without infinite recursion
+    html = render_body(asg)
+    assert 'class="listingblock multi-view"' in html
+    assert 'data-tab="source"' in html
+    assert 'data-tab="preview"' in html
+    assert "Inner note" in html
+
+
+def test_template_hygiene_no_inline_import():
+    """Verify listing.html template does not use __import__."""
+    from pathlib import Path
+
+    tpl_path = Path(__file__).parent.parent / "src" / "golem" / "templates" / "default" / "listing.html"
+    tpl_content = tpl_path.read_text(encoding="utf-8")
+    assert "__import__" not in tpl_content
+
+
+def test_include_directive_in_snippet_is_not_resolved():
+    """Verify that include directives in AsciiDoc snippets are NOT resolved during view derivation."""
+    snippet = "include::/etc/passwd[]"
+    views = generate_asciidoc_views(snippet, ["source", "asg", "html"])
+    # Should produce views without raising PreprocessorError or reading local files
+    assert len(views) == 3
+    # The ASG view should not contain file system contents
+    asg_view = next((v for v in views if v["id"] == "asg"), None)
+    assert asg_view is not None
+    assert "/etc/passwd" not in asg_view["content"] or "include" in asg_view["content"]
+
+
+def test_nested_render_attribute_does_not_recurse():
+    """Verify that a snippet containing another render-attributed listing does not cause infinite recursion."""
+    snippet = '[source,asciidoc,render="source,html"]\n----\nhello\n----'
+    views = generate_asciidoc_views(snippet, ["html", "preview"])
+    assert len(views) == 2
+    # Should complete without RecursionError or stack overflow

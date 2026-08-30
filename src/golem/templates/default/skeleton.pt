@@ -1046,7 +1046,12 @@
                 if (copyBtn) {
                     var block = copyBtn.closest(".listingblock");
                     if (!block) return;
-                    var codeEl = block.querySelector(".tab-pane:not([hidden]) pre code, .tab-pane.active pre code, .listing-content pre code, pre code");
+                    var activePane = block.querySelector('.tab-pane:not([hidden]), .tab-pane.active');
+                    var codeEl = activePane ? activePane.querySelector('pre code') : null;
+                    if (!codeEl) {
+                        // Fallback to source pane or any pane with code
+                        codeEl = block.querySelector('.tab-pane[data-tab="source"] pre code') || block.querySelector('pre code');
+                    }
                     if (!codeEl) return;
 
                     var clone = codeEl.cloneNode(true);

@@ -54,6 +54,32 @@ class GolemRenderer(asciidoctype.AsciiDoctypeRenderer):
 
         return extract_listing_views(node, highlighter=self.highlighter)
 
+    def get_listing_roles(self, node: dict[str, Any]) -> list[str]:
+        """Extract and sanitize role identifiers for listing badges.
+
+        Filters role attributes to permit only safe alphanumeric characters,
+        hyphens, and underscores to prevent CSS/HTML injection.
+        """
+        if not isinstance(node, dict):
+            return []
+        attrs = node.get("attributes")
+        role_attr = attrs.get("role") if isinstance(attrs, dict) else node.get("role")
+        if not role_attr:
+            return []
+        if isinstance(role_attr, str):
+            raw_roles = role_attr.split()
+        elif isinstance(role_attr, (list, tuple, set)):
+            raw_roles = [str(r) for r in role_attr]
+        else:
+            raw_roles = [str(role_attr)]
+
+        sanitized: list[str] = []
+        for r in raw_roles:
+            cleaned = re.sub(r"[^a-zA-Z0-9_-]", "", r)
+            if cleaned and cleaned not in sanitized:
+                sanitized.append(cleaned)
+        return sanitized
+
     def render_view_content(self, view: dict[str, Any]) -> str:
         """Render raw HTML content for a validated derived view tab."""
         return str(view.get("content", ""))

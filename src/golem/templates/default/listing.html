@@ -1,8 +1,6 @@
-<figure tal:define="views_fn python:getattr(renderer, 'get_derived_views', None) or __import__('golem.views', fromlist=['extract_listing_views']).extract_listing_views;
-                    derived_views python:views_fn(node, getattr(renderer, 'highlighter', None)) if not hasattr(renderer, 'get_derived_views') else renderer.get_derived_views(node, ctx);
+<figure tal:define="derived_views python:renderer.get_derived_views(node, ctx) if hasattr(renderer, 'get_derived_views') else [];
                     lang python:node.get('attributes', {}).get('language') if isinstance(node.get('attributes'), dict) and node.get('attributes', {}).get('language') else (node.get('attributes', {}).get('lang') if isinstance(node.get('attributes'), dict) and node.get('attributes', {}).get('lang') else (node.get('language') or ''));
-                    role_attr python:node.get('attributes', {}).get('role') if isinstance(node.get('attributes'), dict) else node.get('role');
-                    roles python:role_attr.split() if isinstance(role_attr, str) else (list(role_attr) if role_attr else []);
+                    roles python:renderer.get_listing_roles(node) if hasattr(renderer, 'get_listing_roles') else [];
                     highlighted python:None if derived_views else renderer.highlight_code(node, ctx)"
         tal:attributes="class python:'listingblock multi-view' if derived_views else 'listingblock';
                         id python:node.get('attributes', {}).get('id') if isinstance(node.get('attributes'), dict) else (node.get('id') or None)">
@@ -20,7 +18,12 @@
       </button>
     </div>
     <div class="listing-actions">
-      <span tal:repeat="r roles" tal:attributes="class python:f'badge badge-{r}'" tal:content="r"></span>
+      <tal:block tal:repeat="r roles">
+        <span tal:define="safe_r python:''.join([c for c in r.lower() if c.isalnum() or c in '-_'])"
+              tal:condition="safe_r"
+              tal:attributes="class python:f'badge badge-{safe_r}'"
+              tal:content="r"></span>
+      </tal:block>
       <span tal:condition="lang" class="badge badge-lang" tal:content="python:lang.upper()"></span>
       <button type="button" class="listing-copy-btn" aria-label="Copy code to clipboard" title="Copy code"><svg class="icon-copy" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
     </div>

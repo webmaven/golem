@@ -365,7 +365,7 @@ def test_compile_page_custom_pygments_css(tmp_path):
 
 
 def test_compile_page_includes_client_interaction_script(tmp_path):
-    """Test that default skeleton template includes client-side copy and tab scripts."""
+    """Test that default skeleton template includes client-side copy and tab scripts with preview fallback."""
     config = GolemConfig(output_dir=str(tmp_path / "dist"))
     compiler = PageCompiler(config)
 
@@ -377,3 +377,17 @@ def test_compile_page_includes_client_interaction_script(tmp_path):
     assert "navigator.clipboard" in html
     assert ".tab-btn" in html
     assert "aria-selected" in html
+    assert 'data-tab="preview"' in html or "rendered-preview" in html
+    assert 'data-tab="source"' in html
+
+
+def test_skeleton_copy_button_preview_targeting(tmp_path):
+    """Verify skeleton client script scopes copy to active pane and falls back to source pane for preview tab."""
+    from pathlib import Path
+
+    tpl_path = Path(__file__).parent.parent / "src" / "golem" / "templates" / "default" / "skeleton.pt"
+    tpl_content = tpl_path.read_text(encoding="utf-8")
+    assert "activePane" in tpl_content
+    assert "data-tab" in tpl_content
+    assert "rendered-preview" in tpl_content
+    assert '.tab-pane[data-tab="source"] pre code' in tpl_content

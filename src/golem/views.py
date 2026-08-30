@@ -9,6 +9,7 @@ Provides build-time synthesis of multi-view tabs from AsciiDoc listings:
 
 from __future__ import annotations
 
+import copy
 import html
 import json
 import logging
@@ -46,6 +47,35 @@ VIEW_LABELS: dict[str, str] = {
     "html": "HTML",
     "preview": "Preview",
 }
+
+
+def _strip_view_attributes(node: Any) -> None:
+    """Recursively strip multi-view render attributes from node structures to prevent infinite recursion."""
+    if not node:
+        return
+    if isinstance(node, list):
+        for item in node:
+            _strip_view_attributes(item)
+        return
+    if isinstance(node, dict):
+        attrs = node.get("attributes")
+        if isinstance(attrs, dict):
+            for k in VIEW_ATTRIBUTES:
+                attrs.pop(k, None)
+        for key in ("blocks", "children", "items", "inlines"):
+            if key in node and isinstance(node[key], list):
+                for child in node[key]:
+                    _strip_view_attributes(child)
+        return
+    if hasattr(node, "attributes") and isinstance(node.attributes, dict):
+        for k in VIEW_ATTRIBUTES:
+            node.attributes.pop(k, None)
+    if hasattr(node, "blocks") and node.blocks:
+        for child in node.blocks:
+            _strip_view_attributes(child)
+    elif hasattr(node, "children") and node.children:
+        for child in node.children:
+            _strip_view_attributes(child)
 
 
 def parse_views_attribute(attributes: Optional[dict[str, Any]]) -> list[str]:
@@ -132,7 +162,7 @@ def generate_asciidoc_views(
         if asg_dict is not None and asg_obj is not None:
             return asg_obj, asg_dict
         try:
-            ast = asciidoctrine.parse_to_ast(code_text)
+            ast = asciidoctrine.parse_to_ast(code_text, preprocess_directives=False, safe_mode=20)
             resolver = ASGResolver(ast)
             asg_obj = resolver.resolve(ast)
             if hasattr(asg_obj, "to_dict"):
@@ -155,7 +185,9 @@ def generate_asciidoc_views(
         try:
             from golem.renderer import render_body
 
-            rendered_html_str = render_body(resolved_asg, highlighter=active_highlighter)
+            asg_to_render = copy.deepcopy(resolved_asg)
+            _strip_view_attributes(asg_to_render)
+            rendered_html_str = render_body(asg_to_render, highlighter=active_highlighter)
         except Exception as err:
             logger.warning("Failed to render ASG to HTML: %s", err)
             rendered_html_str = f'<div class="error">{html.escape(str(err))}</div>'
