@@ -491,33 +491,49 @@
             height: 1rem;
         }
 
-        /* ── Multi-View Listing Tabs ───────────────────────── */
+        /* ── Multi-View Listing Tabs (Physical Folder Tabs) ────────── */
+        .listingblock.multi-view .listing-header {
+            padding: 0.45rem 0.75rem 0;
+            align-items: flex-end;
+        }
+        .listingblock.multi-view .listing-title {
+            padding-bottom: 0.35rem;
+        }
+        .listingblock.multi-view .listing-actions {
+            padding-bottom: 0.35rem;
+        }
         .listing-tabs {
             display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
+            align-items: flex-end;
+            gap: 3px;
             margin-right: auto;
+            margin-bottom: -1px;
+            position: relative;
+            z-index: 10;
+            align-self: flex-end;
         }
         .tab-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
             font-family: var(--golem-font-ui);
-            font-size: 0.72rem;
+            font-size: 0.73rem;
             font-weight: 600;
-            padding: 0.15em 0.55em;
-            border-radius: 3px;
+            padding: 0.35rem 0.75rem calc(0.35rem + 1px);
+            border-radius: 5px 5px 0 0;
+            border: 1px solid transparent;
+            border-bottom: none;
             background: transparent;
             color: var(--golem-text-muted);
-            border: 1px solid transparent;
             cursor: pointer;
             line-height: 1.2;
-            transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+            position: relative;
+            transition: color 0.15s ease, background-color 0.15s ease;
         }
-        .tab-btn:hover {
+        .tab-btn:hover:not(.active) {
             color: var(--golem-text);
-            border-color: var(--golem-border);
-            background: var(--golem-bg);
+            background: color-mix(in srgb, var(--golem-text) 5%, transparent);
+            border-color: color-mix(in srgb, var(--golem-border) 60%, transparent) color-mix(in srgb, var(--golem-border) 60%, transparent) transparent;
         }
         .tab-btn:focus-visible {
             outline: 2px solid var(--golem-primary);
@@ -525,9 +541,16 @@
         }
         .tab-btn.active, .tab-btn[aria-selected="true"] {
             color: var(--golem-primary);
-            background: var(--golem-bg);
-            border-color: var(--golem-border);
             font-weight: 700;
+            background: var(--golem-code-bg);
+            border: 1px solid var(--golem-border);
+            border-bottom: 1px solid var(--golem-code-bg);
+            margin-bottom: -1px;
+            z-index: 20;
+        }
+        .tab-btn[data-tab="preview"].active {
+            background: var(--golem-bg);
+            border-bottom: 1px solid var(--golem-bg);
         }
         .listing-panes {
             position: relative;
