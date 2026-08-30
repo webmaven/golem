@@ -9,6 +9,7 @@ Golem operates as a deterministic, compiler-grade document processing pipeline b
 
 == Pipeline Lifecycle
 
+.Compilation Pipeline Data Flow
 [source,text]
 ----
  Source .adoc File

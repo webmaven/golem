@@ -15,6 +15,7 @@ Deploying your Golem documentation site to GitHub Pages with automatic build cac
 
 === `.github/workflows/docs.yml`
 
+..github/workflows/docs.yml
 [source,yaml]
 ----
 name: Deploy Documentation
@@ -129,6 +130,7 @@ Configure the build settings in the Cloudflare Pages Dashboard:
 
 Under **Settings > Environment variables**, specify the Python runtime version:
 
+.Cloudflare Environment Variables
 [source,text]
 ----
 PYTHON_VERSION = 3.14
@@ -140,6 +142,7 @@ For repositories hosted on GitLab, deploy to GitLab Pages using `.gitlab-ci.yml`
 
 === `.gitlab-ci.yml`
 
+..gitlab-ci.yml
 [source,yaml]
 ----
 image: python:3.14-slim

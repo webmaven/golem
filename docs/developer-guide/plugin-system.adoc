@@ -11,6 +11,7 @@ Golem utilizes `pluggy`—the plugin engine behind `pytest`—to provide clean l
 
 Plugins implement hooks using the `@hookimpl` decorator from `golem.plugins`:
 
+.my_plugin.py
 [source,python]
 ----
 from pathlib import Path
@@ -64,6 +65,7 @@ class MyPlugin:
 
 In your plugin package's `pyproject.toml`:
 
+.pyproject.toml
 [source,toml]
 ----
 [project.entry-points."golem.plugins"]

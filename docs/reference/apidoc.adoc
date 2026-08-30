@@ -11,6 +11,7 @@ Golem includes a built-in API reference documentation generator plugin (`golem.p
 
 You can generate comprehensive API reference pages for your Python packages either automatically during build or via the CLI:
 
+.Terminal
 [source,bash]
 ----
 golem apidoc [PACKAGE] [--output <dir>] [--docstring-style <style>]
@@ -20,6 +21,7 @@ golem apidoc [PACKAGE] [--output <dir>] [--docstring-style <style>]
 
 Configure API generation settings in your project configuration:
 
+.golem.toml
 [source,toml]
 ----
 [api]
@@ -36,6 +38,7 @@ In technical manuals, guides, or tutorials, you often want to splice live API do
 
 Golem provides the `golem:apidoc[...]` inline block macro:
 
+.engine_guide.adoc
 [source,asciidoc]
 ----
 = Engine Architecture Guide

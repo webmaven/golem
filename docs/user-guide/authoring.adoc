@@ -12,7 +12,8 @@ Golem supports full standards-compliant AsciiDoc across 39 node types, rendered 
 === 1. Admonition Blocks
 Golem supports all 5 standard admonitions with distinctive, color-coded callout boxes:
 
-[source,asciidoc]
+.Admonition Callouts
+[source,asciidoc,render="source,preview"]
 ----
 [NOTE]
 ====
@@ -40,11 +41,10 @@ High-risk warning for potential data loss or security issues.
 ====
 ----
 
-=== 2. Source Code & Callouts
-Syntax-highlighted listings with numbered callouts:
+=== 2. Source Code, Listing Headers & Callouts
+Golem provides rich, IDE-style code listings with semantic header bars, block titles, uppercase language badges, test/state role badges, and one-click clipboard copying.
 
-[source,asciidoc]
-------
+.hello_golem.py
 [source,python]
 ----
 import click <1>
@@ -55,11 +55,112 @@ def hello():
 ----
 <1> Import the click CLI framework.
 <2> Decorate the function as a command entry point.
-------
+
+==== Listing Headers, Badges & Clipboard Copying
+
+When authoring code blocks in AsciiDoc:
+
+* *Block Titles & Filenames:* Prefixing a block with `.filename.py` or `.Title` renders a clean, styled `.listing-title` in the top header bar.
+* *Language Badges:* Specifying `[source,python]` or `[source,toml]` automatically displays a capitalized language badge (e.g. `PYTHON`, `TOML`, `ASCIIDOC`) via `.badge.badge-lang`.
+* *Role Badges:* Specifying `role="test"`, `role="shared"`, or `role="reset"` in block attributes renders distinctive semantic role badges (`.badge-test`, `.badge-shared`, `.badge-reset`) to indicate test isolation or execution state.
+* *One-Click Clipboard Copy:* Every listing header includes an accessible copy button (`.listing-copy-btn`). Clicking the button copies the listing's code directly to the user's clipboard and displays a visual confirmation checkmark.
+
+.Stateful Test Listing Example
+[source,asciidoc]
+----
+.pipeline_config.py
+[source,python,role="shared test"]
+----
+base_url = "https://example.com/api"
+timeout = 30
+----
+----
+
+== Multi-View Derived Renderings
+
+Technical documentation often needs to demonstrate not just raw AsciiDoc source code, but also how that source is parsed, compiled, or visually rendered. Golem includes a built-in *Multi-View Derived Rendering Engine* that compiles code snippets into interactive tabbed containers at build time.
+
+=== The `render` Attribute & Aliases
+
+To generate derived multi-view tabs, author a `[source,asciidoc]` block and specify the `render` attribute (or one of its aliases: `views`, `display`, `formats`):
+
+.Multi-View Syntax Example
+[source,asciidoc]
+----
+.Interactive Admonition Demo
+[source,asciidoc,render="source,asg,html,preview"]
+----
+[NOTE]
+====
+This note is rendered into AsciiDoc, ASG JSON, HTML, and Live Preview tabs!
+====
+----
+----
+
+=== Supported View Channels
+
+Golem supports four canonical compilation view channels:
+
+[cols="1,1,3"]
+|===
+| View Channel | Aliases | Description
+
+| `source`
+| `asciidoc`, `adoc`, `src`
+| The raw, syntax-highlighted AsciiDoc input snippet (Tab label: *AsciiDoc*).
+
+| `asg`
+| `ast`, `json`
+| The parsed Abstract Semantic Graph (ASG) dictionary serialized as formatted, syntax-highlighted JSON (Tab label: *ASG*).
+
+| `html`
+| `rendered-html`, `markup`
+| The compiled HTML5 fragment source code, syntax-highlighted (Tab label: *HTML*).
+
+| `preview`
+| `live`, `rendered`, `view`
+| The live, interactive HTML component rendered directly inside a `.rendered-preview` container (Tab label: *Preview*).
+|===
+
+=== Live Multi-View Demonstrations
+
+==== 1. Source & Live Preview (`render="source,preview"`)
+
+.Formatted Text Callout
+[source,asciidoc,render="source,preview"]
+----
+[TIP]
+====
+Multi-view blocks make it easy for readers to compare AsciiDoc markup with its rendered visual output.
+====
+----
+
+==== 2. Full Multi-View Pipeline (`render="source,asg,html,preview"`)
+
+.Rich Content Block Pipeline
+[source,asciidoc,render="source,asg,html,preview"]
+----
+* *Bold Emphasis*
+* _Italic Text_
+* `Inline Monospace`
+----
+
+=== Zero-JS Baseline & Progressive Enhancement
+
+Golem's multi-view tab system is engineered with progressive enhancement and accessibility:
+
+* *Zero-JS Baseline:* When JavaScript is unavailable or disabled, the first tab is active and visible by default, while subsequent tab panes are hidden using standard HTML `hidden` attributes. All content is fully indexed by search engines and readable in text browsers.
+* *Interactive Tab Switching:* With JavaScript enabled, clicking any tab button or navigating via keyboard arrows (`role="tab"`, `role="tablist"`, `role="tabpanel"`) toggles the visible pane with seamless transitions.
+* *Context-Aware Clipboard Copying:* When viewing a multi-view container, the clipboard copy button automatically targets the code or text of whichever tab is currently active (e.g. copying JSON when the ASG tab is selected, or raw HTML when the HTML tab is selected).
+
+== Other AsciiDoc Constructs
 
 === 3. Structured Tables
 Tables support explicit column widths, header alignment, and embedded formatting:
 
+.CLI Commands Summary
+[source,asciidoc,render="source,preview"]
+----
 [cols="1,2,1"]
 |===
 | Command | Purpose | Default Port
@@ -67,11 +168,13 @@ Tables support explicit column widths, header alignment, and embedded formatting
 | `golem serve` | Live-reload development server | `8000`
 | `golem build` | Compile static site to `dist/` | N/A
 |===
+----
 
 === 4. Mathematical Expressions (STEM)
 Inline formulas and block equations:
 
-[source,asciidoc]
+.STEM Mathematical Equations
+[source,asciidoc,render="source,preview"]
 ----
 Inline formula: stem:[E = mc^2]
 
@@ -84,7 +187,8 @@ Inline formula: stem:[E = mc^2]
 === 5. Description Lists & Footnotes
 Hierarchical term-definition syntax and anchored footnotes:
 
-[source,asciidoc]
+.Core Architecture Concepts
+[source,asciidoc,render="source,preview"]
 ----
 AST:: Concrete Abstract Syntax Tree parsed by Lark.
 ASG:: Semantic Abstract Semantic Graph resolved by `asciidoctrine`.footnote:[Named after the compiler intermediate representation.]

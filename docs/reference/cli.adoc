@@ -16,6 +16,7 @@ The `golem` command-line utility provides commands for initializing, authoring, 
 
 Initialize a new Golem documentation project scaffold.
 
+.Terminal
 [source,bash]
 ----
 golem init [--template=<package|site|book|simple>] [--output-dir=<dir>] [-C <dir>]
@@ -29,6 +30,7 @@ golem init [--template=<package|site|book|simple>] [--output-dir=<dir>] [-C <dir
 
 Generate a new `.adoc` document skeleton with pre-filled metadata headers (`:golem-type:`, `:author:`, `:date:`).
 
+.Terminal
 [source,bash]
 ----
 golem new <doc_type> <TITLE> [-C <dir>]
@@ -42,6 +44,7 @@ golem new <doc_type> <TITLE> [-C <dir>]
 
 Compile AsciiDoc source files into static HTML via incremental DAG caching.
 
+.Terminal
 [source,bash]
 ----
 golem build [--config=<path>] [--clean] [--strict] [-v] [-q] [-C <dir>]
@@ -58,6 +61,7 @@ golem build [--config=<path>] [--clean] [--strict] [-v] [-q] [-C <dir>]
 
 Start the multi-threaded live-reload dev server with Server-Sent Events (SSE) and in-browser error overlays.
 
+.Terminal
 [source,bash]
 ----
 golem serve [--port=<port>] [--host=<host>] [--strict] [-C <dir>]
@@ -72,6 +76,7 @@ golem serve [--port=<port>] [--host=<host>] [--strict] [-C <dir>]
 
 Extract and execute embedded Python code examples from documentation and docstrings using `asciidoctest`.
 
+.Terminal
 [source,bash]
 ----
 golem doctest [paths...] [-m/--mode=<explicit|eager|auto>] [-s/--source=<pkg_or_file>] [-v] [-x]
@@ -87,6 +92,7 @@ golem doctest [paths...] [-m/--mode=<explicit|eager|auto>] [-s/--source=<pkg_or_
 
 Generate AsciiDoc API reference documentation from Python packages using static AST analysis and docstring formatting.
 
+.Terminal
 [source,bash]
 ----
 golem apidoc [PACKAGE] [-o/--output=<dir>] [-s/--docstring-style=<style>]
@@ -100,6 +106,7 @@ golem apidoc [PACKAGE] [-o/--output=<dir>] [-s/--docstring-style=<style>]
 
 List and inspect active, built-in, entry-point, and local Pluggy plugin extensions.
 
+.Terminal
 [source,bash]
 ----
 golem plugins [--json] [-C <dir>]
@@ -112,6 +119,7 @@ golem plugins [--json] [-C <dir>]
 
 List active and discovered Chameleon theme templates.
 
+.Terminal
 [source,bash]
 ----
 golem themes [--json] [-C <dir>]

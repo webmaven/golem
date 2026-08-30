@@ -18,6 +18,7 @@ A Golem theme is a self-contained directory containing layout templates and stat
 
 === Standard Theme Directory Structure
 
+.Standard Theme Files
 [source,text]
 ----
 themes/mytheme/
@@ -106,6 +107,7 @@ The default Golem theme ("Workbench" / Fired Clay aesthetic) is engineered entir
 
 Golem automatically supports dark mode via `@media (prefers-color-scheme: dark)`. The dark theme uses charcoal and warm ember tones:
 
+.Dark Mode Custom Properties
 [source,css]
 ----
 @media (prefers-color-scheme: dark) {
@@ -222,6 +224,7 @@ You can load custom web fonts and external stylesheets across your documentation
 
 === In `golem.toml`
 
+.golem.toml
 [source,toml]
 ----
 [site]
@@ -237,6 +240,7 @@ custom_js = [
 
 === In `pyproject.toml`
 
+.pyproject.toml
 [source,toml]
 ----
 [tool.golem.site]
@@ -251,6 +255,7 @@ custom_css = [
 
 Once loaded, assign the font families to Golem's typography tokens:
 
+.static/css/custom.css
 [source,css]
 ----
 :root {
@@ -258,6 +263,161 @@ Once loaded, assign the font families to Golem's typography tokens:
     --golem-font-body: 'Outfit', sans-serif;
     --golem-font-ui: 'Outfit', sans-serif;
     --golem-font-mono: 'Fira Code', monospace;
+}
+----
+
+== Code Listings & Multi-View Component Styling
+
+Golem renders code blocks and multi-view derived listings as structured `<figure>` components with semantic headers, interactive tabs, language and test role badges, and clipboard copy controls.
+
+=== DOM Structure & CSS Classes
+
+==== Standard Listing Block
+[source,html]
+----
+<figure class="listingblock" id="block-id">
+  <header class="listing-header">
+    <span class="listing-title">example.py</span>
+    <div class="listing-actions">
+      <span class="badge badge-test">test</span>
+      <span class="badge badge-lang">PYTHON</span>
+      <button type="button" class="listing-copy-btn" aria-label="Copy code to clipboard">
+        <svg class="icon-copy" ...></svg>
+      </button>
+    </div>
+  </header>
+  <div class="listing-content">
+    <pre class="highlight python"><code class="language-python">...</code></pre>
+  </div>
+</figure>
+----
+
+==== Multi-View Derived Listing Block
+[source,html]
+----
+<figure class="listingblock multi-view">
+  <header class="listing-header">
+    <span class="listing-title">Admonition Demo</span>
+    <div class="listing-tabs" role="tablist">
+      <button type="button" class="tab-btn active" data-tab="source" role="tab" aria-selected="true" tabindex="0">AsciiDoc</button>
+      <button type="button" class="tab-btn" data-tab="asg" role="tab" aria-selected="false" tabindex="-1">ASG</button>
+      <button type="button" class="tab-btn" data-tab="html" role="tab" aria-selected="false" tabindex="-1">HTML</button>
+      <button type="button" class="tab-btn" data-tab="preview" role="tab" aria-selected="false" tabindex="-1">Preview</button>
+    </div>
+    <div class="listing-actions">
+      <span class="badge badge-lang">ASCIIDOC</span>
+      <button type="button" class="listing-copy-btn" aria-label="Copy code to clipboard">...</button>
+    </div>
+  </header>
+  <div class="listing-panes">
+    <div class="tab-pane active" data-tab="source" role="tabpanel">
+      <pre class="highlight asciidoc"><code class="language-asciidoc">...</code></pre>
+    </div>
+    <div class="tab-pane" data-tab="asg" role="tabpanel" hidden="hidden">
+      <pre class="highlight json"><code class="language-json">...</code></pre>
+    </div>
+    <div class="tab-pane" data-tab="html" role="tabpanel" hidden="hidden">
+      <pre class="highlight html"><code class="language-html">...</code></pre>
+    </div>
+    <div class="tab-pane" data-tab="preview" role="tabpanel" hidden="hidden">
+      <div class="rendered-preview">...</div>
+    </div>
+  </div>
+</figure>
+----
+
+=== Component Class Reference
+
+[cols="1,1,3"]
+|===
+| Class Name | HTML Element | Role & Styling Purpose
+
+| `.listingblock`
+| `<figure>`
+| Outer wrapper for code listings. Sets border, background (`--golem-code-bg`), accent left stripe (`--golem-primary`), and overflow boundaries.
+
+| `.listingblock.multi-view`
+| `<figure>`
+| Modifier class applied when derived multi-view tabs (`render=...`) are present.
+
+| `.listing-header`
+| `<header>`
+| Flexbox header bar displaying title, tab controls, language badges, and actions against `--golem-surface`.
+
+| `.listing-title`
+| `<span>`
+| Displays filename or block title with bold weight (`--golem-text`) and ellipsis truncation.
+
+| `.listing-tabs`
+| `<div>`
+| Container (`role="tablist"`) grouping interactive tab buttons.
+
+| `.tab-btn`
+| `<button>`
+| Interactive tab switcher (`role="tab"`). Styled with muted text, transitioning to `--golem-primary` on `.active` / `aria-selected="true"`.
+
+| `.listing-actions`
+| `<div>`
+| Right-aligned flex container housing role badges, language pill, and the copy button.
+
+| `.badge`
+| `<span>`
+| Base pill badge styling with uppercase typography (`--golem-font-ui`) and subtle borders.
+
+| `.badge-lang`
+| `<span>`
+| Pill badge displaying language identifier (e.g. `PYTHON`, `TOML`, `ASCIIDOC`).
+
+| `.badge-test`
+| `<span>`
+| Semantic badge for `role="test"` doctest blocks styled using `--golem-note` (teal).
+
+| `.badge-shared`
+| `<span>`
+| Semantic badge for `role="shared"` state blocks styled using `--golem-tip` (olive).
+
+| `.badge-reset`
+| `<span>`
+| Semantic badge for `role="reset"` state-clearing blocks styled using `--golem-warning` (amber).
+
+| `.listing-copy-btn`
+| `<button>`
+| Clipboard copy trigger. Features hover states, focus rings, and a temporary `.copied` state with green checkmark styling (`--golem-tip`).
+
+| `.listing-panes`
+| `<div>`
+| Wrapper for multi-view panes.
+
+| `.tab-pane`
+| `<div>`
+| Individual view panel (`role="tabpanel"`). Hidden panes receive the `[hidden]` attribute (`display: none !important`).
+
+| `.rendered-preview`
+| `<div>`
+| Sandbox container for live rendered HTML in the `preview` tab. Resets background to `--golem-bg` and body text to `--golem-text`.
+|===
+
+=== Design Tokens for Listing Customization
+
+Themes can customize code listings and multi-view blocks by overriding the following CSS custom properties:
+
+[source,css]
+----
+:root {
+    /* Code block container & header */
+    --golem-code-bg: #ece7de;
+    --golem-surface: #f2ede8;
+    --golem-border: #cec8bf;
+    --golem-primary: #8b3a12;
+
+    /* Badges & Actions */
+    --golem-note: #2d6a5a;
+    --golem-tip: #6e7818;
+    --golem-warning: #b58a00;
+    
+    /* Typography */
+    --golem-font-ui: 'Source Sans 3', sans-serif;
+    --golem-font-mono: 'Source Code Pro', monospace;
 }
 ----
 
@@ -271,6 +431,7 @@ To create a fully customized theme or override Golem's default page structure:
 
 === Complete Annotated Custom Theme Example
 
+.themes/mytheme/skeleton.pt
 [source,html]
 ----
 <!DOCTYPE html>
@@ -339,6 +500,7 @@ To create a fully customized theme or override Golem's default page structure:
 
 You can distribute Golem themes as reusable Python packages. Register your theme directory in `pyproject.toml` using entry points:
 
+.pyproject.toml
 [source,toml]
 ----
 [project.entry-points."golem.themes"]

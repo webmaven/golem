@@ -9,6 +9,7 @@
 
 Golem provides a scaffolding command `golem init` to generate a ready-to-build workspace:
 
+.Terminal
 [source,bash]
 ----
 golem init my-project
@@ -17,6 +18,7 @@ cd my-project
 
 This creates the standard standalone documentation structure:
 
+.Directory Structure
 [source,text]
 ----
 my-project/
@@ -25,10 +27,24 @@ my-project/
     └── index.adoc      # Homepage entry point
 ----
 
+The scaffolded `content/index.adoc` starter document includes standard AsciiDoc metadata:
+
+.content/index.adoc
+[source,asciidoc,render="source,preview"]
+----
+= Welcome to My Project
+Michael Bernstein
+:toc:
+
+== Introduction
+Welcome to your new Golem-powered technical documentation portal.
+----
+
 == 2. Scaffolding New Documents
 
 Generate structured chapter or article skeletons with `golem new`:
 
+.Terminal
 [source,bash]
 ----
 golem new chapter "Getting Started"
@@ -40,6 +56,7 @@ This creates `content/getting-started.adoc` with standard headers and metadata.
 
 Compile the documentation into static HTML5:
 
+.Terminal
 [source,bash]
 ----
 golem build
@@ -51,6 +68,7 @@ By default, Golem reads AsciiDoc sources from `content/` and writes static outpu
 
 Start Golem's development server to preview changes in real time:
 
+.Terminal
 [source,bash]
 ----
 golem serve --port 8000
