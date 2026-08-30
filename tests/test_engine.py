@@ -920,46 +920,46 @@ def test_navigation_empty_and_non_adoc_directory_pruning(tmp_path):
 
 
 def test_dir_has_adoc_content_helper(tmp_path):
-    from golem.engine import _dir_has_adoc_content
+    from golem.metadata import dir_has_adoc_content
 
     # Nonexistent path
-    assert _dir_has_adoc_content(tmp_path / "does_not_exist") is False
+    assert dir_has_adoc_content(tmp_path / "does_not_exist") is False
 
     # Empty dir
     empty = tmp_path / "empty"
     empty.mkdir()
-    assert _dir_has_adoc_content(empty) is False
+    assert dir_has_adoc_content(empty) is False
 
     # Dir with non-adoc files only
     non_adoc = tmp_path / "non_adoc"
     non_adoc.mkdir()
     (non_adoc / "readme.txt").write_text("hi")
     (non_adoc / "image.png").write_bytes(b"123")
-    assert _dir_has_adoc_content(non_adoc) is False
+    assert dir_has_adoc_content(non_adoc) is False
 
     # Dir with partial adoc files only
     partial_dir = tmp_path / "partial"
     partial_dir.mkdir()
     (partial_dir / "_partial.adoc").write_text("partial")
-    assert _dir_has_adoc_content(partial_dir) is False
+    assert dir_has_adoc_content(partial_dir) is False
 
     # Dir with adoc file inside hidden/partial subdir
     hidden_sub = tmp_path / "hidden_sub"
     (hidden_sub / "_sub").mkdir(parents=True)
     (hidden_sub / "_sub" / "valid.adoc").write_text("valid")
-    assert _dir_has_adoc_content(hidden_sub) is False
+    assert dir_has_adoc_content(hidden_sub) is False
 
     # Dir with valid adoc file directly inside
     valid_dir = tmp_path / "valid"
     valid_dir.mkdir()
     (valid_dir / "index.adoc").write_text("= Index")
-    assert _dir_has_adoc_content(valid_dir) is True
+    assert dir_has_adoc_content(valid_dir) is True
 
     # Dir with valid adoc file nested inside
     nested_valid = tmp_path / "nested_valid"
     (nested_valid / "sub1" / "sub2").mkdir(parents=True)
     (nested_valid / "sub1" / "sub2" / "doc.adoc").write_text("= Doc")
-    assert _dir_has_adoc_content(nested_valid) is True
+    assert dir_has_adoc_content(nested_valid) is True
 
 
 def test_discover_navigation_respects_nav_order(tmp_path):
@@ -1063,8 +1063,8 @@ def test_theme_template_fine_grained_invalidation(tmp_path, monkeypatch):
 
 
 def test_extract_metadata_layout_classes(tmp_path):
-    """Test _extract_metadata_from_doc extracts body_class, page_class, and content_class."""
-    from golem.engine import _extract_metadata_from_doc
+    """Test extract_metadata_from_doc extracts body_class, page_class, and content_class."""
+    from golem.metadata import extract_metadata_from_doc
 
     doc1 = tmp_path / "doc1.adoc"
     doc1.write_text(
@@ -1088,12 +1088,12 @@ Page text.
         encoding="utf-8",
     )
 
-    meta1 = _extract_metadata_from_doc(doc1)
+    meta1 = extract_metadata_from_doc(doc1)
     assert meta1["body_class"] == "custom-body-layout"
     assert meta1["page_class"] == "custom-body-layout"
     assert meta1["content_class"] == "wide-content"
 
-    meta2 = _extract_metadata_from_doc(doc2)
+    meta2 = extract_metadata_from_doc(doc2)
     assert meta2["body_class"] == "doc-article"
     assert meta2["page_class"] == "doc-article"
     assert meta2["content_class"] == "prose-narrow"
@@ -1444,3 +1444,78 @@ def test_package_template_modification_invalidates_cache(tmp_path):
     engine.cache_data["meta"]["theme_templates"]["skeleton.pt"] = "old_stale_hash"
     outdated = engine.get_outdated_files(commit=False)
     assert doc_path.resolve() in outdated
+
+
+def test_metadata_title_from_filename():
+    from golem.metadata import title_from_filename
+
+    assert title_from_filename("01-getting-started.adoc") == "Getting Started"
+    assert title_from_filename("10_api_reference.adoc") == "Api Reference"
+    assert title_from_filename("02.deep-dive.adoc") == "Deep Dive"
+    assert title_from_filename("simple.adoc") == "Simple"
+    assert title_from_filename("my-cool-feature") == "My Cool Feature"
+    assert title_from_filename("99") == "99"
+
+
+def test_metadata_clean_index_url():
+    from golem.metadata import clean_index_url
+
+    assert clean_index_url("index.html") == "./"
+    assert clean_index_url("docs/guide/index.html") == "docs/guide/"
+    assert clean_index_url("docs/guide/about.html") == "docs/guide/about.html"
+    assert clean_index_url("index.adoc") == "index.adoc"
+
+
+def test_metadata_extract_metadata_and_title(tmp_path):
+    from golem.metadata import extract_metadata_from_doc, extract_title_from_doc
+
+    # Normal doc with full header
+    doc = tmp_path / "01-sample.adoc"
+    doc.write_text(
+        """= Sample Title
+:nav_title: Navigation Title
+:nav_order: 5
+:toc:
+:page_class: page-style
+:body_class: body-style
+:content_class: content-style
+
+== First Section
+Some content.
+""",
+        encoding="utf-8",
+    )
+
+    meta = extract_metadata_from_doc(doc)
+    assert meta["title"] == "Sample Title"
+    assert meta["nav_title"] == "Navigation Title"
+    assert meta["nav_order"] == 5
+    assert meta["has_toc"] is True
+    assert meta["page_class"] == "page-style"
+    assert meta["body_class"] == "body-style"
+    assert meta["content_class"] == "content-style"
+    assert extract_title_from_doc(doc) == "Sample Title"
+
+    # Doc with disabled TOC and title fallback
+    doc_no_header = tmp_path / "02-no-header.adoc"
+    doc_no_header.write_text(
+        """:!toc:
+:nav-order: not-an-int
+
+== Section One
+Body text.
+""",
+        encoding="utf-8",
+    )
+    meta2 = extract_metadata_from_doc(doc_no_header)
+    assert meta2["title"] == "No Header"
+    assert meta2["nav_title"] == "No Header"
+    assert meta2["nav_order"] is None
+    assert meta2["has_toc"] is False
+    assert extract_title_from_doc(doc_no_header) == "No Header"
+
+    # Doc that does not exist
+    nonexistent = tmp_path / "does_not_exist.adoc"
+    meta_none = extract_metadata_from_doc(nonexistent)
+    assert meta_none["title"] == "Does Not Exist"
+    assert meta_none["has_toc"] is False
