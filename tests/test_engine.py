@@ -74,7 +74,7 @@ def test_cache_file_deletion_propagation(tmp_path):
     engine.build_site()
 
     # Verify that the cache maps file_b as a dependency of file_a
-    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(str(file_a.resolve()), [])
+    assert str(file_b.resolve()) in engine.cache.data["dependencies"].get(str(file_a.resolve()), [])
 
     # Second check (unmodified) should be empty
     assert len(engine.get_outdated_files()) == 0
@@ -85,7 +85,7 @@ def test_cache_file_deletion_propagation(tmp_path):
     # The engine must detect the deletion, propagate it to parent index.adoc, and clean up the cache
     outdated = engine.get_outdated_files()
     assert file_a.resolve() in outdated
-    assert str(file_b.resolve()) not in engine.cache_data["files"]
+    assert str(file_b.resolve()) not in engine.cache.data["files"]
 
 
 def test_cache_global_config_edit_propagation(tmp_path):
@@ -171,7 +171,7 @@ def test_cache_non_adoc_edit_propagation(tmp_path):
     engine.build_site()
 
     # Verify that the cache maps file_b as a dependency of file_a
-    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(str(file_a.resolve()), [])
+    assert str(file_b.resolve()) in engine.cache.data["dependencies"].get(str(file_a.resolve()), [])
 
     # Second check (unmodified) should be empty
     assert len(engine.get_outdated_files()) == 0
@@ -269,7 +269,7 @@ def test_engine_corrupt_cache_handling(tmp_path):
     cache_file.write_text("Not valid JSON at all!!!", encoding="utf-8")
 
     engine = BuildEngine(config, cache_file=cache_file)
-    assert engine.cache_data == {"files": {}, "dependencies": {}, "metadata": {}}
+    assert engine.cache.data == {"files": {}, "dependencies": {}, "metadata": {}}
     # The corrupted file should have been deleted/cleared
     assert not cache_file.exists() or cache_file.read_text().strip() == ""
 
@@ -293,12 +293,12 @@ def test_engine_watcher_cpu_optimization(tmp_path):
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     # First call: populates the SHA-256 and caches it
-    h1 = engine._get_sha256(file_a)
+    h1 = engine.cache.get_sha256(file_a)
     assert len(h1) == 64
 
     # Second call: should retrieve from cache without reading file again
     with patch("builtins.open") as mock_open:
-        h2 = engine._get_sha256(file_a)
+        h2 = engine.cache.get_sha256(file_a)
         assert h2 == h1
         mock_open.assert_not_called()
 
@@ -319,7 +319,7 @@ def test_engine_cache_concurrency_lock(tmp_path):
     acquired = []
 
     def worker():
-        with engine._cache_lock():
+        with engine.cache._cache_lock():
             acquired.append("A")
             time.sleep(0.5)
             acquired.append("A_done")
@@ -330,7 +330,7 @@ def test_engine_cache_concurrency_lock(tmp_path):
     time.sleep(0.1)
 
     start_time = time.time()
-    with engine._cache_lock():
+    with engine.cache._cache_lock():
         acquired.append("B")
     duration = time.time() - start_time
 
@@ -352,7 +352,7 @@ def test_engine_watcher_deleted_file_handling(tmp_path):
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     # Accessing SHA-256 for a nonexistent/deleted file should return "" without raising OSError
-    h = engine._get_sha256(file_a)
+    h = engine.cache.get_sha256(file_a)
     assert h == ""
 
 
@@ -368,7 +368,7 @@ def test_engine_cache_lock_file_creation(tmp_path):
 
     # Assert that accessing lock_file creates cache.lock under the correct directory
     lock_path = tmp_path / "cache.lock"
-    with engine._cache_lock():
+    with engine.cache._cache_lock():
         assert lock_path.exists()
 
 
@@ -384,13 +384,13 @@ def test_engine_cache_lock_release_on_error(tmp_path):
 
     # Assert that if an exception is raised inside the lock block, lock is still released
     try:
-        with engine._cache_lock():
+        with engine.cache._cache_lock():
             raise ValueError("Intentional crash")
     except ValueError:
         pass
 
     # A second acquisition should succeed immediately (if lock was not released, it would block/crash)
-    with engine._cache_lock():
+    with engine.cache._cache_lock():
         pass
 
 
@@ -637,10 +637,10 @@ def test_partials_exclusion_and_dependency_propagation(tmp_path):
     assert not (tmp_path / "dist" / "_snippets" / "note.html").exists()
 
     # Partials MUST be tracked in cache dependencies and files
-    assert str(file_partial.resolve()) in engine.cache_data["dependencies"].get(str(file_main.resolve()), [])
-    assert str(file_snippet.resolve()) in engine.cache_data["dependencies"].get(str(file_main.resolve()), [])
-    assert str(file_partial.resolve()) in engine.cache_data["files"]
-    assert str(file_snippet.resolve()) in engine.cache_data["files"]
+    assert str(file_partial.resolve()) in engine.cache.data["dependencies"].get(str(file_main.resolve()), [])
+    assert str(file_snippet.resolve()) in engine.cache.data["dependencies"].get(str(file_main.resolve()), [])
+    assert str(file_partial.resolve()) in engine.cache.data["files"]
+    assert str(file_snippet.resolve()) in engine.cache.data["files"]
 
     # Initial check (unmodified) should have no outdated files
     assert len(engine.get_outdated_files()) == 0
@@ -779,28 +779,28 @@ def test_metadata_caching_and_recovery(tmp_path):
     config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=cache_file)
 
-    # Calling discover_navigation populates cache_data["metadata"]
+    # Calling discover_navigation populates cache.data["metadata"]
     nav = engine.discover_navigation()
     assert len(nav) == 2
 
-    assert "metadata" in engine.cache_data
-    meta1 = engine.cache_data["metadata"].get(str(doc1.resolve()))
+    assert "metadata" in engine.cache.data
+    meta1 = engine.cache.data["metadata"].get(str(doc1.resolve()))
     assert meta1 is not None
     assert meta1["title"] == "Custom Title"
     assert meta1["nav_title"] == "Short Nav"
     assert meta1["has_toc"] is True
 
-    meta2 = engine.cache_data["metadata"].get(str(doc2.resolve()))
+    meta2 = engine.cache.data["metadata"].get(str(doc2.resolve()))
     assert meta2 is not None
     assert meta2["title"] == "Other Doc"
     assert meta2["has_toc"] is False
 
-    engine.save_cache()
+    engine.cache.save_cache()
 
     # Re-instantiate engine with existing cache file
     engine2 = BuildEngine(config, cache_file=cache_file)
-    assert "metadata" in engine2.cache_data
-    assert str(doc1.resolve()) in engine2.cache_data["metadata"]
+    assert "metadata" in engine2.cache.data
+    assert str(doc1.resolve()) in engine2.cache.data["metadata"]
 
     # When files are unmodified, discover_navigation uses cached metadata without re-reading from disk
     orig_open = open
@@ -821,7 +821,7 @@ def test_metadata_caching_and_recovery(tmp_path):
     doc1.write_text("= Updated Title\n:nav_title: Updated Nav\n", encoding="utf-8")
     nav3 = engine2.discover_navigation()
     assert len(nav3) == 2
-    updated_meta1 = engine2.cache_data["metadata"].get(str(doc1.resolve()))
+    updated_meta1 = engine2.cache.data["metadata"].get(str(doc1.resolve()))
     assert updated_meta1["title"] == "Updated Title"
     assert updated_meta1["nav_title"] == "Updated Nav"
 
@@ -1015,7 +1015,7 @@ def test_cache_records_node_types(tmp_path):
     engine.build_site()
 
     p_abs = str(doc.resolve())
-    metadata = engine.cache_data.get("metadata", {}).get(p_abs, {})
+    metadata = engine.cache.data.get("metadata", {}).get(p_abs, {})
     assert "node_types" in metadata
     assert "admonition" in metadata["node_types"]
     assert "listing" in metadata["node_types"]
@@ -1196,7 +1196,7 @@ def calculate_area(radius: float) -> float:
 
 
 def test_engine_clean(tmp_path):
-    """Verify engine.clean() purges output directory, cache file, lockfile, and resets in-memory cache."""
+    """Verify engine.cache.clean() purges cache file, lockfile, and resets in-memory cache."""
     content_dir = tmp_path / "content"
     content_dir.mkdir()
     (content_dir / "index.adoc").write_text("= Index\nContent here.", encoding="utf-8")
@@ -1213,24 +1213,23 @@ def test_engine_clean(tmp_path):
     assert output_dir.exists()
     assert (output_dir / "index.html").exists()
     assert cache_file.exists()
-    assert len(engine.cache_data["files"]) > 0
+    assert len(engine.cache.data["files"]) > 0
 
     # Create dummy lockfile to verify its removal
     lock_file.write_text("lock", encoding="utf-8")
     assert lock_file.exists()
 
     # Call clean()
-    engine.clean()
+    engine.cache.clean()
 
     # Verify everything purged and reset
-    assert not output_dir.exists()
     assert not cache_file.exists()
     assert not lock_file.exists()
-    assert engine.cache_data == {"files": {}, "dependencies": {}, "metadata": {}}
-    assert engine._sha_cache == {}
+    assert engine.cache.data == {"files": {}, "dependencies": {}, "metadata": {}}
+    assert engine.cache._sha_cache == {}
 
     # Calling clean() again on non-existent directories/files should execute without error
-    engine.clean()
+    engine.cache.clean()
 
 
 def test_engine_get_template_files_skipping(tmp_path):
@@ -1441,7 +1440,7 @@ def test_package_template_modification_invalidates_cache(tmp_path):
     assert len(engine.get_outdated_files()) == 0
 
     # Simulate modifying a package template hash in cache
-    engine.cache_data["meta"]["theme_templates"]["skeleton.pt"] = "old_stale_hash"
+    engine.cache.data["meta"]["theme_templates"]["skeleton.pt"] = "old_stale_hash"
     outdated = engine.get_outdated_files(commit=False)
     assert doc_path.resolve() in outdated
 
@@ -1519,3 +1518,40 @@ Body text.
     meta_none = extract_metadata_from_doc(nonexistent)
     assert meta_none["title"] == "Does Not Exist"
     assert meta_none["has_toc"] is False
+
+
+def test_build_cache_direct_operations(tmp_path):
+    """Verify BuildCache class direct initialization, saving, loading, hashing, and clean operations."""
+    from golem.cache import BuildCache
+
+    cache_file = tmp_path / ".golem" / "cache.json"
+    cache = BuildCache(cache_file)
+
+    assert cache.data == {"files": {}, "dependencies": {}, "metadata": {}}
+    assert cache._sha_cache == {}
+
+    # File hashing
+    sample_file = tmp_path / "test.adoc"
+    sample_file.write_text("= Test Document\n", encoding="utf-8")
+    h1 = cache.get_sha256(sample_file)
+    assert len(h1) == 64
+    assert str(sample_file.resolve()) in cache._sha_cache
+
+    # Save cache
+    cache.data["files"][str(sample_file.resolve())] = h1
+    cache.data["dependencies"][str(sample_file.resolve())] = []
+    cache.data["metadata"][str(sample_file.resolve())] = {"title": "Test Document"}
+    cache.save_cache()
+
+    assert cache_file.exists()
+
+    # Load into new cache instance
+    cache2 = BuildCache(cache_file)
+    assert cache2.data["files"][str(sample_file.resolve())] == h1
+    assert str(sample_file.resolve()) in cache2._sha_cache
+
+    # Clean cache
+    cache2.clean()
+    assert not cache_file.exists()
+    assert cache2.data == {"files": {}, "dependencies": {}, "metadata": {}}
+    assert cache2._sha_cache == {}

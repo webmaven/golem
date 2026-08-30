@@ -36,14 +36,12 @@ The compilation pipeline proceeds through sequential phases:
 9. Disk Output & Cache Update: Writes compiled HTML files to `output_dir` and updates content hashes and include dependencies in the cache.
 """
 
-import hashlib
-import json
 import logging
 from pathlib import Path
-from contextlib import contextmanager
 from typing import Any
 import asciidoctrine
 from asciidoctrine.resolver import ASGResolver
+from golem.cache import BuildCache
 from golem.config import GolemConfig
 from golem.metadata import (
     clean_index_url,
@@ -67,7 +65,7 @@ class BuildEngine:
     `content_dir` (Path):: Resolved absolute path to the source content directory.
     `config_path` (Path):: Path to the active `golem.toml` or `pyproject.toml` file.
     `cache_file` (Path):: Path to the JSON cache storage file.
-    `cache_data` (dict):: In-memory cache dictionary containing files, dependencies, metadata, and mtimes.
+    `cache` (BuildCache):: DAG cache database and file digest tracker instance.
     `compiler` (PageCompiler):: Page template compiler instance.
     `errors` (list[dict[str, Any]]):: Errors and diagnostics captured during compilation.
     `diagnostics` (list[dict[str, Any]]):: Diagnostic entries (alias to `errors`).
@@ -82,7 +80,7 @@ class BuildEngine:
     >>> from pathlib import Path
     >>> config = GolemConfig(content_dir="content", output_dir="dist")
     >>> engine = BuildEngine(config, cache_file=Path("cache.json"))
-    >>> isinstance(engine.cache_data, dict)
+    >>> isinstance(engine.cache.data, dict)
     True
     ----
     """
@@ -101,8 +99,7 @@ class BuildEngine:
         self.content_dir = Path(config.content_dir).resolve()
         self.config_path = Path(config.config_path) if config.config_path else Path("golem.toml")
         self.cache_file = cache_file or Path(config.content_dir).parent / ".golem" / "cache.json"
-        self._sha_cache: dict[str, tuple[float, int, str]] = {}
-        self.cache_data = self._load_cache()
+        self.cache = BuildCache(self.cache_file)
         self.compiler = PageCompiler(config)
         self.errors: list[dict[str, Any]] = []
         self.diagnostics: list[dict[str, Any]] = self.errors
@@ -113,129 +110,6 @@ class BuildEngine:
 
         plugins_dir = Path(getattr(config, "plugins_dir", "plugins"))
         self.pm = get_plugin_manager(config=config, plugins_dir=plugins_dir)
-
-    def _load_cache(self) -> dict:
-        """Load and parse the DAG dependency JSON cache from disk.
-
-        Reads cached file hashes, include dependencies, metadata, and modification
-        timestamps under an advisory lock. Initializes an empty schema if the cache
-        file does not exist or is corrupted.
-
-        [returns]
-        `dict`:: Deserialized cache dictionary containing `"files"`, `"dependencies"`, and `"metadata"` tables.
-        """
-        with self._cache_lock():
-            if self.cache_file.exists():
-                try:
-                    with open(self.cache_file, "r") as f:
-                        data = json.load(f)
-                        data.setdefault("files", {})
-                        data.setdefault("dependencies", {})
-                        data.setdefault("metadata", {})
-                        if "mtimes" in data and isinstance(data["mtimes"], dict):
-                            self._sha_cache = {
-                                k: (v[0], v[1], v[2])
-                                for k, v in data["mtimes"].items()
-                                if isinstance(v, (list, tuple)) and len(v) == 3
-                            }
-                        return data
-                except Exception:
-                    try:
-                        self.cache_file.unlink()
-                    except Exception:
-                        pass
-            return {"files": {}, "dependencies": {}, "metadata": {}}
-
-    def save_cache(self):
-        """Persist DAG compilation hashes and metadata atomically to disk.
-
-        Serializes cache records and timestamp caches to JSON. Uses atomic temporary
-        file replacement under an advisory cross-process file lock (`_cache_lock`)
-        to guarantee cache integrity.
-
-        [raises]
-        `OSError`:: If writing or renaming the temporary cache file fails.
-        """
-        import os
-        import tempfile
-
-        with self._cache_lock():
-            if hasattr(self, "_sha_cache") and self._sha_cache:
-                self.cache_data["mtimes"] = {k: list(v) for k, v in self._sha_cache.items()}
-            self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-            dir_path = self.cache_file.parent
-            with tempfile.NamedTemporaryFile("w", dir=dir_path, delete=False, encoding="utf-8") as tf:
-                json.dump(self.cache_data, tf, indent=2)
-                temp_name = tf.name
-
-            try:
-                os.replace(temp_name, self.cache_file)
-            except Exception:
-                if os.path.exists(temp_name):
-                    os.unlink(temp_name)
-                raise
-
-    def clean(self) -> None:
-        """Purge compiled output directory, persistent cache database, and file locks.
-
-        Removes all compiled HTML and static assets from `output_dir`, unlinks
-        the DAG cache file (`cache_file`) and lockfile (`cache.lock`), and resets
-        the in-memory cache data structures.
-
-        [returns]
-        `None`:: Output directory and cache files are purged from disk.
-
-        === Examples
-
-        [source,python]
-        ----
-        from golem.config import GolemConfig
-        from golem.engine import BuildEngine
-
-        config = GolemConfig(content_dir="content", output_dir="dist")
-        engine = BuildEngine(config)
-        engine.clean()
-        ----
-        """
-        import shutil
-
-        output_dir = Path(self.config.output_dir)
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
-
-        if self.cache_file.exists():
-            try:
-                self.cache_file.unlink()
-            except OSError:
-                pass
-
-        lock_path = self.cache_file.parent / "cache.lock"
-        if lock_path.exists():
-            try:
-                lock_path.unlink()
-            except OSError:
-                pass
-
-        self.cache_data = {"files": {}, "dependencies": {}, "metadata": {}}
-        self._sha_cache = {}
-        self._nav_tree_cache = None
-
-    @contextmanager
-    def _cache_lock(self):
-        """Acquire an advisory cross-process lock on the cache lockfile.
-
-        Uses `filelock.FileLock` for cross-platform compatibility (POSIX and Windows).
-        Creates the lock file under `<cache_file_dir>/cache.lock`.
-
-        [yields]
-        `None`:: Yields control while holding the exclusive lock.
-        """
-        from filelock import FileLock
-
-        self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-        lock_path = self.cache_file.parent / "cache.lock"
-        with FileLock(str(lock_path)):
-            yield
 
     def is_partial(self, path: Path) -> bool:
         """Check whether a file or directory is designated as a partial content unit.
@@ -270,54 +144,18 @@ class BuildEngine:
         `dict[str, Any]`:: Dictionary containing `"title"`, `"nav_title"`, `"nav_order"`, `"has_toc"`, `"page_class"`, `"body_class"`, and `"content_class"` keys.
         """
         p_abs = str(path.resolve())
-        current_hash = self._get_sha256(path)
-        cached_hash = self.cache_data.get("files", {}).get(p_abs)
-        cached_meta = self.cache_data.get("metadata", {}).get(p_abs)
+        current_hash = self.cache.get_sha256(path)
+        cached_hash = self.cache.data.get("files", {}).get(p_abs)
+        cached_meta = self.cache.data.get("metadata", {}).get(p_abs)
 
         if cached_meta is not None and cached_hash == current_hash and current_hash != "":
             return cached_meta
 
         meta = extract_metadata_from_doc(path)
-        self.cache_data.setdefault("metadata", {})[p_abs] = meta
+        self.cache.data.setdefault("metadata", {})[p_abs] = meta
         if current_hash:
-            self.cache_data.setdefault("files", {})[p_abs] = current_hash
+            self.cache.data.setdefault("files", {})[p_abs] = current_hash
         return meta
-
-    def _get_sha256(self, path: Path) -> str:
-        """Compute the SHA-256 hexadecimal digest of a file.
-
-        Reads file content in 8192-byte chunks and computes its SHA-256 digest.
-        Utilizes an in-memory cache keyed by path, `mtime`, and `size` to avoid
-        redundant disk reads when file attributes are unmodified.
-
-        [parameters]
-        `path` (Path):: Path to the target file.
-
-        [returns]
-        `str`:: Hexadecimal SHA-256 digest string, or empty string `""` if the file cannot be accessed.
-        """
-        p_abs = str(path.resolve())
-        try:
-            stat = path.stat()
-            mtime = stat.st_mtime
-            size = stat.st_size
-        except OSError:
-            return ""
-
-        if hasattr(self, "_sha_cache"):
-            cached = self._sha_cache.get(p_abs)
-            if cached and cached[0] == mtime and cached[1] == size:
-                return cached[2]
-        else:
-            self._sha_cache = {}
-
-        h = hashlib.sha256()
-        with open(path, "rb") as f:
-            while chunk := f.read(8192):
-                h.update(chunk)
-        hexdigest = h.hexdigest()
-        self._sha_cache[p_abs] = (mtime, size, hexdigest)
-        return hexdigest
 
     def get_outdated_files(self, commit: bool = True) -> set[Path]:
         """Identify outdated files requiring recompilation through DAG dependency analysis.
@@ -344,7 +182,7 @@ class BuildEngine:
         current_abs_files = {str(f.resolve()) for f in all_files}
 
         # 2. Identify deleted files (present in cache but missing from disk)
-        cached_files = set(self.cache_data.get("files", {}).keys())
+        cached_files = set(self.cache.data.get("files", {}).keys())
         deleted_files = set()
         for f_abs_str in cached_files:
             if not Path(f_abs_str).exists():
@@ -359,7 +197,7 @@ class BuildEngine:
         if self.pm:
             results = self.pm.hook.golem_mark_stale(
                 changed_files=list(changed_directly),
-                cache_metadata=self.cache_data.get("metadata", {}),
+                cache_metadata=self.cache.data.get("metadata", {}),
             )
             for res in results:
                 if res and isinstance(res, list):
@@ -373,8 +211,8 @@ class BuildEngine:
         for f in all_files:
             f_abs = f.resolve()
             try:
-                h = self._get_sha256(f)
-                cached_hash = self.cache_data["files"].get(str(f_abs))
+                h = self.cache.get_sha256(f)
+                cached_hash = self.cache.data["files"].get(str(f_abs))
                 if cached_hash != h:
                     changed_directly.add(f_abs)
                     if not self.is_partial(f):
@@ -392,8 +230,8 @@ class BuildEngine:
             f_path = Path(f_abs_str)
             if f_path.suffix != ".adoc":
                 try:
-                    h = self._get_sha256(f_path)
-                    cached_hash = self.cache_data["files"].get(f_abs_str)
+                    h = self.cache.get_sha256(f_path)
+                    cached_hash = self.cache.data["files"].get(f_abs_str)
                     if cached_hash != h:
                         changed_directly.add(f_path)
                 except Exception:
@@ -403,19 +241,19 @@ class BuildEngine:
         global_changed = False
 
         if self.config_path.exists():
-            h_config = self._get_sha256(self.config_path)
-            cached_config = self.cache_data.get("meta", {}).get("config_file")
+            h_config = self.cache.get_sha256(self.config_path)
+            cached_config = self.cache.data.get("meta", {}).get("config_file")
             if cached_config != h_config:
                 global_changed = True
                 if commit:
-                    self.cache_data.setdefault("meta", {})["config_file"] = h_config
+                    self.cache.data.setdefault("meta", {})["config_file"] = h_config
 
         # Check theme and layout templates
         current_templates = self._get_template_fingerprints()
 
-        cached_templates = self.cache_data.get("meta", {}).get("theme_templates")
-        if cached_templates is None and "skeleton_pt" in self.cache_data.get("meta", {}):
-            cached_templates = {"skeleton.pt": self.cache_data["meta"]["skeleton_pt"]}
+        cached_templates = self.cache.data.get("meta", {}).get("theme_templates")
+        if cached_templates is None and "skeleton_pt" in self.cache.data.get("meta", {}):
+            cached_templates = {"skeleton.pt": self.cache.data["meta"]["skeleton_pt"]}
 
         templates_changed = False
         master_layout_keys = {"skeleton.pt", "page.pt", "layout.pt", "skeleton.html", "page.html", "layout.html"}
@@ -434,13 +272,13 @@ class BuildEngine:
                         global_changed = True
                     else:
                         changed_granular_nodes.add(stem)
-        elif self.cache_data.get("files"):
+        elif self.cache.data.get("files"):
             templates_changed = True
             if current_templates:
                 global_changed = True
 
         if changed_granular_nodes:
-            for f_abs_str, meta in self.cache_data.get("metadata", {}).items():
+            for f_abs_str, meta in self.cache.data.get("metadata", {}).items():
                 if not isinstance(meta, dict):
                     continue
                 f_path = Path(f_abs_str)
@@ -451,7 +289,7 @@ class BuildEngine:
                     outdated.add(f_path)
 
         if commit:
-            self.cache_data.setdefault("meta", {})["theme_templates"] = current_templates
+            self.cache.data.setdefault("meta", {})["theme_templates"] = current_templates
 
         # If a global layout or config changed, we must mark all existing non-partial .adoc documents as outdated!
         if global_changed:
@@ -460,16 +298,16 @@ class BuildEngine:
             # Short-circuit and return full re-build
             if commit and (deleted_files or global_changed or templates_changed):
                 for d in deleted_files:
-                    self.cache_data["files"].pop(d, None)
-                    self.cache_data["dependencies"].pop(d, None)
-                    self.cache_data.get("metadata", {}).pop(d, None)
-                self.save_cache()
+                    self.cache.data["files"].pop(d, None)
+                    self.cache.data["dependencies"].pop(d, None)
+                    self.cache.data.get("metadata", {}).pop(d, None)
+                self.cache.save_cache()
             return outdated
 
         # 4. Re-verify the DAG: resolve reverse dependencies (parent links)
         reverse_deps: dict[str, set[str]] = {}
         for f_str in cached_files | current_abs_files:
-            cached_deps = self.cache_data["dependencies"].get(f_str, [])
+            cached_deps = self.cache.data["dependencies"].get(f_str, [])
             for dep in cached_deps:
                 reverse_deps.setdefault(dep, set()).add(f_str)
 
@@ -490,10 +328,10 @@ class BuildEngine:
         # 5. Purge deleted files from the cache database
         if commit and (deleted_files or global_changed or templates_changed):
             for d in deleted_files:
-                self.cache_data["files"].pop(d, None)
-                self.cache_data["dependencies"].pop(d, None)
-                self.cache_data.get("metadata", {}).pop(d, None)
-            self.save_cache()
+                self.cache.data["files"].pop(d, None)
+                self.cache.data["dependencies"].pop(d, None)
+                self.cache.data.get("metadata", {}).pop(d, None)
+            self.cache.save_cache()
 
         return outdated
 
@@ -505,8 +343,8 @@ class BuildEngine:
     ) -> None:
         """Update DAG cache entries, SHA-256 hashes, node types, and dependency relations for a document.
 
-        Computes the SHA-256 digest of the specified document and updates `cache_data["files"]`
-        and `cache_data["metadata"]`. Associates ASG structural node types (such as `["admonition", "listing"]`)
+        Computes the SHA-256 digest of the specified document and updates `cache.data["files"]`
+        and `cache.data["metadata"]`. Associates ASG structural node types (such as `["admonition", "listing"]`)
         for granular template invalidation. Resolves included partials and child files (`include::...[]`)
         from the supplied `included_files` list or falls back to regex/AST parsing, caching digests
         for all resolved dependencies, and persists the cache to disk.
@@ -537,17 +375,17 @@ class BuildEngine:
         ----
         """
         p_abs = str(path.resolve())
-        self.cache_data["files"][p_abs] = self._get_sha256(path)
+        self.cache.data["files"][p_abs] = self.cache.get_sha256(path)
         meta = extract_metadata_from_doc(path)
-        existing_meta = self.cache_data.get("metadata", {}).get(p_abs, {})
+        existing_meta = self.cache.data.get("metadata", {}).get(p_abs, {})
         if node_types is not None:
             meta["node_types"] = node_types
         elif isinstance(existing_meta, dict) and "node_types" in existing_meta:
             meta["node_types"] = existing_meta["node_types"]
-        self.cache_data.setdefault("metadata", {})[p_abs] = meta
+        self.cache.data.setdefault("metadata", {})[p_abs] = meta
         if included_files is not None:
             unique_deps = list(dict.fromkeys(str(Path(f).resolve()) for f in included_files))
-            self.cache_data["dependencies"][p_abs] = unique_deps
+            self.cache.data["dependencies"][p_abs] = unique_deps
         else:
             deps = []
             try:
@@ -585,18 +423,18 @@ class BuildEngine:
 
             # De-duplicate and make sure all are absolute paths as strings
             unique_deps = list(dict.fromkeys(str(Path(d).resolve()) for d in deps))
-            self.cache_data["dependencies"][p_abs] = unique_deps
+            self.cache.data["dependencies"][p_abs] = unique_deps
 
         # Compute and record the SHA-256 hashes for all of the dependency files as well!
         for dep in unique_deps:
             dep_path = Path(dep)
             if dep_path.exists():
                 try:
-                    self.cache_data["files"][dep] = self._get_sha256(dep_path)
+                    self.cache.data["files"][dep] = self.cache.get_sha256(dep_path)
                 except Exception:
                     pass
 
-        self.save_cache()
+        self.cache.save_cache()
 
     def _generate_canonical_link(self, rel_path: Path | str) -> str:
         """Generate a canonical relative HTML URL path for a document.
@@ -1143,7 +981,7 @@ class BuildEngine:
                             continue
                         key = rel.as_posix()
                         if key not in current_templates:
-                            current_templates[key] = self._get_sha256(tpl_file)
+                            current_templates[key] = self.cache.get_sha256(tpl_file)
         return current_templates
 
     def sync_static_assets(self) -> None:
@@ -1281,7 +1119,7 @@ class BuildEngine:
         all_docs = (
             [f for f in self.content_dir.glob("**/*.adoc") if not self.is_partial(f)] if self.content_dir.exists() else []
         )
-        to_build = {f for f in outdated if not self.is_partial(f)} if (outdated or self.cache_data["files"]) else set(all_docs)
+        to_build = {f for f in outdated if not self.is_partial(f)} if (outdated or self.cache.data["files"]) else set(all_docs)
 
         output_dir = Path(self.config.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
