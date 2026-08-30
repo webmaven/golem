@@ -352,7 +352,7 @@
             overflow: hidden;
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
-        .listingblock:focus-within {
+        .listingblock:has(.listing-content:focus-within, .listing-panes:focus-within) {
             border-color: var(--golem-primary);
             box-shadow: 0 0 0 1px var(--golem-primary);
         }
@@ -384,7 +384,7 @@
             padding: 1rem 1.25rem;
             box-shadow: none;
         }
-        .listingblock:focus-within pre {
+        .listingblock:has(.listing-content:focus-within, .listing-panes:focus-within) pre {
             box-shadow: none;
             border-color: transparent;
         }
