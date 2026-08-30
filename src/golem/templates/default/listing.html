@@ -1,21 +1,31 @@
 <figure tal:define="derived_views python:renderer.get_derived_views(node, ctx) if hasattr(renderer, 'get_derived_views') else [];
+                    listing_uid python:renderer.get_listing_uid(node, ctx) if hasattr(renderer, 'get_listing_uid') else (node.get('attributes', {}).get('id') if isinstance(node.get('attributes'), dict) and node.get('attributes', {}).get('id') else (node.get('id') or f'listing-{id(node)}'));
                     lang python:node.get('attributes', {}).get('language') if isinstance(node.get('attributes'), dict) and node.get('attributes', {}).get('language') else (node.get('attributes', {}).get('lang') if isinstance(node.get('attributes'), dict) and node.get('attributes', {}).get('lang') else (node.get('language') or ''));
                     roles python:renderer.get_listing_roles(node) if hasattr(renderer, 'get_listing_roles') else [];
                     highlighted python:None if derived_views else renderer.highlight_code(node, ctx)"
         tal:attributes="class python:'listingblock multi-view' if derived_views else 'listingblock';
-                        id python:node.get('attributes', {}).get('id') if isinstance(node.get('attributes'), dict) else (node.get('id') or None)">
+                        id listing_uid">
+  <tal:block tal:condition="derived_views">
+    <tal:block tal:repeat="view derived_views">
+      <input type="radio"
+             class="tab-input"
+             tal:attributes="name python:'tabs_' + str(listing_uid);
+                             id python:'tab_' + str(listing_uid) + '_' + str(view.get('id', ''));
+                             value view.get('id');
+                             checked python:'checked' if repeat.view.start else None" />
+    </tal:block>
+  </tal:block>
   <header class="listing-header">
     <span tal:condition="node.get('title')" class="listing-title"><tal:block tal:condition="python:isinstance(node.get('title'), list)" tal:repeat="inline node.get('title', [])" tal:replace="structure renderer.render(inline, ctx)" /><tal:block tal:condition="python:isinstance(node.get('title'), dict)" tal:replace="structure renderer.render(node.get('title'), ctx)" /><tal:block tal:condition="python:isinstance(node.get('title'), str)" tal:content="node.get('title')" /></span>
     <div tal:condition="derived_views" class="listing-tabs" role="tablist">
-      <button tal:repeat="view derived_views"
-              type="button"
-              tal:attributes="class python:'tab-btn active' if repeat.view.start else 'tab-btn';
-                              data-tab view.get('id');
-                              role 'tab';
-                              aria-selected python:'true' if repeat.view.start else 'false';
-                              tabindex python:'0' if repeat.view.start else '-1'"
-              tal:content="view.get('label')">
-      </button>
+      <label tal:repeat="view derived_views"
+             tal:attributes="class python:'tab-btn active' if repeat.view.start else 'tab-btn';
+                             for python:'tab_' + str(listing_uid) + '_' + str(view.get('id', ''));
+                             data-tab view.get('id');
+                             role 'tab';
+                             tabindex '0'"
+             tal:content="view.get('label')">
+      </label>
     </div>
     <div class="listing-actions">
       <tal:block tal:repeat="r roles">
@@ -33,8 +43,7 @@
       <div tal:repeat="view derived_views"
            tal:attributes="class python:'tab-pane active' if repeat.view.start else 'tab-pane';
                            data-tab view.get('id');
-                           role 'tabpanel';
-                           hidden python:None if repeat.view.start else 'hidden'"
+                           role 'tabpanel'"
            tal:content="structure python:renderer.render_view_content(view) if hasattr(renderer, 'render_view_content') else view.get('content')">
       </div>
     </div>

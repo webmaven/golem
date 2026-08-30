@@ -37,7 +37,7 @@ def test_asciidoc_derived_views_rendering():
 
 
 def test_zero_js_baseline():
-    """Verify zero-JS baseline: first tab is active/visible, subsequent tabs are hidden."""
+    """Verify zero-JS baseline: radio inputs control tab selection declaratively via CSS :has()."""
     asg = {
         "name": "listing",
         "type": "block",
@@ -48,19 +48,24 @@ def test_zero_js_baseline():
         },
     }
     html = render_body(asg)
-    # First tab button active
-    assert 'class="tab-btn active" data-tab="source" role="tab" aria-selected="true" tabindex="0"' in html
-    # Subsequent tab buttons inactive
-    assert 'class="tab-btn" data-tab="asg" role="tab" aria-selected="false" tabindex="-1"' in html
-    assert 'class="tab-btn" data-tab="html" role="tab" aria-selected="false" tabindex="-1"' in html
-    assert 'class="tab-btn" data-tab="preview" role="tab" aria-selected="false" tabindex="-1"' in html
+    # First tab radio input is checked
+    assert 'type="radio"' in html
+    assert 'class="tab-input"' in html
+    assert 'value="source"' in html
+    assert 'checked="checked"' in html
 
-    # First tab pane active and not hidden
+    # Tab labels are present with data-tab and for attributes
+    assert 'class="tab-btn active"' in html
+    assert 'data-tab="source"' in html
+    assert 'data-tab="asg"' in html
+    assert 'data-tab="html"' in html
+    assert 'data-tab="preview"' in html
+
+    # Tab panes are present with role="tabpanel"
     assert '<div class="tab-pane active" data-tab="source" role="tabpanel">' in html
-    # Subsequent tab panes have hidden attribute
-    assert '<div class="tab-pane" data-tab="asg" role="tabpanel" hidden="hidden">' in html
-    assert '<div class="tab-pane" data-tab="html" role="tabpanel" hidden="hidden">' in html
-    assert '<div class="tab-pane" data-tab="preview" role="tabpanel" hidden="hidden">' in html
+    assert '<div class="tab-pane" data-tab="asg" role="tabpanel">' in html
+    assert '<div class="tab-pane" data-tab="html" role="tabpanel">' in html
+    assert '<div class="tab-pane" data-tab="preview" role="tabpanel">' in html
 
 
 def test_attribute_aliases():

@@ -376,7 +376,7 @@ def test_compile_page_includes_client_interaction_script(tmp_path):
     assert ".listing-copy-btn" in html
     assert "navigator.clipboard" in html
     assert ".tab-btn" in html
-    assert "aria-selected" in html
+    assert ".tab-input" in html
     assert 'data-tab="preview"' in html or "rendered-preview" in html
     assert 'data-tab="source"' in html
 

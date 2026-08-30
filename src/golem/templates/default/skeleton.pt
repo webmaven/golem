@@ -536,7 +536,15 @@
             height: 1rem;
         }
 
-        /* ── Multi-View Listing Tabs (Physical Folder Tabs) ────────── */
+        /* ── Multi-View Listing Tabs (Zero-JS Radio-Controlled Physical Tabs) ── */
+        .tab-input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+            margin: 0;
+            pointer-events: none;
+        }
         .listingblock.multi-view .listing-header {
             padding: 0.45rem 0.75rem 0;
             align-items: flex-end;
@@ -573,9 +581,10 @@
             cursor: pointer;
             line-height: 1.2;
             position: relative;
+            user-select: none;
             transition: color 0.15s ease, background-color 0.15s ease;
         }
-        .tab-btn:hover:not(.active) {
+        .tab-btn:hover {
             color: var(--golem-text);
             background: color-mix(in srgb, var(--golem-text) 5%, transparent);
             border-color: color-mix(in srgb, var(--golem-border) 60%, transparent) color-mix(in srgb, var(--golem-border) 60%, transparent) transparent;
@@ -584,7 +593,12 @@
             outline: 2px solid var(--golem-primary);
             outline-offset: 1px;
         }
-        .tab-btn.active, .tab-btn[aria-selected="true"] {
+
+        /* Declarative Zero-JS Active Tab State via :has() */
+        .listingblock:has(.tab-input[value="source"]:checked) .tab-btn[data-tab="source"],
+        .listingblock:has(.tab-input[value="asg"]:checked) .tab-btn[data-tab="asg"],
+        .listingblock:has(.tab-input[value="html"]:checked) .tab-btn[data-tab="html"],
+        .listingblock:has(.tab-input[value="preview"]:checked) .tab-btn[data-tab="preview"] {
             color: var(--golem-primary);
             font-weight: 700;
             background: var(--golem-code-bg);
@@ -593,28 +607,36 @@
             margin-bottom: -1px;
             z-index: 20;
         }
-        .tab-btn[data-tab="preview"].active {
+        .listingblock:has(.tab-input[value="preview"]:checked) .tab-btn[data-tab="preview"] {
             background: var(--golem-bg);
             border-bottom: 1px solid var(--golem-bg);
         }
+
         .listing-panes {
             position: relative;
             background: var(--golem-code-bg);
         }
-        .tab-pane {
-            display: block;
+        .listing-panes .tab-pane {
+            display: none;
         }
-        .tab-pane[hidden] {
-            display: none !important;
+
+        /* Declarative Zero-JS Active Pane Visibility via :has() */
+        .listingblock:has(.tab-input[value="source"]:checked) .tab-pane[data-tab="source"],
+        .listingblock:has(.tab-input[value="asg"]:checked) .tab-pane[data-tab="asg"],
+        .listingblock:has(.tab-input[value="html"]:checked) .tab-pane[data-tab="html"],
+        .listingblock:has(.tab-input[value="preview"]:checked) .tab-pane[data-tab="preview"] {
+            display: block;
         }
         .tab-pane pre {
             margin: 0;
             border: none;
-            border-left: none;
             border-radius: 0;
             background: transparent;
-            padding: 1rem 1.25rem;
-            box-shadow: none;
+        }
+        .tab-pane pre code {
+            border: none;
+            background: transparent;
+            padding: 0;
         }
         .rendered-preview {
             padding: 1.25rem;
@@ -1096,7 +1118,11 @@
                 if (copyBtn) {
                     var block = copyBtn.closest(".listingblock");
                     if (!block) return;
-                    var activePane = block.querySelector('.tab-pane:not([hidden]), .tab-pane.active');
+                    var checkedInput = block.querySelector('.tab-input:checked');
+                    var activePane = checkedInput ? block.querySelector('.tab-pane[data-tab="' + checkedInput.value + '"]') : null;
+                    if (!activePane) {
+                        activePane = block.querySelector('.tab-pane') || block.querySelector('.listing-content');
+                    }
                     var codeEl = activePane ? activePane.querySelector('pre code') : null;
                     if (!codeEl) {
                         // Fallback to source pane or any pane with code
@@ -1135,63 +1161,6 @@
                             copyBtn._copyTimeout = null;
                         }, 2000);
                     });
-                    return;
-                }
-
-                var tabBtn = e.target.closest(".tab-btn");
-                if (tabBtn) {
-                    var block = tabBtn.closest(".listingblock") || tabBtn.closest(".tab-container") || tabBtn.parentElement;
-                    if (!block) return;
-                    var tabId = tabBtn.getAttribute("data-tab");
-                    var tablist = tabBtn.closest('[role="tablist"]') || tabBtn.parentElement;
-                    var tabs = tablist.querySelectorAll(".tab-btn");
-
-                    tabs.forEach(function(t) {
-                        var active = (t === tabBtn);
-                        t.setAttribute("aria-selected", active ? "true" : "false");
-                        t.classList.toggle("active", active);
-                        t.tabIndex = active ? 0 : -1;
-                    });
-
-                    var panes = block.querySelectorAll(".tab-pane");
-                    panes.forEach(function(pane) {
-                        var match = (pane.getAttribute("data-tab") === tabId);
-                        if (match) {
-                            pane.removeAttribute("hidden");
-                            pane.classList.add("active");
-                        } else {
-                            pane.setAttribute("hidden", "hidden");
-                            pane.classList.remove("active");
-                        }
-                    });
-                }
-            });
-
-            document.addEventListener("keydown", function(e) {
-                var tabBtn = e.target.closest(".tab-btn");
-                if (!tabBtn) return;
-                var tablist = tabBtn.closest('[role="tablist"]');
-                if (!tablist) return;
-
-                var tabs = Array.from(tablist.querySelectorAll(".tab-btn"));
-                var idx = tabs.indexOf(tabBtn);
-                if (idx === -1) return;
-
-                var newIdx = -1;
-                if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-                    newIdx = (idx + 1) % tabs.length;
-                } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-                    newIdx = (idx - 1 + tabs.length) % tabs.length;
-                } else if (e.key === "Home") {
-                    newIdx = 0;
-                } else if (e.key === "End") {
-                    newIdx = tabs.length - 1;
-                }
-
-                if (newIdx !== -1) {
-                    e.preventDefault();
-                    tabs[newIdx].focus();
-                    tabs[newIdx].click();
                 }
             });
         })();

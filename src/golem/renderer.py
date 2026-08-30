@@ -54,6 +54,48 @@ class GolemRenderer(asciidoctype.AsciiDoctypeRenderer):
 
         return extract_listing_views(node, highlighter=self.highlighter)
 
+    def get_listing_uid(
+        self,
+        node: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
+    ) -> str:
+        """Generate a deterministic unique identifier for a listing block.
+
+        Preserves existing user-defined anchor IDs or constructs a deterministic
+        slug derived from the block title, sequential counter, or content digest.
+        """
+        if not isinstance(node, dict):
+            return "listing"
+
+        # Cached on node to ensure stability across multiple template evaluations
+        if "_golem_uid" in node:
+            return str(node["_golem_uid"])
+
+        attrs = node.get("attributes")
+        if isinstance(attrs, dict) and attrs.get("id"):
+            uid = str(attrs["id"])
+            node["_golem_uid"] = uid
+            return uid
+
+        if node.get("id"):
+            uid = str(node["id"])
+            node["_golem_uid"] = uid
+            return uid
+
+        title = node.get("title")
+        if title:
+            raw_title = self.extract_text(title) if hasattr(self, "extract_text") else str(title)
+            slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", raw_title.lower()).strip("-")
+            base = slug if slug else "listing"
+        else:
+            base = "listing"
+
+        counter = getattr(self, "_listing_counter", 0) + 1
+        self._listing_counter = counter
+        uid = f"{base}-{counter}"
+        node["_golem_uid"] = uid
+        return uid
+
     def get_listing_roles(self, node: dict[str, Any]) -> list[str]:
         """Extract and sanitize role identifiers for listing badges.
 
