@@ -67,14 +67,14 @@ When authoring code blocks in AsciiDoc:
 
 .Stateful Test Listing Example
 [source,asciidoc]
-----
+------
 .pipeline_config.py
 [source,python,role="shared test"]
 ----
 base_url = "https://example.com/api"
 timeout = 30
 ----
-----
+------
 
 == Multi-View Derived Renderings
 
@@ -86,7 +86,7 @@ To generate derived multi-view tabs, author a `[source,asciidoc]` block and spec
 
 .Multi-View Syntax Example
 [source,asciidoc]
-----
+------
 .Interactive Admonition Demo
 [source,asciidoc,render="source,asg,html,preview"]
 ----
@@ -95,7 +95,7 @@ To generate derived multi-view tabs, author a `[source,asciidoc]` block and spec
 This note is rendered into AsciiDoc, ASG JSON, HTML, and Live Preview tabs!
 ====
 ----
-----
+------
 
 === Supported View Channels
 
