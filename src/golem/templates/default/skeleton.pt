@@ -599,33 +599,15 @@
         }
         ol.colist {
             list-style: none;
-            counter-reset: colist-counter;
             padding-left: 0;
         }
         ol.colist > li {
-            counter-increment: colist-counter;
-            position: relative;
-            padding-left: 2rem;
+            /* Callout badges are rendered by <i class="conum"> from the template;
+               no ::before counter is needed — flex aligns badge + text naturally. */
+            display: flex;
+            align-items: baseline;
+            gap: 0.5em;
             margin-bottom: 0.5rem;
-        }
-        ol.colist > li::before {
-            content: counter(colist-counter);
-            position: absolute;
-            left: 0;
-            top: 0.2em;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 1.25em;
-            height: 1.25em;
-            border-radius: 50%;
-            background: var(--golem-primary);
-            color: #ffffff;
-            font-family: var(--golem-font-mono);
-            font-style: normal;
-            font-size: 0.75em;
-            font-weight: bold;
-            line-height: 1;
         }
         .colist ol {
             padding-left: 1.25rem;
