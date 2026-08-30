@@ -194,7 +194,7 @@ Hierarchical term-definition syntax and anchored footnotes:
 [source,asciidoc,render="source,preview"]
 ----
 AST:: Concrete Abstract Syntax Tree parsed by Lark.
-ASG:: Semantic Abstract Semantic Graph resolved by `asciidoctrine`.footnote:[Named after the compiler intermediate representation.]
+ASG:: Semantic Abstract Semantic Graph resolved by `asciidoctrine` footnote:[Named after the compiler intermediate representation.]
 ----
 
 == Partial Files Protocol (`_*.adoc`)
