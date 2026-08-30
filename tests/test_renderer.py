@@ -412,3 +412,11 @@ def test_render_listing_header_structure():
     assert 'class="badge badge-shared"' in html
     assert 'class="badge badge-lang">PYTHON</span>' in html
     assert 'class="listing-copy-btn"' in html
+
+
+def test_listing_copy_button_markup():
+    """Verify listing copy button contains accessible aria-label and icon-copy class."""
+    asg = {"name": "listing", "type": "block", "value": "x = 1", "attributes": {"language": "python"}}
+    html = render_body(asg)
+    assert 'aria-label="Copy code to clipboard"' in html
+    assert 'class="icon-copy"' in html

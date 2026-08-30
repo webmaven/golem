@@ -362,3 +362,18 @@ def test_compile_page_custom_pygments_css(tmp_path):
     )
     assert "/* Custom Pygments CSS */" in html
     assert ".highlight { color: red; }" in html
+
+
+def test_compile_page_includes_client_interaction_script(tmp_path):
+    """Test that default skeleton template includes client-side copy and tab scripts."""
+    config = GolemConfig(output_dir=str(tmp_path / "dist"))
+    compiler = PageCompiler(config)
+
+    html = compiler.compile_page(
+        title="Listing Page",
+        body_content="<p>Test</p>",
+    )
+    assert ".listing-copy-btn" in html
+    assert "navigator.clipboard" in html
+    assert ".tab-btn" in html
+    assert "aria-selected" in html
