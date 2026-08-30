@@ -331,13 +331,13 @@
         p code, li code, td code {
             background: var(--golem-code-bg);
             padding: 0.1em 0.35em;
-            border-radius: 3px;
+            border-radius: 2px;
             border: 1px solid var(--golem-border);
         }
         h1 code, h2 code, h3 code, h4 code, h5 code, h6 code {
             background: var(--golem-code-bg);
             padding: 0.1em 0.3em;
-            border-radius: 3px;
+            border-radius: 2px;
             border: 1px solid var(--golem-border);
             font-size: 0.85em;
         }
@@ -368,7 +368,7 @@
             color: var(--golem-text);
             background-color: var(--golem-surface);
             border: 1px solid var(--golem-border);
-            border-radius: 4px;
+            border-radius: 5px;
             padding: 0.15em 0.55em;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
             vertical-align: baseline;
