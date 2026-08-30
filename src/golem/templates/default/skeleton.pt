@@ -344,51 +344,24 @@
         .listingblock {
             position: relative;
             margin: 1.25rem 0;
-            border: 1px solid var(--golem-border);
-            border-left: 3px solid var(--golem-primary);
-            border-radius: 4px;
-            overflow: hidden;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-        .listingblock:focus-within {
-            border-color: var(--golem-primary);
-            box-shadow: 0 0 0 1px var(--golem-primary);
-        }
-        /* Title bar — always present, houses the language badge */
-        .listingblock::before {
-            content: '';
-            display: block;
-            height: 2rem;
-            background: var(--golem-surface);
-            border-bottom: 1px solid var(--golem-border);
         }
         pre, .listingblock pre {
             position: relative;
             background: var(--golem-code-bg);
-            /* No border/radius — .listingblock is the shell */
-            border: none;
-            border-radius: 0;
-            padding: 0.875rem 1.25rem;
+            border: 1px solid var(--golem-border);
+            border-left: 3px solid var(--golem-primary);
+            border-radius: 4px;
+            padding: 1rem 1.25rem;
             overflow-x: auto;
             line-height: 1.55;
-            margin: 0;
+            margin: 1.25rem 0;
             cursor: text;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
         .listingblock:focus-within pre,
         pre:focus-within {
             user-select: all;
             -webkit-user-select: all;
-        }
-        /* Bare <pre> outside a .listingblock keeps its own box */
-        :not(.listingblock) > pre {
-            border: 1px solid var(--golem-border);
-            border-left: 3px solid var(--golem-primary);
-            border-radius: 4px;
-            padding: 1rem 1.25rem;
-            margin: 1.25rem 0;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-        :not(.listingblock) > pre:focus-within {
             border-color: var(--golem-primary);
             box-shadow: 0 0 0 1px var(--golem-primary);
         }
@@ -400,33 +373,29 @@
         }
 
         /* ── Listing Language & Role Badges ────────────────── */
-        /* Badge sits in the title bar (top:0 of the pre, which starts
-           immediately below the 2rem bar, so absolute top:0 on the pre
-           peeks into the bar via a negative translate) */
         .listingblock pre.highlight::before,
+        pre.highlight[class*="language-"]::before,
+        pre[class*="language-"]::before,
         .listingblock pre[class*="highlight"] code[class*="language-"]::before,
         pre.highlight code[class*="language-"]::before,
         pre.highlight.test::before,
         pre.highlight.shared::before,
         pre.highlight.reset::before {
             position: absolute;
-            top: -2rem;           /* lift into the title bar */
-            right: 0.75rem;
-            height: 2rem;
-            display: flex;
-            align-items: center;
+            top: 0.45rem;
+            right: 0.65rem;
             font-family: var(--golem-font-ui);
             font-size: 0.68rem;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.06em;
-            padding: 0 0.55em;
+            letter-spacing: 0.05em;
+            padding: 0.15em 0.55em;
             border-radius: 3px;
-            background: var(--golem-code-bg);
+            background: var(--golem-surface);
             color: var(--golem-text-muted);
             border: 1px solid var(--golem-border);
             pointer-events: none;
-            line-height: 1;
+            line-height: 1.2;
             z-index: 2;
         }
 
