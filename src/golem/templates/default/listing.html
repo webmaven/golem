@@ -1,21 +1,47 @@
-<figure class="listingblock"
-        tal:attributes="id python:node.get('attributes', {}).get('id') if isinstance(node.get('attributes'), dict) else (node.get('id') or None)"
-        tal:define="highlighted python:renderer.highlight_code(node, ctx);
+<figure tal:define="views_fn python:getattr(renderer, 'get_derived_views', None) or __import__('golem.views', fromlist=['extract_listing_views']).extract_listing_views;
+                    derived_views python:views_fn(node, getattr(renderer, 'highlighter', None)) if not hasattr(renderer, 'get_derived_views') else renderer.get_derived_views(node, ctx);
                     lang python:node.get('attributes', {}).get('language') if isinstance(node.get('attributes'), dict) and node.get('attributes', {}).get('language') else (node.get('attributes', {}).get('lang') if isinstance(node.get('attributes'), dict) and node.get('attributes', {}).get('lang') else (node.get('language') or ''));
                     role_attr python:node.get('attributes', {}).get('role') if isinstance(node.get('attributes'), dict) else node.get('role');
-                    roles python:role_attr.split() if isinstance(role_attr, str) else (list(role_attr) if role_attr else [])">
+                    roles python:role_attr.split() if isinstance(role_attr, str) else (list(role_attr) if role_attr else []);
+                    highlighted python:None if derived_views else renderer.highlight_code(node, ctx)"
+        tal:attributes="class python:'listingblock multi-view' if derived_views else 'listingblock';
+                        id python:node.get('attributes', {}).get('id') if isinstance(node.get('attributes'), dict) else (node.get('id') or None)">
   <header class="listing-header">
     <span tal:condition="node.get('title')" class="listing-title"><tal:block tal:condition="python:isinstance(node.get('title'), list)" tal:repeat="inline node.get('title', [])" tal:replace="structure renderer.render(inline, ctx)" /><tal:block tal:condition="python:isinstance(node.get('title'), dict)" tal:replace="structure renderer.render(node.get('title'), ctx)" /><tal:block tal:condition="python:isinstance(node.get('title'), str)" tal:content="node.get('title')" /></span>
+    <div tal:condition="derived_views" class="listing-tabs" role="tablist">
+      <button tal:repeat="view derived_views"
+              type="button"
+              tal:attributes="class python:'tab-btn active' if repeat.view.start else 'tab-btn';
+                              data-tab view.get('id');
+                              role 'tab';
+                              aria-selected python:'true' if repeat.view.start else 'false';
+                              tabindex python:'0' if repeat.view.start else '-1'"
+              tal:content="view.get('label')">
+      </button>
+    </div>
     <div class="listing-actions">
       <span tal:repeat="r roles" tal:attributes="class python:f'badge badge-{r}'" tal:content="r"></span>
       <span tal:condition="lang" class="badge badge-lang" tal:content="python:lang.upper()"></span>
       <button type="button" class="listing-copy-btn" aria-label="Copy code to clipboard" title="Copy code"><svg class="icon-copy" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
     </div>
   </header>
-  <div class="listing-content">
-    <tal:block tal:condition="highlighted" tal:replace="structure python:highlighted if highlighted is not None else renderer.render(node, ctx)" />
-    <tal:block tal:condition="not:highlighted">
-      <pre class="highlight" tal:attributes="class python:'highlight' + ((' ' + lang) if lang else '')"><code tal:attributes="class python:('language-' + lang) if lang else None"><tal:block tal:repeat="inline node.get('inlines', [])" tal:replace="structure renderer.render(inline, ctx)" /><tal:block tal:condition="not:node.get('inlines')" tal:content="node.get('value', '')" /></code></pre>
-    </tal:block>
-  </div>
+  <tal:block tal:condition="derived_views">
+    <div class="listing-panes">
+      <div tal:repeat="view derived_views"
+           tal:attributes="class python:'tab-pane active' if repeat.view.start else 'tab-pane';
+                           data-tab view.get('id');
+                           role 'tabpanel';
+                           hidden python:None if repeat.view.start else 'hidden'"
+           tal:content="structure python:renderer.render_view_content(view) if hasattr(renderer, 'render_view_content') else view.get('content')">
+      </div>
+    </div>
+  </tal:block>
+  <tal:block tal:condition="not:derived_views">
+    <div class="listing-content">
+      <tal:block tal:condition="highlighted" tal:replace="structure python:highlighted if highlighted is not None else renderer.render(node, ctx)" />
+      <tal:block tal:condition="not:highlighted">
+        <pre class="highlight" tal:attributes="class python:'highlight' + ((' ' + lang) if lang else '')"><code tal:attributes="class python:('language-' + lang) if lang else None"><tal:block tal:repeat="inline node.get('inlines', [])" tal:replace="structure renderer.render(inline, ctx)" /><tal:block tal:condition="not:node.get('inlines')" tal:content="node.get('value', '')" /></code></pre>
+      </tal:block>
+    </div>
+  </tal:block>
 </figure>

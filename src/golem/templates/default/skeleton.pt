@@ -491,6 +491,76 @@
             height: 1rem;
         }
 
+        /* ── Multi-View Listing Tabs ───────────────────────── */
+        .listing-tabs {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-right: auto;
+        }
+        .tab-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--golem-font-ui);
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.15em 0.55em;
+            border-radius: 3px;
+            background: transparent;
+            color: var(--golem-text-muted);
+            border: 1px solid transparent;
+            cursor: pointer;
+            line-height: 1.2;
+            transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+        }
+        .tab-btn:hover {
+            color: var(--golem-text);
+            border-color: var(--golem-border);
+            background: var(--golem-bg);
+        }
+        .tab-btn:focus-visible {
+            outline: 2px solid var(--golem-primary);
+            outline-offset: 1px;
+        }
+        .tab-btn.active, .tab-btn[aria-selected="true"] {
+            color: var(--golem-primary);
+            background: var(--golem-bg);
+            border-color: var(--golem-border);
+            font-weight: 700;
+        }
+        .listing-panes {
+            position: relative;
+            background: var(--golem-code-bg);
+        }
+        .tab-pane {
+            display: block;
+        }
+        .tab-pane[hidden] {
+            display: none !important;
+        }
+        .tab-pane pre {
+            margin: 0;
+            border: none;
+            border-left: none;
+            border-radius: 0;
+            background: transparent;
+            padding: 1rem 1.25rem;
+            box-shadow: none;
+        }
+        .rendered-preview {
+            padding: 1.25rem;
+            background: var(--golem-bg);
+            border-radius: 0 0 4px 4px;
+            color: var(--golem-text);
+            font-family: var(--golem-font-body);
+        }
+        .rendered-preview > :first-child {
+            margin-top: 0;
+        }
+        .rendered-preview > :last-child {
+            margin-bottom: 0;
+        }
 
         /* ── Callout Badges (.conum) ───────────────────────── */
         i.conum {

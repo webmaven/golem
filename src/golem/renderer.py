@@ -41,6 +41,24 @@ from golem.highlighting import make_highlighter
 DEFAULT_TEMPLATES_DIR: Path = Path(__file__).parent / "templates" / "default"
 
 
+class GolemRenderer(asciidoctype.AsciiDoctypeRenderer):
+    """AsciiDoctypeRenderer subclass with Golem-specific multi-view extensions."""
+
+    def get_derived_views(
+        self,
+        node: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
+    ) -> list[dict[str, str]]:
+        """Extract multi-view derived representations for a listing node."""
+        from golem.views import extract_listing_views
+
+        return extract_listing_views(node, highlighter=self.highlighter)
+
+    def render_view_content(self, view: dict[str, Any]) -> str:
+        """Render raw HTML content for a validated derived view tab."""
+        return str(view.get("content", ""))
+
+
 def render_body(
     asg_root: Union[Node, dict[str, Any]],
     search_paths: Optional[List[Path]] = None,
@@ -83,7 +101,7 @@ def render_body(
     if DEFAULT_TEMPLATES_DIR.exists() and DEFAULT_TEMPLATES_DIR not in active_search_paths:
         active_search_paths.append(DEFAULT_TEMPLATES_DIR)
 
-    renderer = asciidoctype.AsciiDoctypeRenderer(
+    renderer = GolemRenderer(
         search_paths=active_search_paths,
         highlighter=active_highlighter,
     )
