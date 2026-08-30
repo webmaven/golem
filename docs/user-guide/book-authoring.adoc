@@ -123,7 +123,7 @@ Configure document-level and book-level table of contents generation:
 Technical books often describe user interface workflows, keyboard combinations, and command sequences. Enable the `:experimental:` attribute to activate AsciiDoc UI macros:
 
 .ui_macros.adoc
-[source,asciidoc]
+[source,asciidoc,render="source,preview"]
 ----
 :experimental:
 
@@ -208,7 +208,7 @@ High-quality nonfiction manuscripts follow standard publishing conventions for d
 Front matter consists of introductory material preceding the first numbered chapter:
 
 ._frontmatter/preface.adoc
-[source,asciidoc]
+[source,asciidoc,render="source,preview"]
 ----
 [preface]
 == Preface
@@ -229,7 +229,7 @@ The `[preface]` role indicates to the renderer that this section precedes Chapte
 Organize your core technical content using Part headers (`=`) or Chapter headers (`==`):
 
 .chapters/01-consensus.adoc
-[source,asciidoc]
+[source,asciidoc,render="source,preview"]
 ----
 = Part I: Fundamentals of Consensus
 
@@ -245,7 +245,7 @@ When a follower node experiences an election timeout, it transitions to the cand
 Appendices provide supplementary specifications, reference tables, or mathematical proofs. Use the `[appendix]` attribute to designate an appendix section:
 
 .appendices/a-tla-spec.adoc
-[source,asciidoc]
+[source,asciidoc,render="source,preview"]
 ----
 [appendix]
 == Formal TLA+ Specifications
@@ -262,7 +262,7 @@ When `:sectnums:` is active, AsciiDoc automatically renumbers `[appendix]` secti
 Back matter provides index definitions, bibliographic references, and colophon notes:
 
 ._backmatter/glossary.adoc
-[source,asciidoc]
+[source,asciidoc,render="source,preview"]
 ----
 [glossary]
 == Glossary of Terms
