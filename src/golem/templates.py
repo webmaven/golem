@@ -83,6 +83,10 @@ DEFAULT_TEMPLATE = """\
             max-width: 800px;
             line-height: 1.6;
         }
+        #golem-content img {
+            max-width: 100%;
+            height: auto;
+        }
         #golem-sidebar-right {
             width: 200px;
             padding: 20px;
@@ -219,6 +223,14 @@ class PageCompiler:
         effective_content_class = (content_class or "").strip()
         effective_pygments_css = pygments_css if pygments_css is not None else PYGMENTS_CSS
 
+        # Compute a depth-relative path back to the site root so the header
+        # home-link works at any deployment base path (e.g. /golem/ on GitHub
+        # Pages), without requiring a site_url to be configured.
+        from pathlib import PurePosixPath
+
+        _depth = len(PurePosixPath(current_path).parent.parts) if current_path else 0
+        root_path = ("../" * _depth) if _depth else "./"
+
         import golem
 
         generator_version = getattr(golem, "__version__", "0.1.0a2")
@@ -252,7 +264,7 @@ class PageCompiler:
                     except Exception:
                         template = self.default_template
                 else:
-                    template = self.default_template
+                    template = self._load_builtin_template() or self.default_template
 
         return template(
             title=effective_title,
@@ -270,6 +282,7 @@ class PageCompiler:
             site_title=getattr(self.config, "site_title", "Golem Docs"),
             site_author=getattr(self.config, "site_author", "Anonymous"),
             site_url=getattr(self.config, "site_url", None),
+            root_path=root_path,
             generator_version=generator_version,
             custom_css=custom_css or [],
             custom_js=custom_js or [],

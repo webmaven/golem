@@ -19,6 +19,7 @@ Golem features an intelligent navigation discovery engine that builds sidebar na
 
 When auto-discovering navigation trees, Golem uses document metadata to establish reading hierarchy:
 
+.content/getting-started.adoc
 [source,asciidoc]
 ----
 = Getting Started
@@ -36,6 +37,7 @@ When auto-discovering navigation trees, Golem uses document metadata to establis
 
 If you prefer to define navigation order manually, specify `nav` in `[navigation]`:
 
+.golem.toml
 [source,toml]
 ----
 [navigation]

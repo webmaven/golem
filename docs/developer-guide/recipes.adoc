@@ -9,6 +9,7 @@
 
 Transform custom AsciiDoc roles (like `[.alert]`) into custom CSS-styled admonition blocks during ASG semantic resolution:
 
+.alert_badge_plugin.py
 [source,python]
 ----
 import pluggy
@@ -32,6 +33,7 @@ class AlertBadgePlugin:
 
 Register a new command `golem stats` that scans the output directory and prints a summary report of generated pages and total payload size:
 
+.site_stats_plugin.py
 [source,python]
 ----
 from pathlib import Path
@@ -69,6 +71,7 @@ class SiteStatsPlugin:
 
 Inject custom OpenGraph metadata and canonical link tags into the rendered HTML `<head>` prior to writing files to disk:
 
+.canonical_url_plugin.py
 [source,python]
 ----
 import pluggy

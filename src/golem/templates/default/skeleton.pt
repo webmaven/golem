@@ -17,14 +17,14 @@
     <style>
         :root {
             /* Light Mode Default (Fired Clay / Workbench) */
-            --golem-bg: #f7f4ef;
-            --golem-surface: #f2ede8;
-            --golem-code-bg: #ece7de;
+            --golem-bg: #faf9f5;
+            --golem-surface: #f3f0e8;
+            --golem-code-bg: #ede8df;
             --golem-text: #1e1a16;
             --golem-text-muted: #6b5d52;
             --golem-primary: #8b3a12;
             --golem-primary-hover: #6b2a08;
-            --golem-border: #cec8bf;
+            --golem-border: #dfdbd2;
             --golem-link: #8b3a12;
             --golem-link-visited: #3e2518;
             --golem-link-hover: #6b2a08;
@@ -323,29 +323,85 @@
             color: var(--golem-link-visited);
         }
 
-        /* ── Code & Listings ───────────────────────────────── */
-        code, kbd, samp {
+        /* ── Code & Inline Elements ────────────────────────── */
+        code, samp {
             font-family: var(--golem-font-mono);
             font-size: 0.875em;
         }
         p code, li code, td code {
             background: var(--golem-code-bg);
             padding: 0.1em 0.35em;
-            border-radius: 3px;
+            border-radius: 2px;
             border: 1px solid var(--golem-border);
         }
         h1 code, h2 code, h3 code, h4 code, h5 code, h6 code {
             background: var(--golem-code-bg);
             padding: 0.1em 0.3em;
-            border-radius: 3px;
+            border-radius: 2px;
             border: 1px solid var(--golem-border);
             font-size: 0.85em;
         }
+
+        /* ── UI Macros (kbd, btn, menu) ────────────────────── */
+        kbd {
+            display: inline-block;
+            font-family: var(--golem-font-mono);
+            font-size: 0.8em;
+            font-weight: 600;
+            line-height: 1.25;
+            color: var(--golem-text);
+            background-color: var(--golem-surface);
+            border: 1px solid var(--golem-border);
+            border-bottom: 2px solid var(--golem-border);
+            border-radius: 4px;
+            padding: 0.15em 0.45em;
+            box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        b.button, .button {
+            display: inline-block;
+            font-family: var(--golem-font-ui);
+            font-size: 0.85em;
+            font-weight: 600;
+            line-height: 1.3;
+            color: var(--golem-text);
+            background-color: var(--golem-surface);
+            border: 1px solid var(--golem-border);
+            border-radius: 5px;
+            padding: 0.15em 0.55em;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+            vertical-align: baseline;
+            white-space: nowrap;
+        }
+        span.menuseq {
+            font-family: var(--golem-font-ui);
+            font-size: 0.92em;
+            color: var(--golem-text);
+        }
+        span.menuseq b.menu,
+        span.menuseq b.submenu,
+        span.menuseq b.menuitem {
+            font-family: var(--golem-font-ui);
+            font-weight: 600;
+            color: var(--golem-text);
+        }
+        /* ── Code Blocks & Listings ────────────────────────── */
         .listingblock {
             position: relative;
             margin: 1.25rem 0;
+            border: 1px solid var(--golem-border);
+            border-left: 3px solid var(--golem-primary);
+            border-radius: 4px;
+            background: var(--golem-code-bg);
+            overflow: hidden;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
-        pre, .listingblock pre {
+        .listingblock:has(.listing-content:focus-within, .listing-panes:focus-within) {
+            border-color: var(--golem-primary);
+            box-shadow: 0 0 0 1px var(--golem-primary);
+        }
+        pre {
             position: relative;
             background: var(--golem-code-bg);
             border: 1px solid var(--golem-border);
@@ -358,12 +414,24 @@
             cursor: text;
             transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
-        .listingblock:focus-within pre,
         pre:focus-within {
             user-select: all;
             -webkit-user-select: all;
             border-color: var(--golem-primary);
             box-shadow: 0 0 0 1px var(--golem-primary);
+        }
+        .listingblock pre {
+            margin: 0;
+            border: none;
+            border-left: none;
+            border-radius: 0;
+            background: transparent;
+            padding: 1rem 1.25rem;
+            box-shadow: none;
+        }
+        .listingblock:has(.listing-content:focus-within, .listing-panes:focus-within) pre {
+            box-shadow: none;
+            border-color: transparent;
         }
         pre code {
             background: transparent;
@@ -372,18 +440,35 @@
             font-size: 0.875rem;
         }
 
-        /* ── Listing Language & Role Badges ────────────────── */
-        .listingblock pre.highlight::before,
-        pre.highlight[class*="language-"]::before,
-        pre[class*="language-"]::before,
-        .listingblock pre[class*="highlight"] code[class*="language-"]::before,
-        pre.highlight code[class*="language-"]::before,
-        pre.highlight.test::before,
-        pre.highlight.shared::before,
-        pre.highlight.reset::before {
-            position: absolute;
-            top: 0.45rem;
-            right: 0.65rem;
+        /* ── Listing Header & Actions ──────────────────────── */
+        .listing-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            padding: 0.45rem 0.75rem;
+            background: var(--golem-surface);
+            border-bottom: 1px solid var(--golem-border);
+            font-family: var(--golem-font-ui);
+            font-size: 0.8rem;
+        }
+        .listing-title {
+            font-weight: 600;
+            color: var(--golem-text);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-right: auto;
+        }
+        .listing-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-left: auto;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
             font-family: var(--golem-font-ui);
             font-size: 0.68rem;
             font-weight: 700;
@@ -394,152 +479,177 @@
             background: var(--golem-surface);
             color: var(--golem-text-muted);
             border: 1px solid var(--golem-border);
-            pointer-events: none;
             line-height: 1.2;
-            z-index: 2;
         }
-
-        /* Language Badges */
-        pre.highlight.python::before,
-        pre.highlight.py::before,
-        pre.highlight[class*="language-python"]::before,
-        pre.highlight code.language-python::before,
-        pre.highlight code[data-lang="python"]::before { content: 'python'; }
-
-        pre.highlight.javascript::before,
-        pre.highlight.js::before,
-        pre.highlight[class*="language-javascript"]::before,
-        pre.highlight code.language-javascript::before,
-        pre.highlight code[data-lang="javascript"]::before { content: 'javascript'; }
-
-        pre.highlight.typescript::before,
-        pre.highlight.ts::before,
-        pre.highlight[class*="language-typescript"]::before,
-        pre.highlight code.language-typescript::before,
-        pre.highlight code[data-lang="typescript"]::before { content: 'typescript'; }
-
-        pre.highlight.html::before,
-        pre.highlight[class*="language-html"]::before,
-        pre.highlight code.language-html::before,
-        pre.highlight code[data-lang="html"]::before { content: 'html'; }
-
-        pre.highlight.css::before,
-        pre.highlight[class*="language-css"]::before,
-        pre.highlight code.language-css::before,
-        pre.highlight code[data-lang="css"]::before { content: 'css'; }
-
-        pre.highlight.json::before,
-        pre.highlight[class*="language-json"]::before,
-        pre.highlight code.language-json::before,
-        pre.highlight code[data-lang="json"]::before { content: 'json'; }
-
-        pre.highlight.yaml::before,
-        pre.highlight.yml::before,
-        pre.highlight[class*="language-yaml"]::before,
-        pre.highlight code.language-yaml::before,
-        pre.highlight code[data-lang="yaml"]::before { content: 'yaml'; }
-
-        pre.highlight.toml::before,
-        pre.highlight[class*="language-toml"]::before,
-        pre.highlight code.language-toml::before,
-        pre.highlight code[data-lang="toml"]::before { content: 'toml'; }
-
-        pre.highlight.xml::before,
-        pre.highlight[class*="language-xml"]::before,
-        pre.highlight code.language-xml::before,
-        pre.highlight code[data-lang="xml"]::before { content: 'xml'; }
-
-        pre.highlight.bash::before,
-        pre.highlight.sh::before,
-        pre.highlight.shell::before,
-        pre.highlight.zsh::before,
-        pre.highlight[class*="language-bash"]::before,
-        pre.highlight code.language-bash::before,
-        pre.highlight code.language-sh::before,
-        pre.highlight code[data-lang="bash"]::before { content: 'bash'; }
-
-        pre.highlight.rust::before,
-        pre.highlight.rs::before,
-        pre.highlight[class*="language-rust"]::before,
-        pre.highlight code.language-rust::before,
-        pre.highlight code[data-lang="rust"]::before { content: 'rust'; }
-
-        pre.highlight.go::before,
-        pre.highlight[class*="language-go"]::before,
-        pre.highlight code.language-go::before,
-        pre.highlight code[data-lang="go"]::before { content: 'go'; }
-
-        pre.highlight.c::before,
-        pre.highlight[class*="language-c"]::before,
-        pre.highlight code.language-c::before,
-        pre.highlight code[data-lang="c"]::before { content: 'c'; }
-
-        pre.highlight.cpp::before,
-        pre.highlight.c\\+\\+::before,
-        pre.highlight[class*="language-cpp"]::before,
-        pre.highlight code.language-cpp::before,
-        pre.highlight code[data-lang="cpp"]::before { content: 'c++'; }
-
-        pre.highlight.java::before,
-        pre.highlight[class*="language-java"]::before,
-        pre.highlight code.language-java::before,
-        pre.highlight code[data-lang="java"]::before { content: 'java'; }
-
-        pre.highlight.ruby::before,
-        pre.highlight.rb::before,
-        pre.highlight[class*="language-ruby"]::before,
-        pre.highlight code.language-ruby::before,
-        pre.highlight code[data-lang="ruby"]::before { content: 'ruby'; }
-
-        pre.highlight.sql::before,
-        pre.highlight[class*="language-sql"]::before,
-        pre.highlight code.language-sql::before,
-        pre.highlight code[data-lang="sql"]::before { content: 'sql'; }
-
-        pre.highlight.dockerfile::before,
-        pre.highlight.docker::before,
-        pre.highlight[class*="language-dockerfile"]::before,
-        pre.highlight code.language-dockerfile::before,
-        pre.highlight code[data-lang="dockerfile"]::before { content: 'docker'; }
-
-        pre.highlight.diff::before,
-        pre.highlight[class*="language-diff"]::before,
-        pre.highlight code.language-diff::before,
-        pre.highlight code[data-lang="diff"]::before { content: 'diff'; }
-
-        pre.highlight.asciidoc::before,
-        pre.highlight.adoc::before,
-        pre.highlight[class*="language-asciidoc"]::before,
-        pre.highlight code.language-asciidoc::before,
-        pre.highlight code[data-lang="asciidoc"]::before { content: 'asciidoc'; }
-
-        pre.highlight.text::before,
-        pre.highlight.txt::before,
-        pre.highlight.plain::before,
-        pre.highlight[class*="language-text"]::before,
-        pre.highlight code.language-text::before,
-        pre.highlight code[data-lang="text"]::before { content: 'text'; }
-
-        /* Role Badges */
-        pre.highlight.test::before,
-        pre.highlight code.test::before {
-            content: 'test';
+        .badge-lang {
+            color: var(--golem-text-muted);
+            border-color: var(--golem-border);
+            background: var(--golem-bg);
+        }
+        .badge-test {
             color: var(--golem-note);
             border-color: color-mix(in srgb, var(--golem-note) 40%, var(--golem-border));
+            background: color-mix(in srgb, var(--golem-note) 10%, transparent);
         }
-
-        pre.highlight.shared::before,
-        pre.highlight code.shared::before {
-            content: 'shared';
+        .badge-shared {
             color: var(--golem-tip);
             border-color: color-mix(in srgb, var(--golem-tip) 40%, var(--golem-border));
+            background: color-mix(in srgb, var(--golem-tip) 10%, transparent);
         }
-
-        pre.highlight.reset::before,
-        pre.highlight code.reset::before {
-            content: 'reset';
+        .badge-reset {
             color: var(--golem-warning);
             border-color: color-mix(in srgb, var(--golem-warning) 40%, var(--golem-border));
+            background: color-mix(in srgb, var(--golem-warning) 10%, transparent);
+        }
+        .listing-copy-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--golem-font-ui);
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.15em 0.55em;
+            border-radius: 3px;
+            background: var(--golem-surface);
+            color: var(--golem-text-muted);
+            border: 1px solid var(--golem-border);
+            cursor: pointer;
+            line-height: 1.2;
+            transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+        }
+        .listing-copy-btn:hover {
+            color: var(--golem-text);
+            border-color: var(--golem-primary);
+            background: var(--golem-bg);
+        }
+        .listing-copy-btn:focus-visible {
+            outline: 2px solid var(--golem-primary);
+            outline-offset: 1px;
+        }
+        .listing-copy-btn.copied {
+            color: var(--golem-tip);
+            border-color: var(--golem-tip);
+        }
+        .listing-copy-btn svg {
+            display: block;
+            width: 1rem;
+            height: 1rem;
+        }
+
+        /* ── Multi-View Listing Tabs (Zero-JS Radio-Controlled Physical Tabs) ── */
+        .tab-input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+            margin: 0;
+            pointer-events: none;
+        }
+        .listingblock.multi-view .listing-header {
+            padding: 0.45rem 0.75rem 0;
+            align-items: flex-end;
+        }
+        .listingblock.multi-view .listing-title {
+            padding-bottom: 0.35rem;
+        }
+        .listingblock.multi-view .listing-actions {
+            padding-bottom: 0.35rem;
+        }
+        .listing-tabs {
+            display: inline-flex;
+            align-items: flex-end;
+            gap: 3px;
+            margin-right: auto;
+            margin-bottom: -1px;
+            position: relative;
+            z-index: 10;
+            align-self: flex-end;
+        }
+        .tab-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--golem-font-ui);
+            font-size: 0.73rem;
+            font-weight: 600;
+            padding: 0.35rem 0.75rem calc(0.35rem + 1px);
+            border-radius: 5px 5px 0 0;
+            border: 1px solid transparent;
+            border-bottom: none;
+            background: transparent;
+            color: var(--golem-text-muted);
+            cursor: pointer;
+            line-height: 1.2;
+            position: relative;
+            user-select: none;
+            transition: color 0.15s ease, background-color 0.15s ease;
+        }
+        .tab-btn:hover {
+            color: var(--golem-text);
+            background: color-mix(in srgb, var(--golem-text) 5%, transparent);
+            border-color: color-mix(in srgb, var(--golem-border) 60%, transparent) color-mix(in srgb, var(--golem-border) 60%, transparent) transparent;
+        }
+        .tab-btn:focus-visible {
+            outline: 2px solid var(--golem-primary);
+            outline-offset: 1px;
+        }
+
+        /* Declarative Zero-JS Active Tab State via :has() */
+        .listingblock:has(.tab-input[value="source"]:checked) .tab-btn[data-tab="source"],
+        .listingblock:has(.tab-input[value="asg"]:checked) .tab-btn[data-tab="asg"],
+        .listingblock:has(.tab-input[value="html"]:checked) .tab-btn[data-tab="html"],
+        .listingblock:has(.tab-input[value="preview"]:checked) .tab-btn[data-tab="preview"] {
+            color: var(--golem-primary);
+            font-weight: 700;
+            background: var(--golem-code-bg);
+            border: 1px solid var(--golem-border);
+            border-bottom: 1px solid var(--golem-code-bg);
+            margin-bottom: -1px;
+            z-index: 20;
+        }
+        .listingblock:has(.tab-input[value="preview"]:checked) .tab-btn[data-tab="preview"] {
+            background: var(--golem-bg);
+            border-bottom: 1px solid var(--golem-bg);
+        }
+
+        .listing-panes {
+            position: relative;
+            background: var(--golem-code-bg);
+        }
+        .listing-panes .tab-pane {
+            display: none;
+        }
+
+        /* Declarative Zero-JS Active Pane Visibility via :has() */
+        .listingblock:has(.tab-input[value="source"]:checked) .tab-pane[data-tab="source"],
+        .listingblock:has(.tab-input[value="asg"]:checked) .tab-pane[data-tab="asg"],
+        .listingblock:has(.tab-input[value="html"]:checked) .tab-pane[data-tab="html"],
+        .listingblock:has(.tab-input[value="preview"]:checked) .tab-pane[data-tab="preview"] {
+            display: block;
+        }
+        .tab-pane pre {
+            margin: 0;
+            border: none;
+            border-radius: 0;
+            background: transparent;
+        }
+        .tab-pane pre code {
+            border: none;
+            background: transparent;
+            padding: 0;
+        }
+        .rendered-preview {
+            padding: 1.25rem;
+            background: var(--golem-bg);
+            border-radius: 0 0 4px 4px;
+            color: var(--golem-text);
+            font-family: var(--golem-font-body);
+        }
+        .rendered-preview > :first-child {
+            margin-top: 0;
+        }
+        .rendered-preview > :last-child {
+            margin-bottom: 0;
         }
 
         /* ── Callout Badges (.conum) ───────────────────────── */
@@ -579,33 +689,15 @@
         }
         ol.colist {
             list-style: none;
-            counter-reset: colist-counter;
             padding-left: 0;
         }
         ol.colist > li {
-            counter-increment: colist-counter;
-            position: relative;
-            padding-left: 2rem;
+            /* Callout badges are rendered by <i class="conum"> from the template;
+               no ::before counter is needed — flex aligns badge + text naturally. */
+            display: flex;
+            align-items: baseline;
+            gap: 0.5em;
             margin-bottom: 0.5rem;
-        }
-        ol.colist > li::before {
-            content: counter(colist-counter);
-            position: absolute;
-            left: 0;
-            top: 0.2em;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 1.25em;
-            height: 1.25em;
-            border-radius: 50%;
-            background: var(--golem-primary);
-            color: #ffffff;
-            font-family: var(--golem-font-mono);
-            font-style: normal;
-            font-size: 0.75em;
-            font-weight: bold;
-            line-height: 1;
         }
         .colist ol {
             padding-left: 1.25rem;
@@ -748,6 +840,26 @@
             display: block;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
+        }
+
+        /* ── Images & Media ────────────────────────────────── */
+        #golem-content img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 6px;
+            border: 1px solid var(--golem-border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        #golem-content .imageblock {
+            margin: 1.5rem 0;
+        }
+        #golem-content .imageblock .title {
+            font-family: var(--golem-font-ui);
+            font-size: 0.85rem;
+            color: var(--golem-text-muted);
+            margin-top: 0.5rem;
+            text-align: center;
         }
 
         /* ── Focus Rings (Accessibility) ───────────────────── */
@@ -927,7 +1039,7 @@
 <body tal:attributes="class body_class or None">
     <a href="#golem-content" class="golem-skip-link">Skip to main content</a>
     <header id="golem-header" class="golem-header">
-        <h1><a href="/" tal:attributes="href site_url or '/'">${site_title}</a></h1>
+        <h1><a href="./" tal:attributes="href site_url or root_path">${site_title}</a></h1>
         <span tal:condition="site_author" class="golem-author">${site_author}</span>
     </header>
     <div id="golem-wrapper">
@@ -967,6 +1079,92 @@
     <footer id="golem-footer" class="golem-footer">
         <p>Generated by Golem ${generator_version}</p>
     </footer>
+    <script>
+        (function() {
+            var CHECK_ICON = '<svg class="icon-check" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+
+            function copyToClipboard(text, done) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function() {
+                        done(true);
+                    }).catch(function() {
+                        fallbackCopy(text, done);
+                    });
+                } else {
+                    fallbackCopy(text, done);
+                }
+            }
+
+            function fallbackCopy(text, done) {
+                try {
+                    var ta = document.createElement("textarea");
+                    ta.value = text;
+                    ta.style.position = "fixed";
+                    ta.style.left = "-999999px";
+                    ta.style.top = "-999999px";
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    var res = document.execCommand("copy");
+                    document.body.removeChild(ta);
+                    done(res);
+                } catch (err) {
+                    done(false);
+                }
+            }
+
+            document.addEventListener("click", function(e) {
+                var copyBtn = e.target.closest(".listing-copy-btn");
+                if (copyBtn) {
+                    var block = copyBtn.closest(".listingblock");
+                    if (!block) return;
+                    var checkedInput = block.querySelector('.tab-input:checked');
+                    var activePane = checkedInput ? block.querySelector('.tab-pane[data-tab="' + checkedInput.value + '"]') : null;
+                    if (!activePane) {
+                        activePane = block.querySelector('.tab-pane') || block.querySelector('.listing-content');
+                    }
+                    var codeEl = activePane ? activePane.querySelector('pre code') : null;
+                    if (!codeEl) {
+                        // Fallback to source pane or any pane with code
+                        codeEl = block.querySelector('.tab-pane[data-tab="source"] pre code') || block.querySelector('pre code');
+                    }
+                    if (!codeEl) return;
+
+                    var clone = codeEl.cloneNode(true);
+                    var conums = clone.querySelectorAll(".conum, i.conum");
+                    for (var i = 0; i < conums.length; i++) {
+                        conums[i].remove();
+                    }
+                    var text = clone.textContent;
+
+                    copyToClipboard(text, function(success) {
+                        if (!success) return;
+                        if (copyBtn._copyTimeout) {
+                            clearTimeout(copyBtn._copyTimeout);
+                        }
+                        if (!copyBtn._originalHtml) {
+                            copyBtn._originalHtml = copyBtn.innerHTML;
+                        }
+                        var originalLabel = copyBtn.getAttribute("aria-label");
+                        var originalTitle = copyBtn.getAttribute("title");
+
+                        copyBtn.innerHTML = CHECK_ICON;
+                        copyBtn.setAttribute("aria-label", "Copied!");
+                        if (originalTitle) copyBtn.setAttribute("title", "Copied!");
+                        copyBtn.classList.add("copied");
+
+                        copyBtn._copyTimeout = setTimeout(function() {
+                            copyBtn.innerHTML = copyBtn._originalHtml;
+                            if (originalLabel) copyBtn.setAttribute("aria-label", originalLabel);
+                            if (originalTitle) copyBtn.setAttribute("title", originalTitle);
+                            copyBtn.classList.remove("copied");
+                            copyBtn._copyTimeout = null;
+                        }, 2000);
+                    });
+                }
+            });
+        })();
+    </script>
     <tal:block tal:repeat="js_file custom_js">
         <script src="${js_file}"></script>
     </tal:block>

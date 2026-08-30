@@ -251,14 +251,18 @@ class LiveReloadServer:
                         if not err_msg and server_instance.errors_func is not None:
                             errs = server_instance.errors_func()
                             if errs:
-                                err_msg = "\n".join(f"[{e.get('file', 'unknown')}] {e.get('message', '')}" for e in errs)
+                                from golem.cli import format_diagnostic
+
+                                err_msg = "\n\n".join(
+                                    format_diagnostic(e, content_dir=server_instance.watch_dir) for e in errs
+                                )
 
                         if err_msg:
                             escaped_err = err_msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                             error_banner = f"""
-                            <div id="golem-error-overlay" style="position:fixed;top:0;left:0;right:0;background:#ef4444;color:#ffffff;padding:12px 20px;font-family:monospace;font-size:14px;z-index:99999;box-shadow:0 4px 6px -1px rgba(0,0,0,0.2);">
-                                <strong>[Golem Build Warning/Error]</strong>
-                                <pre style="margin:6px 0 0 0;white-space:pre-wrap;">{escaped_err}</pre>
+                            <div id="golem-error-overlay" style="position:fixed;top:0;left:0;right:0;background:#b91c1c;color:#ffffff;padding:14px 20px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;z-index:99999;box-shadow:0 10px 25px -5px rgba(0,0,0,0.4);max-height:50vh;overflow-y:auto;">
+                                <strong style="color:#ffffff;font-size:14px;">[Golem Build Warning/Error]</strong>
+                                <pre style="margin:8px 0 0 0;padding:12px 14px;background:#18181b;color:#f4f4f5;border:1px solid #3f3f46;border-radius:4px;white-space:pre-wrap;font-family:inherit;line-height:1.45;">{escaped_err}</pre>
                             </div>
                             """
 

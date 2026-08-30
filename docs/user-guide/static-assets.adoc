@@ -13,6 +13,7 @@ By default, any static files placed in your project's `static/` directory (or th
 
 === Typical Asset Directory Structure
 
+.Directory Structure
 [source,text]
 ----
 my-docs-project/
@@ -54,10 +55,9 @@ Authors can customize colors, typography, and page layout dimensions simply by c
 
 Create your custom stylesheet in your project's static folder:
 
+.static/css/custom.css
 [source,css]
 ----
-/* static/css/custom.css */
-
 /* 1. Custom Color Palette (Modern Slate / Indigo Theme) */
 :root {
     --golem-bg: #f8fafc;
@@ -113,6 +113,7 @@ Create your custom stylesheet in your project's static folder:
 
 Register your stylesheet and optional web fonts in `golem.toml`:
 
+.golem.toml
 [source,toml]
 ----
 [site]
@@ -134,6 +135,7 @@ output_dir = "dist"
 
 If you configure Golem inside `pyproject.toml`:
 
+.pyproject.toml
 [source,toml]
 ----
 [tool.golem.site]
@@ -156,6 +158,7 @@ You can reference images, media, and downloadable files directly in your AsciiDo
 
 === Inline and Block Images
 
+.images_example.adoc
 [source,asciidoc]
 ----
 // Relative to current document or absolute static root
@@ -166,6 +169,7 @@ You can also use inline images image:/static/images/badge.svg[Build Status] insi
 
 === File Downloads and Links
 
+.downloads_example.adoc
 [source,asciidoc]
 ----
 Download our link:/static/downloads/whitepaper.pdf[Technical Whitepaper (PDF)].

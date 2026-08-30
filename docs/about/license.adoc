@@ -4,6 +4,7 @@
 :idseparator: -
 :sectanchors:
 
+.LICENSE
 [source,text]
 ----
 include::../../LICENSE[]

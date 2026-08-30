@@ -11,6 +11,7 @@ Golem requires *Python >= 3.14* and operates with zero Node.js, npm, or external
 
 Install Golem directly into your project virtual environment via `pip`:
 
+.Terminal
 [source,bash]
 ----
 # Create and activate an isolated virtual environment
@@ -23,6 +24,7 @@ pip install golem-docs
 
 Verify your installation:
 
+.Terminal
 [source,bash]
 ----
 golem --version
@@ -32,6 +34,7 @@ golem --version
 
 To contribute or develop plugins against the latest bleeding-edge commits:
 
+.Terminal
 [source,bash]
 ----
 git clone https://github.com/webmaven/golem.git
@@ -48,6 +51,7 @@ The `[docs]` optional-dependency group declares `golem-docs` as its own dependen
 When installed in editable mode, pip satisfies that self-reference with the editable
 install already in the environment — no duplicate copy is created.
 
+.Terminal
 [source,bash]
 ----
 # Install in editable mode with the docs extra (self-hosting)

@@ -38,6 +38,189 @@ from asciidoctrine.nodes import Node
 from golem.highlighting import make_highlighter
 
 
+DEFAULT_TEMPLATES_DIR: Path = Path(__file__).parent / "templates" / "default"
+
+
+class GolemRenderer(asciidoctype.AsciiDoctypeRenderer):
+    """AsciiDoctypeRenderer subclass with Golem-specific multi-view extensions."""
+
+    def get_derived_views(
+        self,
+        node: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
+    ) -> list[dict[str, str]]:
+        """Extract multi-view derived representations for a listing node."""
+        from golem.views import extract_listing_views
+
+        return extract_listing_views(node, highlighter=self.highlighter)
+
+    def get_listing_uid(
+        self,
+        node: dict[str, Any],
+        context: Optional[dict[str, Any]] = None,
+    ) -> str:
+        """Generate a deterministic unique identifier for a listing block.
+
+        Preserves existing user-defined anchor IDs or constructs a deterministic
+        slug derived from the block title, sequential counter, or content digest.
+        """
+        if not isinstance(node, dict):
+            return "listing"
+
+        # Cached on node to ensure stability across multiple template evaluations
+        if "_golem_uid" in node:
+            return str(node["_golem_uid"])
+
+        attrs = node.get("attributes")
+        if isinstance(attrs, dict) and attrs.get("id"):
+            uid = str(attrs["id"])
+            node["_golem_uid"] = uid
+            return uid
+
+        if node.get("id"):
+            uid = str(node["id"])
+            node["_golem_uid"] = uid
+            return uid
+
+        title = node.get("title")
+        if title:
+            raw_title = self.extract_text(title) if hasattr(self, "extract_text") else str(title)
+            slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", raw_title.lower()).strip("-")
+            base = slug if slug else "listing"
+        else:
+            base = "listing"
+
+        counter = getattr(self, "_listing_counter", 0) + 1
+        self._listing_counter = counter
+        uid = f"{base}-{counter}"
+        node["_golem_uid"] = uid
+        return uid
+
+    def get_listing_roles(self, node: dict[str, Any]) -> list[str]:
+        """Extract and sanitize role identifiers for listing badges.
+
+        Filters role attributes to permit only safe alphanumeric characters,
+        hyphens, and underscores to prevent CSS/HTML injection.
+        """
+        if not isinstance(node, dict):
+            return []
+        attrs = node.get("attributes")
+        role_attr = attrs.get("role") if isinstance(attrs, dict) else node.get("role")
+        if not role_attr:
+            return []
+        if isinstance(role_attr, str):
+            raw_roles = role_attr.split()
+        elif isinstance(role_attr, (list, tuple, set)):
+            raw_roles = [str(r) for r in role_attr]
+        else:
+            raw_roles = [str(role_attr)]
+
+        sanitized: list[str] = []
+        for r in raw_roles:
+            cleaned = re.sub(r"[^a-zA-Z0-9_-]", "", r)
+            if cleaned and cleaned not in sanitized:
+                sanitized.append(cleaned)
+        return sanitized
+
+    def highlight_code(
+        self,
+        node: dict[str, Any],
+        ctx: Optional[dict[str, Any]] = None,
+    ) -> Optional[str]:
+        """Highlight code with callout markers re-injected into the output.
+
+        Overrides `AsciiDoctypeRenderer.highlight_code` to handle listing nodes
+        whose ``inlines`` list contains a mix of ``text`` and ``callout`` nodes.
+        The parent implementation calls ``extract_text``, which silently drops
+        ``callout`` inlines because their ``value`` is an integer rather than a
+        string. This override:
+
+        1. Detects whether any ``callout`` inlines are present.
+        2. If so, separates text segments from callout markers, tracks the line
+           number at which each callout occurs (by counting newlines accumulated
+           in the text segments preceding it), and highlights only the clean code.
+        3. After Pygments produces the highlighted HTML, splits the ``<code>``
+           inner content on newlines and appends
+           ``<i class="conum" data-value="N"><b>N</b></i>`` at each callout line.
+        4. Falls back to the parent implementation unchanged when there are no
+           callout inlines.
+
+        [parameters]
+        `node` (dict[str, Any]):: ASG listing node dictionary.
+        `ctx` (dict[str, Any] | None, optional):: Template rendering context.
+
+        [returns]
+        `str | None`:: Highlighted HTML with callout badges, or ``None`` when no
+        highlighter is configured or the language is unrecognised.
+        """
+        if self.highlighter is None:
+            return None
+
+        inlines = node.get("inlines") if isinstance(node, dict) else None
+        if not isinstance(inlines, list):
+            return super().highlight_code(node, ctx)
+
+        has_callouts = any(isinstance(il, dict) and il.get("name") == "callout" for il in inlines)
+        if not has_callouts:
+            return super().highlight_code(node, ctx)
+
+        # --- Separate text from callout inlines ---
+        code_parts: list[str] = []
+        # Maps 0-based line number → list of callout values at that line
+        callout_positions: dict[int, list] = {}
+        for inline in inlines:
+            if not isinstance(inline, dict):
+                continue
+            if inline.get("name") == "callout":
+                line_num = "".join(code_parts).count("\n")
+                val = inline.get("value", "")
+                callout_positions.setdefault(line_num, []).append(val)
+            else:
+                raw = inline.get("value", "")
+                if isinstance(raw, str):
+                    code_parts.append(raw)
+
+        code = "".join(code_parts)
+
+        # Resolve language the same way the parent does
+        attrs = node.get("attributes") if isinstance(node, dict) else {}
+        lang: str = ""
+        if isinstance(attrs, dict):
+            lang = attrs.get("language") or attrs.get("lang") or ""
+        if not lang:
+            lang = (node.get("language") or "") if isinstance(node, dict) else ""
+
+        highlighted = self.highlighter(code, str(lang))
+        if highlighted is None:
+            return None
+
+        if not callout_positions:
+            return highlighted
+
+        # --- Inject callout badges into the highlighted HTML ---
+        # make_highlighter output: <pre class="highlight LANG"><code class="language-LANG">CONTENT</code></pre>
+        m = re.search(
+            r"(<pre[^>]*><code[^>]*>)(.*)(</code></pre>)",
+            highlighted,
+            re.DOTALL,
+        )
+        if not m:
+            return highlighted
+
+        pre_open, content, pre_close = m.group(1), m.group(2), m.group(3)
+        lines = content.split("\n")
+        for line_num, vals in callout_positions.items():
+            if 0 <= line_num < len(lines):
+                for val in vals:
+                    safe_val = re.sub(r"[^0-9]", "", str(val))
+                    lines[line_num] += f'<i class="conum" data-value="{safe_val}"><b>{safe_val}</b></i>'
+        return pre_open + "\n".join(lines) + pre_close
+
+    def render_view_content(self, view: dict[str, Any]) -> str:
+        """Render raw HTML content for a validated derived view tab."""
+        return str(view.get("content", ""))
+
+
 def render_body(
     asg_root: Union[Node, dict[str, Any]],
     search_paths: Optional[List[Path]] = None,
@@ -56,7 +239,7 @@ def render_body(
 
     [parameters]
     `asg_root` (Node | dict[str, Any]):: AST Node or ASG dictionary representation of the document or fragment.
-    `search_paths` (list[Path] | None, optional):: Optional list of directory paths containing custom Chameleon template overrides. Defaults to `None`.
+    `search_paths` (list[Path] | None, optional):: Optional list of directory paths containing custom Chameleon template overrides. Defaults to including `src/golem/templates/default`.
     `highlighter` (Callable[[str, str], Optional[str]] | None, optional):: Optional syntax highlighter callable. Defaults to default Fired Clay Pygments highlighter.
 
     [returns]
@@ -73,9 +256,16 @@ def render_body(
         raise TypeError(f"Expected Node or dict, got {type(asg_root).__name__}")
 
     _ensure_section_ids(node_dict)
+    _reattach_block_titles(node_dict)
     active_highlighter = highlighter if highlighter is not None else make_highlighter()
-    renderer = asciidoctype.AsciiDoctypeRenderer(
-        search_paths=search_paths,
+    active_search_paths: list[Path] = []
+    if search_paths:
+        active_search_paths.extend(search_paths)
+    if DEFAULT_TEMPLATES_DIR.exists() and DEFAULT_TEMPLATES_DIR not in active_search_paths:
+        active_search_paths.append(DEFAULT_TEMPLATES_DIR)
+
+    renderer = GolemRenderer(
+        search_paths=active_search_paths,
         highlighter=active_highlighter,
     )
     if node_dict.get("name") == "document":
@@ -118,6 +308,83 @@ def _slugify(text: str) -> str:
     s = text.lower().strip()
     s = re.sub(r"[^a-z0-9]+", "-", s)
     return s.strip("-")
+
+
+def _is_block_title_paragraph(block: dict[str, Any]) -> bool:
+    """Return True if a paragraph block is an orphaned AsciiDoc block title.
+
+    Detects the asciidoctrine parser limitation where a block title line
+    (``.Title``) following another block is parsed as a standalone paragraph
+    instead of being attached as the ``title`` attribute of the following block.
+    A paragraph qualifies as an orphaned block title when it has exactly one
+    text-type inline whose value begins with a single ``.`` followed by
+    non-whitespace content.
+
+    [parameters]
+    `block` (dict[str, Any]):: ASG node dictionary to inspect.
+
+    [returns]
+    `bool`:: ``True`` if the block is an orphaned block-title paragraph.
+    """
+    if not isinstance(block, dict) or block.get("name") != "paragraph":
+        return False
+    inlines = block.get("inlines", [])
+    if len(inlines) != 1:
+        return False
+    inline = inlines[0]
+    if not isinstance(inline, dict):
+        return False
+    value = inline.get("value", "")
+    return isinstance(value, str) and value.startswith(".") and len(value) > 1 and not value[1:2].isspace()
+
+
+def _reattach_block_titles(node: Any) -> None:
+    """Post-process an ASG dictionary to reattach orphaned block-title paragraphs.
+
+    Fixes an ``asciidoctrine`` parser limitation where block titles (``.Title``
+    syntax) appearing after other blocks are parsed as standalone paragraphs
+    instead of being attached as the ``title`` attribute of the following block.
+    This pass traverses all block lists recursively and, for each consecutive
+    pair where the first block is an orphaned block-title paragraph (detected
+    via `_is_block_title_paragraph`) and the second block has no title, strips
+    the leading ``.`` from the first inline's value, promotes the remaining
+    inlines as the ``title`` of the second block, and removes the orphaned
+    paragraph from the block list.
+
+    NOTE: Modifies the ASG dictionary in-place.
+
+    [parameters]
+    `node` (Any):: ASG root dictionary or any sub-node to recursively process.
+    """
+    if not isinstance(node, dict):
+        return
+
+    for key in ("blocks", "children", "items"):
+        blocks = node.get(key)
+        if not isinstance(blocks, list) or not blocks:
+            continue
+
+        to_remove: set[int] = set()
+        for i, block in enumerate(blocks):
+            if i in to_remove or not isinstance(block, dict):
+                continue
+            if _is_block_title_paragraph(block) and i + 1 < len(blocks):
+                next_block = blocks[i + 1]
+                if isinstance(next_block, dict) and next_block.get("title") is None:
+                    inlines = block.get("inlines", [])
+                    if inlines:
+                        first = dict(inlines[0])
+                        raw = first.get("value", "")
+                        if raw.startswith("."):
+                            first["value"] = raw[1:]
+                        next_block["title"] = [first] + [dict(il) for il in inlines[1:]]
+                        to_remove.add(i)
+
+        if to_remove:
+            node[key] = [b for j, b in enumerate(blocks) if j not in to_remove]
+
+        for block in node[key]:
+            _reattach_block_titles(block)
 
 
 def _ensure_section_ids(node: Any) -> None:

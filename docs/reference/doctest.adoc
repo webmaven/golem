@@ -11,6 +11,7 @@ Technical documentation easily becomes stale when APIs change. Golem integrates 
 
 Run doctest verification across your documentation:
 
+.Terminal
 [source,bash]
 ----
 golem doctest
@@ -20,9 +21,11 @@ golem doctest
 
 In your AsciiDoc source:
 
-[source,asciidoc]
+.config_doctest.adoc
+[source,asciidoc,render="source,preview"]
 ----
-[source,python]
+.config_example.py
+[source,python,role="test"]
 ....
 >>> from golem.config import GolemConfig
 >>> config = GolemConfig(content_dir="docs")
@@ -31,7 +34,7 @@ In your AsciiDoc source:
 ....
 ----
 
-Running `golem doctest` extracts these blocks and executes them in an isolated test environment.
+Running `golem doctest` extracts these blocks and executes them in an isolated test environment. In the rendered HTML documentation, the block automatically receives a `TEST` role badge and a `PYTHON` language badge.
 
 == Test Block Roles & State Models
 
@@ -41,8 +44,10 @@ Golem's doctest plugin supports advanced state management and isolation models:
 
 By default or when marked with `[source,python,role="test"]`, blocks run in isolated, ephemeral state:
 
-[source,asciidoc]
+.isolated_test.adoc
+[source,asciidoc,render="source,preview"]
 ----
+.calculator_test.py
 [source,python,role="test"]
 ....
 >>> a = 10
@@ -55,13 +60,16 @@ By default or when marked with `[source,python,role="test"]`, blocks run in isol
 
 Use `role="shared"` to retain variable definitions and state across subsequent blocks:
 
-[source,asciidoc]
+.shared_timeline.adoc
+[source,asciidoc,render="source,preview"]
 ----
+.api_setup.py
 [source,python,role="shared"]
 ....
 base_url = "https://example.com"
 ....
 
+.api_test.py
 [source,python,role="shared test"]
 ....
 >>> f"{base_url}/api"
@@ -77,14 +85,17 @@ Shared state automatically resets at top-level section boundaries (`==`), isolat
 
 Manage multiple independent timelines within a single document using named contexts:
 
-[source,asciidoc]
+.named_scopes.adoc
+[source,asciidoc,render="source,preview"]
 ----
-[source,python,shared="server"]
+.server_config.py
+[source,python,role="shared",shared="server"]
 ....
 port = 8080
 ....
 
-[source,python,shared="client"]
+.client_config.py
+[source,python,role="shared",shared="client"]
 ....
 timeout = 30
 ....
@@ -92,5 +103,16 @@ timeout = 30
 
 === Explicit Reset Markers
 
-Clear all accumulated shared state and named contexts on demand using `[source,python,reset]`.
+Clear all accumulated shared state and named contexts on demand using `role="reset"`:
+
+.reset_state.adoc
+[source,asciidoc,render="source,preview"]
+----
+.clean_slate.py
+[source,python,role="reset test"]
+....
+>>> "base_url" in locals() or "base_url" in globals()
+False
+....
+----
 

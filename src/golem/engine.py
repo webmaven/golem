@@ -1264,6 +1264,14 @@ class BuildEngine:
             theme_path = Path("themes") / self.config.theme
             paths.append(theme_path.resolve() if theme_path.exists() else theme_path)
 
+        # 3. Built-in package templates (e.g. src/golem/templates/<theme> and src/golem/templates/default)
+        pkg_theme = Path(__file__).parent / "templates" / getattr(self.config, "theme", "default")
+        if pkg_theme.exists() and pkg_theme.is_dir():
+            paths.append(pkg_theme.resolve())
+        pkg_default = Path(__file__).parent / "templates" / "default"
+        if pkg_default != pkg_theme and pkg_default.exists() and pkg_default.is_dir():
+            paths.append(pkg_default.resolve())
+
         return paths
 
     def _get_template_files(self) -> list[Path]:
@@ -1348,6 +1356,9 @@ class BuildEngine:
         3. Custom templates static assets (`<templates_dir>/static`).
         4. User project static assets (`<static_dir>`).
 
+        Additionally synchronizes non-AsciiDoc media and static assets located within
+        `content_dir` directly into `output_dir`, preserving relative directory paths.
+
         Higher-precedence assets overwrite lower-precedence assets with matching relative paths.
 
         [returns]
@@ -1402,6 +1413,16 @@ class BuildEngine:
             if user_static.exists() and user_static.is_dir():
                 output_static_dir.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(user_static, output_static_dir, dirs_exist_ok=True)
+
+        # 4. Content directory static assets (images, attachments, non-AsciiDoc media)
+        if self.content_dir.exists() and self.content_dir.is_dir():
+            output_dir = Path(self.config.output_dir)
+            for item in self.content_dir.rglob("*"):
+                if item.is_file() and item.suffix != ".adoc" and not item.name.startswith("."):
+                    rel = item.relative_to(self.content_dir)
+                    dest = output_dir / rel
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(item, dest)
 
     def build_site(self) -> list[Path]:
         """Orchestrate the incremental compilation pipeline for outdated AsciiDoc documents.

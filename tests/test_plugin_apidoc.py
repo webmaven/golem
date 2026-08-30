@@ -234,3 +234,37 @@ class ServiceConfig:
         assert "UNANNOTATED_VAR" in raw_adoc
     finally:
         sys.path.remove(str(tmp_path))
+
+
+def test_on_pre_parse_verbatim_and_backtick_protection():
+    """Verify on_pre_parse does not expand macros in backticks or verbatim blocks."""
+    from golem.plugins import apidoc
+
+    raw = """= Guide
+
+Here is `golem:apidoc[...]` in an inline code span.
+
+[source,asciidoc]
+----
+= Code Listing
+golem:apidoc[target="some.pkg.Class", depth="all"]
+----
+
+....
+golem:apidoc[literal_block]
+....
+
+And \\golem:apidoc[target="escaped"] is escaped.
+"""
+    processed = apidoc.on_pre_parse(raw)
+
+    # Inline backticks preserved
+    assert "`golem:apidoc[...]`" in processed
+
+    # Verbatim blocks preserved without expansion or warnings
+    assert 'golem:apidoc[target="some.pkg.Class", depth="all"]' in processed
+    assert "golem:apidoc[literal_block]" in processed
+
+    # Escaped macro unescaped
+    assert 'golem:apidoc[target="escaped"]' in processed
+    assert "\\golem:apidoc" not in processed

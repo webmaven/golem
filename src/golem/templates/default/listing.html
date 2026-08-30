@@ -1,0 +1,59 @@
+<figure tal:define="derived_views python:renderer.get_derived_views(node, ctx) if hasattr(renderer, 'get_derived_views') else [];
+                    listing_uid python:renderer.get_listing_uid(node, ctx) if hasattr(renderer, 'get_listing_uid') else (node.get('attributes', {}).get('id') if isinstance(node.get('attributes'), dict) and node.get('attributes', {}).get('id') else (node.get('id') or f'listing-{id(node)}'));
+                    lang python:node.get('attributes', {}).get('language') if isinstance(node.get('attributes'), dict) and node.get('attributes', {}).get('language') else (node.get('attributes', {}).get('lang') if isinstance(node.get('attributes'), dict) and node.get('attributes', {}).get('lang') else (node.get('language') or ''));
+                    roles python:renderer.get_listing_roles(node) if hasattr(renderer, 'get_listing_roles') else [];
+                    highlighted python:None if derived_views else renderer.highlight_code(node, ctx)"
+        tal:attributes="class python:'listingblock multi-view' if derived_views else 'listingblock';
+                        id listing_uid">
+  <tal:block tal:condition="derived_views">
+    <tal:block tal:repeat="view derived_views">
+      <input type="radio"
+             class="tab-input"
+             tal:attributes="name python:'tabs_' + str(listing_uid);
+                             id python:'tab_' + str(listing_uid) + '_' + str(view.get('id', ''));
+                             value view.get('id');
+                             checked python:'checked' if repeat.view.start else None" />
+    </tal:block>
+  </tal:block>
+  <header class="listing-header">
+    <span tal:condition="node.get('title')" class="listing-title"><tal:block tal:condition="python:isinstance(node.get('title'), list)" tal:repeat="inline node.get('title', [])" tal:replace="structure renderer.render(inline, ctx)" /><tal:block tal:condition="python:isinstance(node.get('title'), dict)" tal:replace="structure renderer.render(node.get('title'), ctx)" /><tal:block tal:condition="python:isinstance(node.get('title'), str)" tal:content="node.get('title')" /></span>
+    <div tal:condition="derived_views" class="listing-tabs" role="tablist">
+      <label tal:repeat="view derived_views"
+             tal:attributes="class python:'tab-btn active' if repeat.view.start else 'tab-btn';
+                             for python:'tab_' + str(listing_uid) + '_' + str(view.get('id', ''));
+                             data-tab view.get('id');
+                             role 'tab';
+                             tabindex '0'"
+             tal:content="view.get('label')">
+      </label>
+    </div>
+    <div class="listing-actions">
+      <tal:block tal:repeat="r roles">
+        <span tal:define="safe_r python:''.join([c for c in r.lower() if c.isalnum() or c in '-_'])"
+              tal:condition="safe_r"
+              tal:attributes="class python:f'badge badge-{safe_r}'"
+              tal:content="r"></span>
+      </tal:block>
+      <span tal:condition="lang" class="badge badge-lang" tal:content="python:lang.upper()"></span>
+      <button type="button" class="listing-copy-btn" aria-label="Copy code to clipboard" title="Copy code"><svg class="icon-copy" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+    </div>
+  </header>
+  <tal:block tal:condition="derived_views">
+    <div class="listing-panes">
+      <div tal:repeat="view derived_views"
+           tal:attributes="class python:'tab-pane active' if repeat.view.start else 'tab-pane';
+                           data-tab view.get('id');
+                           role 'tabpanel'"
+           tal:content="structure python:renderer.render_view_content(view) if hasattr(renderer, 'render_view_content') else view.get('content')">
+      </div>
+    </div>
+  </tal:block>
+  <tal:block tal:condition="not:derived_views">
+    <div class="listing-content">
+      <tal:block tal:condition="highlighted" tal:replace="structure python:highlighted if highlighted is not None else renderer.render(node, ctx)" />
+      <tal:block tal:condition="not:highlighted">
+        <pre class="highlight" tal:attributes="class python:'highlight' + ((' ' + lang) if lang else '')"><code tal:attributes="class python:('language-' + lang) if lang else None"><tal:block tal:repeat="inline node.get('inlines', [])" tal:replace="structure renderer.render(inline, ctx)" /><tal:block tal:condition="not:node.get('inlines')" tal:content="node.get('value', '')" /></code></pre>
+      </tal:block>
+    </div>
+  </tal:block>
+</figure>

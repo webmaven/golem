@@ -9,34 +9,43 @@ Golem utilizes `pluggy`—the plugin engine behind `pytest`—to provide clean l
 
 == Available Hook Specifications
 
-Plugins implement hooks using the `@hookimpl` decorator:
+Plugins implement hooks using the `@hookimpl` decorator from `golem.plugins`:
 
+.my_plugin.py
 [source,python]
 ----
-import pluggy
-
-hookimpl = pluggy.HookimplMarker("golem")
+from pathlib import Path
+from typing import Any
+import click
+from golem.plugins import hookimpl
 
 class MyPlugin:
     @hookimpl
-    def on_pre_parse(self, source_text: str, file_path: str) -> str | None:
-        '''Called before AsciiDoc parsing. Can mutate raw source text.'''
-        return source_text
+    def on_pre_parse(self, raw_content: str) -> str:
+        """Called sequentially before Lark parsing. Can mutate raw AsciiDoc source text."""
+        return raw_content
 
     @hookimpl
-    def on_ast_created(self, ast: dict, file_path: str) -> dict | None:
-        '''Called after Lark AST parsing.'''
+    def on_ast_created(self, ast: Any) -> Any:
+        """Called after Lark parses AsciiDoc source into an AST before semantic resolution."""
         return ast
 
     @hookimpl
-    def on_asg_created(self, asg: dict, file_path: str) -> dict | None:
-        '''Called after ASG semantic resolution.'''
+    def on_asg_created(self, asg: dict[str, Any]) -> dict[str, Any]:
+        """Called after semantic ASG resolution into a structured dictionary."""
         return asg
 
     @hookimpl
-    def on_post_render(self, html: str, file_path: str) -> str | None:
-        '''Called after HTML rendering before writing to disk.'''
-        return html
+    def on_post_render(self, html_content: str) -> str:
+        """Called after Chameleon layout rendering before writing the HTML page to disk."""
+        return html_content
+
+    @hookimpl
+    def golem_add_subcommands(self, cli: click.Group) -> None:
+        """Attach custom Click subcommands to the main golem CLI during bootstrap."""
+        @cli.command("mycmd")
+        def my_command():
+            click.echo("Custom plugin command executed!")
 
     @hookimpl
     def golem_mark_stale(
@@ -44,28 +53,19 @@ class MyPlugin:
         changed_files: list[Path],
         cache_metadata: dict[str, dict[str, Any]],
     ) -> list[Path] | None:
-        '''
+        """
         Called during dependency analysis to allow plugins to register stale pages for recompilation.
         Inspects `changed_files` and per-document `cache_metadata` (including `node_types`).
         Returns a list of `Path` objects corresponding to pages that need recompilation.
-        '''
+        """
         return []
-
-    @hookimpl
-    def on_build_completed(self, site_dist_dir: str, manifest: dict) -> None:
-        '''Called after the entire build completes.'''
-        pass
-
-    @hookimpl
-    def golem_add_subcommands(self, cli_group: object) -> None:
-        '''Inject custom Click subcommands into the golem CLI.'''
-        pass
 ----
 
 == Registering Plugins via Entry Points
 
 In your plugin package's `pyproject.toml`:
 
+.pyproject.toml
 [source,toml]
 ----
 [project.entry-points."golem.plugins"]

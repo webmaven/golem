@@ -9,6 +9,7 @@
 
 Run `golem serve` to start the live authoring environment:
 
+.Terminal
 [source,bash]
 ----
 golem serve --host 127.0.0.1 --port 8000
