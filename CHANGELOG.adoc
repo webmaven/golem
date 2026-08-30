@@ -14,6 +14,18 @@ toc::[]
 
 === Added
 
+* *AsciiDoc Multi-View Derived Rendering Engine:*
+** Interactive tabbed code containers generated at build time via `render`, `views`, `display`, or `formats` attributes on `[source,asciidoc]` blocks.
+** Supports four canonical compilation channels: `source` (raw AsciiDoc), `asg` (parsed ASG JSON), `html` (rendered HTML5 markup), and `preview` (live rendered component).
+** Zero-JS tab switching using modern declarative CSS `:has()` and `<input type="radio">` controls with physical folder tab styling.
+** Deterministic unique listing identifiers (`get_listing_uid`) for stable anchor targeting and navigation.
+* *Enhanced Code Listing Headers & Actions:*
+** Semantic `<header class="listing-header">` featuring listing titles, uppercase language badges (`.badge-lang`), role badges (`.badge-test`, `.badge-shared`, `.badge-reset`), and a one-click clipboard copy button (`.listing-copy-btn`).
+** Context-aware clipboard copying that dynamically copies the active tab pane.
+* *UI Macro Styling (`:experimental:`):*
+** Dedicated 3D keycap styling for `<kbd>` with border bevel and surface background.
+** Dedicated action button styling for `<b class="button">` / `.button` with sans-serif UI font and 5px rounded corners.
+** Dedicated sans-serif menu hierarchy styling for `<span class="menuseq">` and menu path components.
 * *CLI Build & Serve Enhancements:* Added `-q`/`--quiet` flag and elapsed execution timing to `golem build`, along with startup compilation status and live rebuild progress in `golem serve`.
 * *Server-Side Syntax Highlighting:* Pygments-powered syntax highlighting integrated into the build pipeline with Fired Clay styling.
 * *Project Hygiene & CI Checks:* Added `CONTRIBUTING.adoc` contributor guide and AST-based CI canary test (`tests/test_syntax_invariants.py`).
@@ -21,6 +33,10 @@ toc::[]
 
 === Changed
 
+* *Default Theme Palette & Radii Refinements:*
+** Lightened default light mode background to clean warm paper (`#faf9f5`).
+** Refined inline code corner radius to `2px` for crisper inline badges, and increased action button corner radius to `5px` to clearly differentiate clickable UI controls.
+** Styled dev server diagnostic error overlay with dark theme and aligned source code error carets.
 * *Plugin Execution Gating:* Refactored `get_plugin_manager()` to a two-pass discovery-registration architecture where `config.plugins` is the sole authority for activation and execution order.
 * *Dependency Upgrades:* Bumped `asciidoctrine` to `>=0.2.0a4`, `asciidoctype` to `>=0.1.0a4`, and added `pygments>=2.18`.
 * *AsciiDoc Docstrings:* Standardized docstrings across all internal modules to AsciiDoc format using `asciidocstring` conventions.
@@ -28,6 +44,11 @@ toc::[]
 
 === Fixed
 
+* *Syntax Highlighting Callout Preservation:* Overrode `GolemRenderer.highlight_code()` to preserve AsciiDoc `<i class="conum">` callouts through Pygments and re-inject badges into highlighted lines; removed duplicate CSS counter badges on `ol.colist > li`.
+* *Orphaned Block Title Reattachment:* Added `_reattach_block_titles()` ASG transform to reattach orphaned `.Title` paragraphs to succeeding listing, table, and admonition blocks.
+* *ApiDoc Plugin Macro Protection:* Protected delimited verbatim blocks, inline code backticks, and backslash-escaped macros (`\golem:apidoc[...]`) from unintended macro expansion in `golem.plugins.apidoc`.
+* *Listing Focus Outline Scoping:* Limited `.listingblock` focus outline highlight strictly to code content and pane interactions via `:has(.listing-content:focus-within, .listing-panes:focus-within)`.
+* *Snippet Compilation Hardening:* Hardened isolated multi-view snippet compilation against infinite recursion, attribute injection, and template leakages, with sanitized listing role identifiers.
 * *Python Exception Handling:* Corrected five occurrences of deprecated Python 2 `except A, B:` syntax to Python 3 `except (A, B):`.
 * *Plugin Hook Robustness:* Isolated plugin exceptions across all build hooks and added conflict warnings when multiple plugins modify the same value.
 * *Cross-Platform File Locking:* Replaced POSIX-only `fcntl` cache locking with cross-platform `filelock`.
