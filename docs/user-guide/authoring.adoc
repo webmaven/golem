@@ -4,6 +4,7 @@
 :idseparator: -
 :sectanchors:
 :source-highlighter: highlight.js
+:stem: latexmath
 
 Golem supports full standards-compliant AsciiDoc across 39 node types, rendered through Chameleon ZPT templates.
 
@@ -176,6 +177,8 @@ Inline formulas and block equations:
 .STEM Mathematical Equations
 [source,asciidoc,render="source,preview"]
 ----
+:stem: latexmath
+
 Inline formula: stem:[E = mc^2]
 
 [stem]
