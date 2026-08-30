@@ -45,7 +45,6 @@ toc::[]
 === Fixed
 
 * *Syntax Highlighting Callout Preservation:* Overrode `GolemRenderer.highlight_code()` to preserve AsciiDoc `<i class="conum">` callouts through Pygments and re-inject badges into highlighted lines; removed duplicate CSS counter badges on `ol.colist > li`.
-* *Orphaned Block Title Reattachment:* Added `_reattach_block_titles()` ASG transform to reattach orphaned `.Title` paragraphs to succeeding listing, table, and admonition blocks.
 * *ApiDoc Plugin Macro Protection:* Protected delimited verbatim blocks, inline code backticks, and backslash-escaped macros (`\golem:apidoc[...]`) from unintended macro expansion in `golem.plugins.apidoc`.
 * *Listing Focus Outline Scoping:* Limited `.listingblock` focus outline highlight strictly to code content and pane interactions via `:has(.listing-content:focus-within, .listing-panes:focus-within)`.
 * *Snippet Compilation Hardening:* Hardened isolated multi-view snippet compilation against infinite recursion, attribute injection, and template leakages, with sanitized listing role identifiers.
