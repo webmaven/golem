@@ -405,7 +405,7 @@ def test_navigation_auto_discovery_basic(tmp_path):
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
     assert len(nav) == 4
     # Index pinned at top
     assert nav[0]["title"] == "Golem Docs"
@@ -437,7 +437,7 @@ def test_navigation_auto_discovery_nested_hierarchy(tmp_path):
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
     assert len(nav) == 3
     # Root README pinned at top
     assert nav[0]["title"] == "Overview"
@@ -471,7 +471,7 @@ def test_navigation_explicit_override_with_navigation_nav(tmp_path):
     )
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
     assert len(nav) == 2
     assert nav[0]["title"] == "Architecture"
     assert nav[0]["url"] == "02-architecture.html"
@@ -681,7 +681,7 @@ def test_partials_excluded_from_navigation(tmp_path):
     config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
 
     # Collect all titles and paths in nav recursively
     def collect_nav(items):
@@ -782,7 +782,7 @@ def test_metadata_caching_and_recovery(tmp_path):
     engine = BuildEngine(config, cache_file=cache_file)
 
     # Calling discover_navigation populates cache.data["metadata"]
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
     assert len(nav) == 2
 
     assert "metadata" in engine.cache.data
@@ -813,7 +813,7 @@ def test_metadata_caching_and_recovery(tmp_path):
         return orig_open(file, *args, **kwargs)
 
     with patch("builtins.open", side_effect=tracking_open):
-        nav2 = engine2.discover_navigation()
+        nav2 = engine2.nav_builder.discover_navigation()
         assert len(nav2) == 2
         # Neither doc1.adoc nor doc2.adoc should have been opened for reading
         assert not any(str(doc1.resolve()) in call or "doc1.adoc" in call for call in open_calls)
@@ -821,7 +821,7 @@ def test_metadata_caching_and_recovery(tmp_path):
 
     # When a file is modified, discover_navigation refreshes the cached metadata
     doc1.write_text("= Updated Title\n:nav_title: Updated Nav\n", encoding="utf-8")
-    nav3 = engine2.discover_navigation()
+    nav3 = engine2.nav_builder.discover_navigation()
     assert len(nav3) == 2
     updated_meta1 = engine2.cache.data["metadata"].get(str(doc1.resolve()))
     assert updated_meta1["title"] == "Updated Title"
@@ -885,7 +885,7 @@ def test_navigation_empty_and_non_adoc_directory_pruning(tmp_path):
     config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
 
     def get_all_paths_and_titles(items):
         res = []
@@ -983,7 +983,7 @@ def test_discover_navigation_respects_nav_order(tmp_path):
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
     # Home first, then Beta (nav_order: 10), then Alpha (nav_order: 20) despite alphabetical 'alpha' < 'beta'
     titles = [item["title"] for item in nav]
     assert titles == ["Home", "Beta Section", "Alpha Section"]
@@ -1001,7 +1001,7 @@ def test_generate_nav_html_active_states(tmp_path):
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    html = engine.generate_nav_html(current_rel_path=Path("guide.adoc"))
+    html = engine.nav_builder.generate_nav_html(current_rel_path=Path("guide.adoc"))
     assert 'class="golem-nav-item active"' in html
     assert '<a href="guide.html" aria-current="page" class="active">Guide</a>' in html
 
@@ -1298,7 +1298,7 @@ def test_build_site_caches_discover_navigation_single_call(tmp_path):
     )
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    original_discover = engine.discover_navigation
+    original_discover = engine.nav_builder.discover_navigation
     call_count = 0
 
     def spied_discover():
@@ -1306,7 +1306,7 @@ def test_build_site_caches_discover_navigation_single_call(tmp_path):
         call_count += 1
         return original_discover()
 
-    with patch.object(engine, "discover_navigation", side_effect=spied_discover):
+    with patch.object(engine.nav_builder, "discover_navigation", side_effect=spied_discover):
         engine.build_site()
 
     # With 4 pages, undiscovered navigation would call discover_navigation at least 3*4=12 times.
@@ -1328,24 +1328,76 @@ def test_nav_methods_accept_and_use_explicit_nav_tree(tmp_path):
         {"title": "Custom Page", "path": "page.adoc", "url": "page.html", "children": []},
     ]
 
-    with patch.object(engine, "discover_navigation", side_effect=AssertionError("discover_navigation should not be called")):
+    with patch.object(
+        engine.nav_builder, "discover_navigation", side_effect=AssertionError("discover_navigation should not be called")
+    ):
         # 1. generate_nav_html
-        html = engine.generate_nav_html(current_rel_path=Path("page.adoc"), nav_tree=custom_tree)
+        html = engine.nav_builder.generate_nav_html(current_rel_path=Path("page.adoc"), nav_tree=custom_tree)
         assert "Custom Home" in html
         assert "Custom Page" in html
         assert 'class="golem-nav-item active"' in html
 
         # 2. get_ordered_nav_pages
-        ordered = engine.get_ordered_nav_pages(nav_tree=custom_tree)
+        ordered = engine.nav_builder.get_ordered_nav_pages(nav_tree=custom_tree)
         assert len(ordered) == 2
         assert ordered[0]["title"] == "Custom Home"
         assert ordered[1]["title"] == "Custom Page"
 
         # 3. get_page_pagination
-        prev_p, next_p = engine.get_page_pagination(current_rel_path=Path("page.adoc"), nav_tree=custom_tree)
+        prev_p, next_p = engine.nav_builder.get_page_pagination(current_rel_path=Path("page.adoc"), nav_tree=custom_tree)
         assert prev_p is not None
         assert prev_p["title"] == "Custom Home"
         assert next_p is None
+
+
+def test_navigation_builder_direct_unit_tests(tmp_path):
+    """Directly verify NavigationBuilder methods with mock callbacks."""
+    from golem.navigation import NavigationBuilder
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Home\n", encoding="utf-8")
+    (content_dir / "guide.adoc").write_text("= Guide\n", encoding="utf-8")
+    (content_dir / "_partial.adoc").write_text("= Partial\n", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    builder = NavigationBuilder(
+        config=config,
+        content_dir=content_dir,
+        is_partial_fn=lambda p: p.name.startswith("_"),
+        get_metadata_fn=lambda p: {
+            "title": p.stem.capitalize(),
+            "nav_title": p.stem.capitalize(),
+            "nav_order": 1 if p.stem == "index" else 2,
+        },
+    )
+
+    # discover_navigation
+    nav_tree = builder.discover_navigation()
+    assert len(nav_tree) == 2
+    assert nav_tree[0]["title"] == "Index"
+    assert nav_tree[1]["title"] == "Guide"
+
+    # generate_nav_html
+    html = builder.generate_nav_html(current_rel_path=Path("guide.adoc"))
+    assert '<nav class="golem-nav">' in html
+    assert 'class="golem-nav-item active"' in html
+
+    # get_ordered_nav_pages
+    pages = builder.get_ordered_nav_pages()
+    assert len(pages) == 2
+    assert pages[0]["title"] == "Index"
+    assert pages[1]["title"] == "Guide"
+
+    # get_page_pagination
+    prev_p, next_p = builder.get_page_pagination(current_rel_path=Path("guide.adoc"))
+    assert prev_p is not None
+    assert prev_p["title"] == "Index"
+    assert next_p is None
+
+    # Empty path handling
+    assert builder.get_page_pagination(None) == (None, None)
+    assert builder.generate_nav_html(nav_tree=[]) == ""
 
 
 def test_get_cached_nav_tree_resets_per_build(tmp_path):
