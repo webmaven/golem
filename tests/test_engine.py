@@ -741,7 +741,9 @@ def test_sync_static_assets_user_and_theme(tmp_path, monkeypatch):
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     # Test sync_static_assets directly
-    engine.sync_static_assets()
+    from golem.assets import sync_static_assets
+
+    sync_static_assets(config, content_dir, output_dir)
 
     dist_static = output_dir / "static"
     assert (dist_static / "theme.css").exists()
@@ -1410,8 +1412,9 @@ def test_sync_static_assets_copies_content_dir_media(tmp_path):
         content_dir=str(content_dir),
         output_dir=str(output_dir),
     )
-    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
-    engine.sync_static_assets()
+    from golem.assets import sync_static_assets
+
+    sync_static_assets(config, content_dir, output_dir)
 
     assert (output_dir / "images" / "diagram.png").exists()
     assert (output_dir / "images" / "diagram.png").read_bytes() == b"\x89PNG\r\n\x1a\nfake"
@@ -1555,3 +1558,59 @@ def test_build_cache_direct_operations(tmp_path):
     assert not cache_file.exists()
     assert cache2.data == {"files": {}, "dependencies": {}, "metadata": {}}
     assert cache2._sha_cache == {}
+
+
+def test_sync_static_assets_all_layers(tmp_path, monkeypatch):
+    """Verify sync_static_assets layered precedence and templates_dir static copying."""
+    monkeypatch.chdir(tmp_path)
+    from golem.assets import sync_static_assets
+
+    # Layer 1: Workspace theme static
+    theme_dir = tmp_path / "themes" / "modern" / "static"
+    (theme_dir / "css").mkdir(parents=True)
+    (theme_dir / "css" / "base.css").write_text("/* theme base */", encoding="utf-8")
+    (theme_dir / "css" / "theme.css").write_text("/* theme custom */", encoding="utf-8")
+
+    # Layer 2: Custom templates_dir static
+    custom_tpl = tmp_path / "custom_tpl"
+    tpl_static = custom_tpl / "static"
+    (tpl_static / "css").mkdir(parents=True)
+    (tpl_static / "css" / "theme.css").write_text("/* tpl custom overrides theme */", encoding="utf-8")
+    (tpl_static / "tpl_asset.js").write_text("// tpl js", encoding="utf-8")
+
+    # Layer 3: User static_dir
+    user_static = tmp_path / "my_static"
+    (user_static / "css").mkdir(parents=True)
+    (user_static / "css" / "theme.css").write_text("/* user static overrides tpl */", encoding="utf-8")
+    (user_static / "user.txt").write_text("user content", encoding="utf-8")
+
+    # Content dir with media and non-adoc files
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Index", encoding="utf-8")
+    (content_dir / ".hidden.png").write_bytes(b"hidden")
+    (content_dir / "img" / "photo.jpg").parent.mkdir(parents=True)
+    (content_dir / "img" / "photo.jpg").write_bytes(b"jpeg-data")
+
+    output_dir = tmp_path / "dist"
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(output_dir),
+        theme="modern",
+        templates_dir=str(custom_tpl),
+        static_dir=str(user_static),
+    )
+
+    sync_static_assets(config, content_dir, output_dir)
+
+    out_static = output_dir / "static"
+    assert (out_static / "css" / "base.css").read_text(encoding="utf-8") == "/* theme base */"
+    assert (out_static / "css" / "theme.css").read_text(encoding="utf-8") == "/* user static overrides tpl */"
+    assert (out_static / "tpl_asset.js").read_text(encoding="utf-8") == "// tpl js"
+    assert (out_static / "user.txt").read_text(encoding="utf-8") == "user content"
+
+    # Content media assets preserved
+    assert (output_dir / "img" / "photo.jpg").read_bytes() == b"jpeg-data"
+    assert not (output_dir / ".hidden.png").exists()
+    assert not (output_dir / "index.adoc").exists()

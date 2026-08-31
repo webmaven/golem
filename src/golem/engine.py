@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Any
 import asciidoctrine
 from asciidoctrine.resolver import ASGResolver
+from golem.assets import sync_static_assets
 from golem.cache import BuildCache
 from golem.config import GolemConfig
 from golem.metadata import (
@@ -984,83 +985,6 @@ class BuildEngine:
                             current_templates[key] = self.cache.get_sha256(tpl_file)
         return current_templates
 
-    def sync_static_assets(self) -> None:
-        """Synchronize static assets from package defaults, theme directories, and user static folders.
-
-        Copies assets into `<output_dir>/static` in layered precedence order:
-        1. Package default theme static assets (`golem/templates/<theme>/static` and `golem/templates/default/static`).
-        2. Workspace theme static assets (`themes/<theme>/static`).
-        3. Custom templates static assets (`<templates_dir>/static`).
-        4. User project static assets (`<static_dir>`).
-
-        Additionally synchronizes non-AsciiDoc media and static assets located within
-        `content_dir` directly into `output_dir`, preserving relative directory paths.
-
-        Higher-precedence assets overwrite lower-precedence assets with matching relative paths.
-
-        [returns]
-        `None`:: Static assets are copied directly to disk.
-
-        === Examples
-
-        [source,python]
-        ----
-        from golem.config import GolemConfig
-        from golem.engine import BuildEngine
-
-        config = GolemConfig(content_dir="content", output_dir="dist", static_dir="static")
-        engine = BuildEngine(config)
-        engine.sync_static_assets()
-        ----
-        """
-        import shutil
-
-        output_static_dir = Path(self.config.output_dir) / "static"
-
-        # 1. Package default theme static assets (if any)
-        pkg_theme_static = Path(__file__).parent / "templates" / getattr(self.config, "theme", "default") / "static"
-        if pkg_theme_static.exists() and pkg_theme_static.is_dir():
-            output_static_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(pkg_theme_static, output_static_dir, dirs_exist_ok=True)
-
-        # Also check package default static if theme != default
-        pkg_default_static = Path(__file__).parent / "templates" / "default" / "static"
-        if pkg_default_static != pkg_theme_static and pkg_default_static.exists() and pkg_default_static.is_dir():
-            output_static_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(pkg_default_static, output_static_dir, dirs_exist_ok=True)
-
-        # 2. Configured theme directory static assets (themes/<theme>/static)
-        theme_name = getattr(self.config, "theme", "default")
-        if theme_name:
-            theme_static = Path("themes") / theme_name / "static"
-            if theme_static.exists() and theme_static.is_dir():
-                output_static_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copytree(theme_static, output_static_dir, dirs_exist_ok=True)
-
-        # Custom templates_dir static (if configured)
-        if hasattr(self.config, "templates_dir") and self.config.templates_dir:
-            tpl_static = Path(self.config.templates_dir) / "static"
-            if tpl_static.exists() and tpl_static.is_dir():
-                output_static_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copytree(tpl_static, output_static_dir, dirs_exist_ok=True)
-
-        # 3. User static_dir (e.g. static/)
-        if hasattr(self.config, "static_dir") and self.config.static_dir:
-            user_static = Path(self.config.static_dir)
-            if user_static.exists() and user_static.is_dir():
-                output_static_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copytree(user_static, output_static_dir, dirs_exist_ok=True)
-
-        # 4. Content directory static assets (images, attachments, non-AsciiDoc media)
-        if self.content_dir.exists() and self.content_dir.is_dir():
-            output_dir = Path(self.config.output_dir)
-            for item in self.content_dir.rglob("*"):
-                if item.is_file() and item.suffix != ".adoc" and not item.name.startswith("."):
-                    rel = item.relative_to(self.content_dir)
-                    dest = output_dir / rel
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(item, dest)
-
     def build_site(self) -> list[Path]:
         """Orchestrate the incremental compilation pipeline for outdated AsciiDoc documents.
 
@@ -1124,7 +1048,7 @@ class BuildEngine:
         output_dir = Path(self.config.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        self.sync_static_assets()
+        sync_static_assets(self.config, self.content_dir, Path(self.config.output_dir))
 
         search_paths = self._get_template_search_paths()
 
