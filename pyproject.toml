@@ -18,10 +18,10 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "asciidoctrine>=0.2.0a4",
-    "asciidocstring>=0.1.0a7",
-    "asciidoctest>=0.2.0a3",
-    "asciidoctype>=0.1.0a4",
+    "asciidoctrine>=0.2.0a5",
+    "asciidocstring>=0.1.0a8",
+    "asciidoctest>=0.2.0a4",
+    "asciidoctype>=0.1.0a5",
     "chameleon",
     "click",
     "filelock",
