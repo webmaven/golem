@@ -1,14 +1,9 @@
 # SDD Progress Ledger
 
-Plan: `/Users/michaelbernstein/.gemini/antigravity/brain/0b13763e-1dc6-4616-93f1-5c1d309f9369/implementation_plan.md`
-Initial Base: `95c9dac2be96b27ac9ce3a827861b081fc57a9df`
+Plan: `/Users/michaelbernstein/.gemini/antigravity/brain/a8a03fb8-4c9d-44dc-9c6e-c0f9d769389b/implementation_plan.md`
+Initial Base: `bee285e8bcdeeee6e8da6735c3ff56f54c813f7a`
 
-- [x] Task 0: Baseline Test Coverage
-- [x] Task 1: Extricate Document Metadata (`src/golem/metadata.py`) — commit `b37fa87`
-- [x] Task 2: Extricate Cache Management (`src/golem/cache.py`) — commit `6054082`
-- [x] Task 3: Extricate Static Assets (`src/golem/assets.py`) — commit `5151b11`
-- [x] Task 4: Extricate Navigation (`src/golem/navigation.py`) — commit `f5236bc`
-- [x] Task 5: Extricate Staleness & Dependencies (`src/golem/staleness.py`) — commit `ac238cb`
-- [x] Task 6: Final Cleanup & E2E Verification — commit `001696a`
-
-All tasks complete. Whole-branch review passed (approved).
+- [x] Task 1: Doctest Runner Cleanups (`golem.plugins.doctest`) (commits bee285e..0e72c88, review clean)
+- [x] Task 2: Block Title & List Parsing Resilience (`golem.renderer`) (commits 0e72c88..a5e90e0, review clean)
+- [x] Task 3: Table Layout & Column Alignment Styling (`golem.templates`) (commits a5e90e0..a760a4a, review clean)
+- [x] Task 4: Issue #10 — AST-Level ASG Macro Splicing for `golem:apidoc[]` (commits a760a4a..81dcca6)

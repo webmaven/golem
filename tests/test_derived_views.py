@@ -27,8 +27,10 @@ def test_asciidoc_derived_views_rendering():
     assert 'data-tab="asg"' in html
     assert 'data-tab="html"' in html
     assert 'data-tab="preview"' in html
-    # Check that ASG tab contains JSON
-    assert '"name"' in html and ('"document"' in html or '"admonition"' in html)
+    # Check that ASG tab contains JSON (Pygments may HTML-escape quotes)
+    assert ('"name"' in html or "&quot;name&quot;" in html) and (
+        '"document"' in html or "&quot;document&quot;" in html or '"admonition"' in html or "&quot;admonition&quot;" in html
+    )
     # Check that HTML tab contains HTML source
     assert '&lt;div class="admonitionblock note"&gt;' in html or '<div class="admonitionblock note">' in html
     # Check that Preview tab contains live rendered HTML
@@ -181,7 +183,7 @@ def test_generate_asciidoc_views_direct():
     v_asg = views[1]
     assert v_asg["id"] == "asg"
     assert v_asg["label"] == "ASG"
-    assert '"name"' in v_asg["content"]
+    assert '"name"' in v_asg["content"] or "&quot;name&quot;" in v_asg["content"]
 
     v_html = views[2]
     assert v_html["id"] == "html"
