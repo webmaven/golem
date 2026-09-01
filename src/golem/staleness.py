@@ -116,7 +116,7 @@ class StalenessTracker:
         content_dir: Path,
         plugin_manager: Any = None,
         config_path: Path | None = None,
-    ):
+    ) -> None:
         """Initialize the staleness tracker with configuration, cache database, and content path.
 
         [parameters]

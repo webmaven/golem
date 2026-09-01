@@ -36,11 +36,16 @@ The compilation pipeline proceeds through sequential phases:
 9. Disk Output & Cache Update: Writes compiled HTML files to `output_dir` and updates content hashes and include dependencies in the cache.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
+import sys
 from typing import Any
+
 import asciidoctrine
 from asciidoctrine.resolver import ASGResolver
+import click
 from golem.assets import sync_static_assets
 from golem.cache import BuildCache
 from golem.config import GolemConfig
@@ -49,9 +54,16 @@ from golem.metadata import (
     extract_metadata_from_doc,
 )
 from golem.navigation import NavigationBuilder
-from golem.renderer import collect_node_types, render_body
+from golem.plugins import get_plugin_manager
+from golem.renderer import (
+    collect_node_types,
+    generate_toc_html,
+    render_body,
+)
 from golem.staleness import StalenessTracker, is_partial
 from golem.templates import PageCompiler
+
+__all__ = ["BuildEngine"]
 
 
 class BuildEngine:
@@ -88,7 +100,7 @@ class BuildEngine:
     ----
     """
 
-    def __init__(self, config: GolemConfig, cache_file: Path | None = None):
+    def __init__(self, config: GolemConfig, cache_file: Path | None = None) -> None:
         """Initialize the build engine with configuration and cache storage.
 
         Resolves content and configuration paths, loads existing cache records,
@@ -105,8 +117,6 @@ class BuildEngine:
         self.cache = BuildCache(self.cache_file)
 
         # Load Pluggy Plugin Manager
-        from golem.plugins import get_plugin_manager
-
         plugins_dir = Path(getattr(config, "plugins_dir", "plugins"))
         self.pm = get_plugin_manager(config=config, plugins_dir=plugins_dir)
 
@@ -226,8 +236,6 @@ class BuildEngine:
         compiled_pages = engine.build_site()
         ----
         """
-        import sys
-
         self.errors = []
         self.diagnostics = self.errors
         self._nav_tree_cache = None
@@ -385,8 +393,6 @@ class BuildEngine:
                     title_str = "Golem Doc"
 
                 # 4. Compile layout via Chameleon templates
-                from golem.renderer import generate_toc_html
-
                 toc_html = generate_toc_html(asg)  # type: ignore[arg-type]
 
                 # Generate dynamic navigation HTML and chapter pagination for this page
@@ -492,7 +498,6 @@ class BuildEngine:
                         rel_out = out_path.relative_to(Path.cwd())
                     except ValueError:
                         rel_out = out_path.relative_to(output_dir) if output_dir in out_path.parents else out_path
-                    import click
 
                     click.echo(f"  [COMPILE] {rel_doc} -> {rel_out}")
             except Exception as e:
