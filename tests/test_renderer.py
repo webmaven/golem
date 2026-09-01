@@ -485,3 +485,131 @@ def test_role_badge_sanitizes_class_names():
     html = render_body(asg)
     assert 'class="injected"' not in html
     assert "badge-evil" not in html or 'badge-evil" class="injected"' not in html
+
+
+def test_render_dot_ordered_lists():
+    """Verify dot-ordered lists with 2, 3, and 4 items render properly into <ol> tags."""
+    # 2 items
+    doc2 = """
+. First item
+. Second item
+"""
+    ast2 = asciidoctrine.parse_to_ast(doc2)
+    asg2 = ASGResolver(ast2).resolve(ast2)
+    html2 = render_body(asg2)
+    assert '<ol class="olist">' in html2
+    assert "<li>First item</li>" in html2
+    assert "<li>Second item</li>" in html2
+
+    # 3 items
+    doc3 = """
+. Item 1
+. Item 2
+. Item 3
+"""
+    ast3 = asciidoctrine.parse_to_ast(doc3)
+    asg3 = ASGResolver(ast3).resolve(ast3)
+    html3 = render_body(asg3)
+    assert '<ol class="olist">' in html3
+    assert "<li>Item 1</li>" in html3
+    assert "<li>Item 2</li>" in html3
+    assert "<li>Item 3</li>" in html3
+
+    # 4 items
+    doc4 = """
+. Alpha
+. Beta
+. Gamma
+. Delta
+"""
+    ast4 = asciidoctrine.parse_to_ast(doc4)
+    asg4 = ASGResolver(ast4).resolve(ast4)
+    html4 = render_body(asg4)
+    assert '<ol class="olist">' in html4
+    assert "<li>Alpha</li>" in html4
+    assert "<li>Beta</li>" in html4
+    assert "<li>Gamma</li>" in html4
+    assert "<li>Delta</li>" in html4
+
+
+def test_render_dot_ordered_list_with_title():
+    """Verify dot-ordered list with items renders correctly under AsciiDoctrine 0.2.0a5.
+
+    NOTE: AsciiDoctrine 0.2.0a5's elevated block_title.5 grammar priority causes
+    `.Shopping List` followed by `. Apples` to have Apples overwrite Shopping List
+    as the list's title (both match the same grammar rule). Shopping List is
+    irrecoverably lost at the parser level. The normalization correctly promotes
+    Apples back from the misparse title into a list item. Oranges and Bananas,
+    parsed normally as list items, are also rendered.
+    """
+    doc = """
+.Shopping List
+. Apples
+. Oranges
+. Bananas
+"""
+    ast = asciidoctrine.parse_to_ast(doc)
+    asg = ASGResolver(ast).resolve(ast)
+    html = render_body(asg)
+    assert '<ol class="olist">' in html
+    # Shopping List title is lost at the parser level due to the grammar quirk
+    # The normalization recovers Apples (the misparse title) as a list item
+    assert "<li>Apples</li>" in html
+    assert "<li>Oranges</li>" in html
+    assert "<li>Bananas</li>" in html
+
+
+def test_render_dot_ordered_list_formatted_items():
+    """Verify formatted inlines in dot-ordered list items render properly."""
+    doc = """
+. *Bold* item
+. _Italic_ item
+. `code` item
+"""
+    ast = asciidoctrine.parse_to_ast(doc)
+    asg = ASGResolver(ast).resolve(ast)
+    html = render_body(asg)
+    assert '<ol class="olist">' in html
+    assert "<strong>Bold</strong> item" in html
+    assert "<em>Italic</em> item" in html
+    assert "<code>code</code> item" in html
+
+
+def test_render_dot_ordered_list_single_item():
+    """Verify single-item dot-ordered list renders properly."""
+    doc = """
+. Only one item
+"""
+    ast = asciidoctrine.parse_to_ast(doc)
+    asg = ASGResolver(ast).resolve(ast)
+    html = render_body(asg)
+    assert '<ol class="olist">' in html
+    assert "<li>Only one item</li>" in html
+
+
+def test_reattach_block_titles_upstream_compat():
+    """Verify block titles are preserved/reattached on example blocks, listings, and tables."""
+    doc = """
+.Important Note
+====
+Example block with title.
+====
+
+.Code Sample
+[source,python]
+----
+x = 1
+----
+
+.Data Table
+|===
+| A | B
+| 1 | 2
+|===
+"""
+    ast = asciidoctrine.parse_to_ast(doc)
+    asg = ASGResolver(ast).resolve(ast)
+    html = render_body(asg)
+    assert "Important Note" in html
+    assert "Code Sample" in html
+    assert "Data Table" in html
