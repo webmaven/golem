@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Any, Sequence
 import click
 
-from asciidoctest.docstring_extractor import extract_and_run_docstring_tests
+from asciidoctest import AsciiDocTestFailure, extract_and_run_docstring_tests
 from asciidoctest.parser import parse_adoc_tests
-from asciidoctest.runner import AsciiDocTestFailure, run_test_blocks
+from asciidoctest.runner import run_test_blocks
 
 
 def run_adoc_file(path: Path | str, mode: str = "explicit") -> tuple[int, int, list[str]]:

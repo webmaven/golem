@@ -709,3 +709,146 @@ def test_run_asciidoc_doctests_auto_discovery_docs_fallback(tmp_path: Path, monk
 
     result = run_asciidoc_doctests()
     assert result == 0
+
+
+def test_runner_uses_toplevel_asciidoctest_imports():
+    """Verify runner.py uses top-level PEP 561 public imports from asciidoctest."""
+    import ast
+    import golem.plugins.doctest.runner as runner_mod
+
+    runner_src = Path(runner_mod.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(runner_src)
+    imports_from_asciidoctest = [
+        node for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module == "asciidoctest"
+    ]
+    imported_names = {alias.name for node in imports_from_asciidoctest for alias in node.names}
+    assert "AsciiDocTestFailure" in imported_names
+    assert "extract_and_run_docstring_tests" in imported_names
+
+    submodule_imports = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module in ("asciidoctest.docstring_extractor", "asciidoctest.runner")
+    ]
+    submodule_names = {alias.name for node in submodule_imports for alias in node.names}
+    assert "extract_and_run_docstring_tests" not in submodule_names
+    assert "AsciiDocTestFailure" not in submodule_names
+
+
+def test_run_docstring_tests_nested_classes_and_methods_passing(tmp_path: Path):
+    """Verify docstring doctest execution with nested classes, inner methods, and classmethods."""
+    from golem.plugins.doctest.runner import run_docstring_tests
+
+    py_file = tmp_path / "nested_structure.py"
+    py_file.write_text(
+        '''"""Module docstring.
+
+[source,python,role="test"]
+----
+>>> MODULE_CONST = 100
+>>> MODULE_CONST
+100
+----
+"""
+
+class Parent:
+    """Parent class docstring.
+
+    [source,python,role="test"]
+    ----
+    >>> p = Parent("alice")
+    >>> p.name
+    'alice'
+    ----
+    """
+
+    def __init__(self, name: str):
+        self.name = name
+
+    def compute(self, x: int) -> int:
+        """Parent method docstring.
+
+        [source,python,role="test"]
+        ----
+        >>> Parent('test').compute(5)
+        10
+        ----
+        """
+        return x * 2
+
+    class Child:
+        """Nested child class docstring.
+
+        [source,python,role="test"]
+        ----
+        >>> c = Parent.Child()
+        >>> c.describe()
+        'child instance'
+        ----
+        """
+
+        def describe(self) -> str:
+            """Child method docstring.
+
+            [source,python,role="test"]
+            ----
+            >>> Parent.Child().describe()
+            'child instance'
+            ----
+            """
+            return "child instance"
+
+        class GrandChild:
+            """Deeply nested grandchild class docstring.
+
+            [source,python,role="test"]
+            ----
+            >>> gc = Parent.Child.GrandChild()
+            >>> gc.level
+            3
+            ----
+            """
+            level = 3
+''',
+        encoding="utf-8",
+    )
+
+    passed, failed, errors = run_docstring_tests(py_file)
+    assert passed == 6
+    assert failed == 0
+    assert len(errors) == 0
+
+
+def test_run_docstring_tests_nested_classes_and_methods_failing(tmp_path: Path):
+    """Verify docstring doctest execution captures failures in nested methods with proper scope naming."""
+    from golem.plugins.doctest.runner import run_docstring_tests
+
+    py_file = tmp_path / "failing_nested.py"
+    py_file.write_text(
+        '''"""Module."""
+
+class Container:
+    """Container."""
+
+    class NestedWorker:
+        """NestedWorker."""
+
+        def process(self) -> int:
+            """Process method.
+
+            [source,python,role="test"]
+            ----
+            >>> 10 + 20
+            999
+            ----
+            """
+            return 30
+''',
+        encoding="utf-8",
+    )
+
+    passed, failed, errors = run_docstring_tests(py_file)
+    assert passed == 0
+    assert failed == 1
+    assert len(errors) == 1
+    assert "Container.NestedWorker.process" in errors[0]
