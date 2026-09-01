@@ -258,6 +258,7 @@ def render_body(
     _ensure_section_ids(node_dict)
     _reattach_block_titles(node_dict)
     _normalize_dot_list_items(node_dict)
+    _propagate_table_alignments(node_dict)
     active_highlighter = highlighter if highlighter is not None else make_highlighter()
     active_search_paths: list[Path] = []
     if search_paths:
@@ -514,6 +515,62 @@ def _normalize_dot_list_items(node: Any) -> None:
 
     for item in node.get("items", []) if isinstance(node.get("items"), list) else []:
         _normalize_dot_list_items(item)
+
+
+def _propagate_table_alignments(node: Any) -> None:
+    """Propagate table column-level alignments and widths to child cells.
+
+    Traverses an ASG dictionary tree. When encountering a `table` block with a `columns`
+    specification list (e.g. from `cols="<,^,>"` or `cols="1,2,1"`), ensures each child
+    `cell` inherits the corresponding column's `halign` and `valign` values if they are not
+    already explicitly defined at the cell level.
+
+    NOTE: Modifies the ASG dictionary in-place.
+
+    [parameters]
+    `node` (Any):: ASG root dictionary or any sub-node to recursively process.
+    """
+    if not node:
+        return
+    if isinstance(node, list):
+        for item in node:
+            _propagate_table_alignments(item)
+        return
+    if not isinstance(node, dict):
+        return
+
+    if node.get("name") == "table":
+        columns = node.get("columns")
+        if isinstance(columns, list) and columns:
+            for row_key in ("rows", "header_rows", "body_rows", "footer_rows"):
+                rows = node.get(row_key)
+                if isinstance(rows, list):
+                    for row in rows:
+                        if not isinstance(row, dict):
+                            continue
+                        cells = row.get("cells")
+                        if not isinstance(cells, list):
+                            continue
+                        col_idx = 0
+                        for cell in cells:
+                            if not isinstance(cell, dict):
+                                col_idx += 1
+                                continue
+                            colspan = cell.get("colspan", 1) or 1
+                            if 0 <= col_idx < len(columns):
+                                col_spec = columns[col_idx]
+                                if isinstance(col_spec, dict):
+                                    if not cell.get("halign") and col_spec.get("halign"):
+                                        cell["halign"] = col_spec["halign"]
+                                    if not cell.get("valign") and col_spec.get("valign"):
+                                        cell["valign"] = col_spec["valign"]
+                            col_idx += colspan
+
+    for key in ("blocks", "children", "items", "rows", "header_rows", "body_rows", "footer_rows", "cells"):
+        val = node.get(key)
+        if isinstance(val, list):
+            for child in val:
+                _propagate_table_alignments(child)
 
 
 def _ensure_section_ids(node: Any) -> None:

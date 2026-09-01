@@ -809,11 +809,24 @@
         }
 
         /* ── Tables ────────────────────────────────────────── */
-        table, table.golem-table {
+        table, table.tableblock, table.golem-table {
             width: 100%;
             border-collapse: collapse;
             margin: 1.5rem 0;
             font-size: 0.925rem;
+        }
+        table caption.title,
+        .tableblock caption.title {
+            font-family: var(--golem-font-ui);
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--golem-text-muted);
+            text-align: left;
+            padding-bottom: 0.5rem;
+            caption-side: top;
+        }
+        colgroup col {
+            /* Support proportional column width styles */
         }
         th {
             font-family: var(--golem-font-ui);
@@ -825,11 +838,41 @@
             padding: 0.6rem 0.85rem;
             border-bottom: 2px solid var(--golem-border);
             color: var(--golem-text-muted);
+            background-color: var(--golem-surface);
         }
         td {
             padding: 0.6rem 0.85rem;
             border-bottom: 1px solid var(--golem-border);
+            vertical-align: top;
         }
+        tr:last-child td {
+            border-bottom: 1px solid var(--golem-border);
+        }
+
+        /* ── Table Alignment Classes (AsciiDoc / AsciiDoctype DSL) ── */
+        th.halign-left, td.halign-left, .halign-left { text-align: left; }
+        th.halign-center, td.halign-center, .halign-center { text-align: center; }
+        th.halign-right, td.halign-right, .halign-right { text-align: right; }
+        th.halign-justify, td.halign-justify, .halign-justify { text-align: justify; }
+
+        th.valign-top, td.valign-top, .valign-top { vertical-align: top; }
+        th.valign-middle, td.valign-middle, .valign-middle { vertical-align: middle; }
+        th.valign-bottom, td.valign-bottom, .valign-bottom { vertical-align: bottom; }
+
+        /* Striping & Grid options */
+        table.stripes-even tbody tr:nth-child(even),
+        table.stripes-odd tbody tr:nth-child(odd),
+        table.stripes-hover tbody tr:hover {
+            background-color: color-mix(in srgb, var(--golem-surface) 60%, transparent);
+        }
+        table.frame-all { border: 1px solid var(--golem-border); }
+        table.frame-sides { border-left: 1px solid var(--golem-border); border-right: 1px solid var(--golem-border); }
+        table.frame-topbot { border-top: 1px solid var(--golem-border); border-bottom: 1px solid var(--golem-border); }
+        table.frame-none { border: none; }
+        table.grid-all th, table.grid-all td { border: 1px solid var(--golem-border); }
+        table.grid-cols th, table.grid-cols td { border-left: 1px solid var(--golem-border); border-right: 1px solid var(--golem-border); }
+        table.grid-rows th, table.grid-rows td { border-top: 1px solid var(--golem-border); border-bottom: 1px solid var(--golem-border); }
+        table.grid-none th, table.grid-none td { border: none; }
 
         /* ── Full-Bleed Table Breakout ──────────────────────── */
         #golem-content table,

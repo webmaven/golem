@@ -613,3 +613,125 @@ x = 1
     assert "Important Note" in html
     assert "Code Sample" in html
     assert "Data Table" in html
+
+
+def test_render_table_column_widths():
+    """Verify table with cols proportions generates colgroup with matching width styles."""
+    doc = """
+[cols="1,2,1"]
+|===
+| Col 1 | Col 2 | Col 3
+
+| A | B | C
+|===
+"""
+    ast = asciidoctrine.parse_to_ast(doc)
+    asg = ASGResolver(ast).resolve(ast)
+    html = render_body(asg)
+    assert "<colgroup>" in html
+    assert '<col style="width: 25%;" />' in html
+    assert '<col style="width: 50%;" />' in html
+    assert "</colgroup>" in html
+
+
+def test_render_table_horizontal_alignments():
+    """Verify table with column alignments generates halign-left, halign-center, and halign-right classes."""
+    doc = """
+[cols="<,^,>",options="header"]
+|===
+| Left Header | Center Header | Right Header
+
+| Left Cell | Center Cell | Right Cell
+|===
+"""
+    ast = asciidoctrine.parse_to_ast(doc)
+    asg = ASGResolver(ast).resolve(ast)
+    html = render_body(asg)
+    assert '<th class="halign-left' in html
+    assert '<th class="halign-center' in html
+    assert '<th class="halign-right' in html
+    assert '<td class="halign-left' in html
+    assert '<td class="halign-center' in html
+    assert '<td class="halign-right' in html
+
+
+def test_render_table_vertical_alignments():
+    """Verify table with vertical column alignments generates valign-bottom, valign-middle, and valign-top classes."""
+    doc = """
+[cols="<.>,1.^,1.<"]
+|===
+| Bottom Cell | Middle Cell | Top Cell
+|===
+"""
+    ast = asciidoctrine.parse_to_ast(doc)
+    asg = ASGResolver(ast).resolve(ast)
+    html = render_body(asg)
+    assert "valign-bottom" in html
+    assert "valign-middle" in html
+    assert "valign-top" in html
+
+
+def test_render_table_cell_alignment_override():
+    """Verify cell-level alignment overrides table column defaults."""
+    asg = {
+        "name": "table",
+        "type": "block",
+        "columns": [
+            {"index": 0, "width": "50%", "halign": "left", "valign": "top"},
+            {"index": 1, "width": "50%", "halign": "left", "valign": "top"},
+        ],
+        "rows": [
+            {
+                "name": "row",
+                "type": "block",
+                "cells": [
+                    {
+                        "name": "cell",
+                        "type": "block",
+                        "halign": "right",
+                        "valign": "bottom",
+                        "blocks": [{"name": "paragraph", "inlines": [{"name": "text", "value": "Overridden"}]}],
+                    },
+                    {
+                        "name": "cell",
+                        "type": "block",
+                        "blocks": [{"name": "paragraph", "inlines": [{"name": "text", "value": "Inherited"}]}],
+                    },
+                ],
+            }
+        ],
+    }
+    html = render_body(asg)
+    assert 'class="halign-right valign-bottom"' in html
+    assert 'class="halign-left valign-top"' in html
+
+
+def test_render_table_caption_title():
+    """Verify table block title renders as a semantic caption element."""
+    doc = """
+.User Roster
+|===
+| Name | Role
+
+| Alice | Admin
+|===
+"""
+    ast = asciidoctrine.parse_to_ast(doc)
+    asg = ASGResolver(ast).resolve(ast)
+    html = render_body(asg)
+    assert '<caption class="title">User Roster</caption>' in html
+
+
+def test_skeleton_table_alignment_styles():
+    """Verify skeleton.pt contains CSS definitions for table colgroup, caption, and alignment classes."""
+    skeleton_path = Path("src/golem/templates/default/skeleton.pt")
+    content = skeleton_path.read_text(encoding="utf-8")
+    assert ".halign-left" in content
+    assert ".halign-center" in content
+    assert ".halign-right" in content
+    assert ".halign-justify" in content
+    assert ".valign-top" in content
+    assert ".valign-middle" in content
+    assert ".valign-bottom" in content
+    assert "colgroup col" in content
+    assert "caption.title" in content
