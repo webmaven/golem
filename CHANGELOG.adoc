@@ -63,7 +63,8 @@ toc::[]
 * *Cross-Platform File Locking:* Replaced POSIX-only `fcntl` cache locking with cross-platform `filelock`.
 * *Configuration Normalization:* Deduplicated TOML parsing across `golem.toml` and `pyproject.toml` into a centralized normalizer helper.
 * *Navigation & TOC Performance:* Cached `discover_navigation()` tree during build cycles and eliminated duplicated text in TOC anchor generation.
-* *CLI Scaffolding & Metadata:* Dynamically resolved `--version` from package metadata and author name from `git config` in `golem init`.
+* *CLI Scaffolding {amp} Metadata:*
+** Dynamically resolved `--version` from package metadata and author name from `git config` in `golem init`.
 * *Repository Cleanliness:* Removed internal review artifacts from tracking and added pattern ignores to `.gitignore`.
 * *Dev Server Disconnects:* Downgraded client socket disconnect exceptions to debug-level logging.
 * *Pygments HTML-Escaped Quotes in Derived Views:* Assertions in derived-view rendering now accept both raw (`"`) and HTML-escaped (`&quot;`) forms of JSON output, fixing failures when Pygments is active.
