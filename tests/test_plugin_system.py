@@ -29,9 +29,9 @@ def test_plugin_golem_mark_stale_hook(tmp_path):
 
     engine.pm.register(MathPlugin())
     # Force rebuild of metadata to ensure it's up to date
-    engine.update_cache_for_file(doc1, node_types=["stem"])
-    engine.update_cache_for_file(doc2, node_types=["text"])
+    engine.staleness_tracker.update_cache_for_file(doc1, node_types=["stem"])
+    engine.staleness_tracker.update_cache_for_file(doc2, node_types=["text"])
 
-    outdated = engine.get_outdated_files(commit=False)
+    outdated = engine.staleness_tracker.get_outdated_files(commit=False)
     assert doc1.resolve() in outdated
     assert doc2.resolve() not in outdated

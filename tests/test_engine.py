@@ -23,22 +23,22 @@ def test_incremental_rebuild_logic(tmp_path):
     engine = BuildEngine(config)
 
     # First compilation
-    rebuild_set = engine.get_outdated_files()
+    rebuild_set = engine.staleness_tracker.get_outdated_files()
     assert Path(file_a).resolve() in rebuild_set
     assert Path(file_b).resolve() in rebuild_set
 
     # Update cache mock state
-    engine.update_cache_for_file(file_a)
-    engine.update_cache_for_file(file_b)
+    engine.staleness_tracker.update_cache_for_file(file_a)
+    engine.staleness_tracker.update_cache_for_file(file_b)
 
     # Second check (unmodified)
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Edit file_b (the included sidebar)
     file_b.write_text("Modified Sidebar content")
 
     # Verify that file_a is flagged for recompilation because file_b is in its include-chain
-    new_rebuild_set = engine.get_outdated_files()
+    new_rebuild_set = engine.staleness_tracker.get_outdated_files()
     assert Path(file_a).resolve() in new_rebuild_set
 
 
@@ -77,13 +77,13 @@ def test_cache_file_deletion_propagation(tmp_path):
     assert str(file_b.resolve()) in engine.cache.data["dependencies"].get(str(file_a.resolve()), [])
 
     # Second check (unmodified) should be empty
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Delete the included sidebar.adoc on disk
     file_b.unlink()
 
     # The engine must detect the deletion, propagate it to parent index.adoc, and clean up the cache
-    outdated = engine.get_outdated_files()
+    outdated = engine.staleness_tracker.get_outdated_files()
     assert file_a.resolve() in outdated
     assert str(file_b.resolve()) not in engine.cache.data["files"]
 
@@ -109,13 +109,13 @@ def test_cache_global_config_edit_propagation(tmp_path):
     engine.build_site()
 
     # Second check (unmodified) should be empty
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Modify the config file
     config_path.write_text("[site]\ntitle = 'New Title'\n", encoding="utf-8")
 
     # The engine must detect the global config edit and invalidate index.adoc
-    outdated = engine.get_outdated_files()
+    outdated = engine.staleness_tracker.get_outdated_files()
     assert file_a.resolve() in outdated
 
 
@@ -144,13 +144,13 @@ def test_cache_global_template_edit_propagation(tmp_path, monkeypatch):
     engine.build_site()
 
     # Second check (unmodified) should be empty
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Modify the template skeleton
     skeleton_pt.write_text("<html><body>NEW ${body_content}</body></html>", encoding="utf-8")
 
     # The engine must detect the global template edit and invalidate index.adoc
-    outdated = engine.get_outdated_files()
+    outdated = engine.staleness_tracker.get_outdated_files()
     assert file_a.resolve() in outdated
 
 
@@ -174,13 +174,13 @@ def test_cache_non_adoc_edit_propagation(tmp_path):
     assert str(file_b.resolve()) in engine.cache.data["dependencies"].get(str(file_a.resolve()), [])
 
     # Second check (unmodified) should be empty
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Edit the non-adoc file_b on disk
     file_b.write_text("print('hello modified')\n", encoding="utf-8")
 
     # The engine must detect the edit of code.py and invalidate parent index.adoc
-    outdated = engine.get_outdated_files()
+    outdated = engine.staleness_tracker.get_outdated_files()
     assert file_a.resolve() in outdated
 
 
@@ -196,14 +196,14 @@ def test_cache_file_addition(tmp_path):
 
     # Initial build
     engine.build_site()
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Add a brand new file
     file_b = content_dir / "about.adoc"
     file_b.write_text("= About\n\nAbout content\n", encoding="utf-8")
 
     # The engine must detect the addition of about.adoc and mark it as outdated
-    outdated = engine.get_outdated_files()
+    outdated = engine.staleness_tracker.get_outdated_files()
     assert file_b.resolve() in outdated
 
     # Compile site again
@@ -212,7 +212,7 @@ def test_cache_file_addition(tmp_path):
     assert compiled[0] == tmp_path / "dist" / "about.html"
 
     # Subsequent check should be empty
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
 
 def test_get_outdated_files_with_commit_false_does_not_mutate_cache(tmp_path):
@@ -235,7 +235,7 @@ def test_get_outdated_files_with_commit_false_does_not_mutate_cache(tmp_path):
     (content / "sub.adoc").unlink()
 
     # Query outdated files with commit=False
-    outdated = engine.get_outdated_files(commit=False)
+    outdated = engine.staleness_tracker.get_outdated_files(commit=False)
     assert len(outdated) > 0
     assert (content / "index.adoc").resolve() in outdated
 
@@ -247,7 +247,7 @@ def test_get_outdated_files_with_commit_false_does_not_mutate_cache(tmp_path):
     assert str((content / "sub.adoc").resolve()) in disk_cache["files"]
 
     # Query with commit=True should now mutate and purge sub.adoc
-    outdated_commit = engine.get_outdated_files(commit=True)
+    outdated_commit = engine.staleness_tracker.get_outdated_files(commit=True)
     assert len(outdated_commit) > 0
     with open(tmp_path / "cache.json", "r") as f:
         disk_cache_after = json.load(f)
@@ -643,13 +643,13 @@ def test_partials_exclusion_and_dependency_propagation(tmp_path):
     assert str(file_snippet.resolve()) in engine.cache.data["files"]
 
     # Initial check (unmodified) should have no outdated files
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Modify the partial file _sidebar.adoc
     file_partial.write_text("Modified sidebar partial content\n", encoding="utf-8")
 
     # Modifying partial must flag parent index.adoc as outdated, but not partial itself as output
-    outdated = engine.get_outdated_files()
+    outdated = engine.staleness_tracker.get_outdated_files()
     assert file_main.resolve() in outdated
     assert file_partial.resolve() not in outdated
 
@@ -657,7 +657,7 @@ def test_partials_exclusion_and_dependency_propagation(tmp_path):
     recompiled = engine.build_site()
     assert tmp_path / "dist" / "index.html" in recompiled
     assert not (tmp_path / "dist" / "_sidebar.html").exists()
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
 
 def test_partials_excluded_from_navigation(tmp_path):
@@ -1052,14 +1052,14 @@ def test_theme_template_fine_grained_invalidation(tmp_path, monkeypatch):
     engine.build_site()
 
     # Initial state should be clean (0 outdated)
-    assert len(engine.get_outdated_files(commit=False)) == 0
+    assert len(engine.staleness_tracker.get_outdated_files(commit=False)) == 0
 
     # Modify listing.html
     listing_tpl.write_text("<div class='code'><pre tal:content=\"node.get('value', '')\"></pre></div>", encoding="utf-8")
 
     # Recheck outdated files
     engine_recheck = BuildEngine(config, cache_file=tmp_path / "cache.json")
-    outdated = engine_recheck.get_outdated_files(commit=False)
+    outdated = engine_recheck.staleness_tracker.get_outdated_files(commit=False)
     assert doc1.resolve() in outdated
     assert doc2.resolve() not in outdated
 
@@ -1269,7 +1269,7 @@ def test_engine_get_template_files_skipping(tmp_path):
         templates_dir=str(templates_dir),
     )
     engine = BuildEngine(config)
-    found_templates = engine._get_template_files()
+    found_templates = engine.staleness_tracker._get_template_files()
 
     found_names = {t.name for t in found_templates}
     assert "base.html" in found_names
@@ -1492,11 +1492,11 @@ def test_package_template_modification_invalidates_cache(tmp_path):
     engine.build_site()
 
     # When no files changed, outdated should be empty
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Simulate modifying a package template hash in cache
     engine.cache.data["meta"]["theme_templates"]["skeleton.pt"] = "old_stale_hash"
-    outdated = engine.get_outdated_files(commit=False)
+    outdated = engine.staleness_tracker.get_outdated_files(commit=False)
     assert doc_path.resolve() in outdated
 
 

@@ -50,6 +50,7 @@ from golem.metadata import (
 )
 from golem.navigation import NavigationBuilder
 from golem.renderer import collect_node_types, render_body
+from golem.staleness import StalenessTracker, is_partial
 from golem.templates import PageCompiler
 
 
@@ -66,6 +67,7 @@ class BuildEngine:
     `config_path` (Path):: Path to the active `golem.toml` or `pyproject.toml` file.
     `cache_file` (Path):: Path to the JSON cache storage file.
     `cache` (BuildCache):: DAG cache database and file digest tracker instance.
+    `staleness_tracker` (StalenessTracker):: Staleness tracker and DAG dependency analyzer.
     `compiler` (PageCompiler):: Page template compiler instance.
     `nav_builder` (NavigationBuilder):: Hierarchical navigation builder and pagination generator.
     `errors` (list[dict[str, Any]]):: Errors and diagnostics captured during compilation.
@@ -101,16 +103,6 @@ class BuildEngine:
         self.config_path = Path(config.config_path) if config.config_path else Path("golem.toml")
         self.cache_file = cache_file or Path(config.content_dir).parent / ".golem" / "cache.json"
         self.cache = BuildCache(self.cache_file)
-        self.compiler = PageCompiler(config)
-        self.nav_builder = NavigationBuilder(
-            self.config,
-            self.content_dir,
-            self.is_partial,
-            self.get_file_metadata,
-        )
-        self.errors: list[dict[str, Any]] = []
-        self.diagnostics: list[dict[str, Any]] = self.errors
-        self._nav_tree_cache: list[dict[str, Any]] | None = None
 
         # Load Pluggy Plugin Manager
         from golem.plugins import get_plugin_manager
@@ -118,24 +110,23 @@ class BuildEngine:
         plugins_dir = Path(getattr(config, "plugins_dir", "plugins"))
         self.pm = get_plugin_manager(config=config, plugins_dir=plugins_dir)
 
-    def is_partial(self, path: Path) -> bool:
-        """Check whether a file or directory is designated as a partial content unit.
-
-        Evaluates whether a path begins with an underscore (`_`) or resides within
-        any directory segment starting with `_` relative to `content_dir`. Partials
-        are excluded from standalone page generation but tracked as dependencies.
-
-        [parameters]
-        `path` (Path):: Filesystem path to evaluate.
-
-        [returns]
-        `bool`:: `True` if the path or any parent segment starts with `_`, `False` otherwise.
-        """
-        try:
-            rel = path.resolve().relative_to(self.content_dir.resolve())
-            return any(part.startswith("_") for part in rel.parts)
-        except ValueError:
-            return any(part.startswith("_") for part in path.parts)
+        self.staleness_tracker = StalenessTracker(
+            config=self.config,
+            cache=self.cache,
+            content_dir=self.content_dir,
+            plugin_manager=self.pm,
+            config_path=self.config_path,
+        )
+        self.compiler = PageCompiler(config)
+        self.nav_builder = NavigationBuilder(
+            self.config,
+            self.content_dir,
+            lambda p: is_partial(p, self.content_dir),
+            self.get_file_metadata,
+        )
+        self.errors: list[dict[str, Any]] = []
+        self.diagnostics: list[dict[str, Any]] = self.errors
+        self._nav_tree_cache: list[dict[str, Any]] | None = None
 
     def get_file_metadata(self, path: Path) -> dict[str, Any]:
         """Retrieve cached or parsed document metadata for an AsciiDoc file.
@@ -163,285 +154,6 @@ class BuildEngine:
         if current_hash:
             self.cache.data.setdefault("files", {})[p_abs] = current_hash
         return meta
-
-    def get_outdated_files(self, commit: bool = True) -> set[Path]:
-        """Identify outdated files requiring recompilation through DAG dependency analysis.
-
-        Resolves stale documents by:
-        1. Scanning `.adoc` source files and comparing current SHA-256 digests against cached hashes.
-        2. Detecting deleted files and removing orphaned cache keys.
-        3. Invoking plugin `golem_mark_stale` hooks for custom invalidation rules.
-        4. Propagating direct modifications through reverse include dependencies to mark parent documents as outdated.
-        5. Checking global configuration (`golem.toml`) and template modifications to trigger full or granular invalidations.
-
-        [parameters]
-        `commit` (bool, optional):: Whether to persist cache modifications (such as deleted file removals and updated template digests) to disk. Defaults to `True`.
-
-        [returns]
-        `set[Path]`:: Set of absolute `Path` objects for outdated documents that must be recompiled.
-        """
-        outdated: set[Path] = set()
-        if not self.content_dir.exists():
-            return outdated
-
-        # 1. Get all actual files present on disk
-        all_files = list(self.content_dir.glob("**/*.adoc"))
-        current_abs_files = {str(f.resolve()) for f in all_files}
-
-        # 2. Identify deleted files (present in cache but missing from disk)
-        cached_files = set(self.cache.data.get("files", {}).keys())
-        deleted_files = set()
-        for f_abs_str in cached_files:
-            if not Path(f_abs_str).exists():
-                deleted_files.add(f_abs_str)
-
-        changed_directly = set()
-
-        # Mark deleted files as directly changed to trigger parent invalidation
-        for d in deleted_files:
-            changed_directly.add(Path(d))
-
-        if self.pm:
-            results = self.pm.hook.golem_mark_stale(
-                changed_files=list(changed_directly),
-                cache_metadata=self.cache.data.get("metadata", {}),
-            )
-            for res in results:
-                if res and isinstance(res, list):
-                    for path in res:
-                        path_p = Path(path).resolve()
-                        if path_p.exists() and not self.is_partial(path_p):
-                            outdated.add(path_p)
-                            changed_directly.add(path_p)
-
-        # 3. Map current file hashes and identify immediately changed files
-        for f in all_files:
-            f_abs = f.resolve()
-            try:
-                h = self.cache.get_sha256(f)
-                cached_hash = self.cache.data["files"].get(str(f_abs))
-                if cached_hash != h:
-                    changed_directly.add(f_abs)
-                    if not self.is_partial(f):
-                        outdated.add(f_abs)
-            except Exception:
-                # If there's an issue reading a file, treat it as changed/outdated
-                changed_directly.add(f_abs)
-                if not self.is_partial(f):
-                    outdated.add(f_abs)
-
-        # Check all non-adoc files listed in cached_files that are still on disk
-        for f_abs_str in cached_files:
-            if f_abs_str in deleted_files:
-                continue
-            f_path = Path(f_abs_str)
-            if f_path.suffix != ".adoc":
-                try:
-                    h = self.cache.get_sha256(f_path)
-                    cached_hash = self.cache.data["files"].get(f_abs_str)
-                    if cached_hash != h:
-                        changed_directly.add(f_path)
-                except Exception:
-                    changed_directly.add(f_path)
-
-        # Check if the global config file or layout template has changed.
-        global_changed = False
-
-        if self.config_path.exists():
-            h_config = self.cache.get_sha256(self.config_path)
-            cached_config = self.cache.data.get("meta", {}).get("config_file")
-            if cached_config != h_config:
-                global_changed = True
-                if commit:
-                    self.cache.data.setdefault("meta", {})["config_file"] = h_config
-
-        # Check theme and layout templates
-        current_templates = self._get_template_fingerprints()
-
-        cached_templates = self.cache.data.get("meta", {}).get("theme_templates")
-        if cached_templates is None and "skeleton_pt" in self.cache.data.get("meta", {}):
-            cached_templates = {"skeleton.pt": self.cache.data["meta"]["skeleton_pt"]}
-
-        templates_changed = False
-        master_layout_keys = {"skeleton.pt", "page.pt", "layout.pt", "skeleton.html", "page.html", "layout.html"}
-        master_layout_stems = {"skeleton", "page", "layout"}
-        changed_granular_nodes: set[str] = set()
-
-        if cached_templates is not None:
-            all_tpl_keys = set(cached_templates.keys()) | set(current_templates.keys())
-            for tpl_key in all_tpl_keys:
-                old_h = cached_templates.get(tpl_key)
-                new_h = current_templates.get(tpl_key)
-                if old_h != new_h:
-                    templates_changed = True
-                    stem = Path(tpl_key).stem.lower()
-                    if tpl_key in master_layout_keys or stem in master_layout_stems:
-                        global_changed = True
-                    else:
-                        changed_granular_nodes.add(stem)
-        elif self.cache.data.get("files"):
-            templates_changed = True
-            if current_templates:
-                global_changed = True
-
-        if changed_granular_nodes:
-            for f_abs_str, meta in self.cache.data.get("metadata", {}).items():
-                if not isinstance(meta, dict):
-                    continue
-                f_path = Path(f_abs_str)
-                if not f_path.exists() or self.is_partial(f_path):
-                    continue
-                node_types = meta.get("node_types")
-                if node_types is None or any(node in node_types for node in changed_granular_nodes):
-                    outdated.add(f_path)
-
-        if commit:
-            self.cache.data.setdefault("meta", {})["theme_templates"] = current_templates
-
-        # If a global layout or config changed, we must mark all existing non-partial .adoc documents as outdated!
-        if global_changed:
-            logging.info("[BuildEngine] Global configuration or template change detected. Invalidating all pages...")
-            outdated.update(f for f in all_files if not self.is_partial(f))
-            # Short-circuit and return full re-build
-            if commit and (deleted_files or global_changed or templates_changed):
-                for d in deleted_files:
-                    self.cache.data["files"].pop(d, None)
-                    self.cache.data["dependencies"].pop(d, None)
-                    self.cache.data.get("metadata", {}).pop(d, None)
-                self.cache.save_cache()
-            return outdated
-
-        # 4. Re-verify the DAG: resolve reverse dependencies (parent links)
-        reverse_deps: dict[str, set[str]] = {}
-        for f_str in cached_files | current_abs_files:
-            cached_deps = self.cache.data["dependencies"].get(f_str, [])
-            for dep in cached_deps:
-                reverse_deps.setdefault(dep, set()).add(f_str)
-
-        # Recursively propagate changed/deleted files back up to their parents (ancestors)
-        queue = list(changed_directly)
-        visited = set(queue)
-        while queue:
-            curr = str(queue.pop(0))
-            parents = reverse_deps.get(curr, set())
-            for p in parents:
-                p_path = Path(p)
-                if p_path not in visited:
-                    if p_path.exists() and not self.is_partial(p_path):
-                        outdated.add(p_path)
-                    visited.add(p_path)
-                    queue.append(p_path)
-
-        # 5. Purge deleted files from the cache database
-        if commit and (deleted_files or global_changed or templates_changed):
-            for d in deleted_files:
-                self.cache.data["files"].pop(d, None)
-                self.cache.data["dependencies"].pop(d, None)
-                self.cache.data.get("metadata", {}).pop(d, None)
-            self.cache.save_cache()
-
-        return outdated
-
-    def update_cache_for_file(
-        self,
-        path: Path,
-        included_files: list[str] | None = None,
-        node_types: list[str] | None = None,
-    ) -> None:
-        """Update DAG cache entries, SHA-256 hashes, node types, and dependency relations for a document.
-
-        Computes the SHA-256 digest of the specified document and updates `cache.data["files"]`
-        and `cache.data["metadata"]`. Associates ASG structural node types (such as `["admonition", "listing"]`)
-        for granular template invalidation. Resolves included partials and child files (`include::...[]`)
-        from the supplied `included_files` list or falls back to regex/AST parsing, caching digests
-        for all resolved dependencies, and persists the cache to disk.
-
-        [parameters]
-        `path` (Path):: Path to the target AsciiDoc document or partial.
-        `included_files` (list[str] | None, optional):: Explicit list of resolved dependency file paths. If `None`, dependencies are parsed from file content. Defaults to `None`.
-        `node_types` (list[str] | None, optional):: List of ASG node type identifiers present in the document. Defaults to `None`.
-
-        [returns]
-        `None`:: Cache dictionary is updated in memory and persisted atomically to disk.
-
-        === Examples
-
-        [source,python]
-        ----
-        from pathlib import Path
-        from golem.config import GolemConfig
-        from golem.engine import BuildEngine
-
-        config = GolemConfig(content_dir="content", output_dir="dist")
-        engine = BuildEngine(config)
-        engine.update_cache_for_file(
-            Path("content/index.adoc"),
-            included_files=["content/_sidebar.adoc"],
-            node_types=["admonition", "listing"],
-        )
-        ----
-        """
-        p_abs = str(path.resolve())
-        self.cache.data["files"][p_abs] = self.cache.get_sha256(path)
-        meta = extract_metadata_from_doc(path)
-        existing_meta = self.cache.data.get("metadata", {}).get(p_abs, {})
-        if node_types is not None:
-            meta["node_types"] = node_types
-        elif isinstance(existing_meta, dict) and "node_types" in existing_meta:
-            meta["node_types"] = existing_meta["node_types"]
-        self.cache.data.setdefault("metadata", {})[p_abs] = meta
-        if included_files is not None:
-            unique_deps = list(dict.fromkeys(str(Path(f).resolve()) for f in included_files))
-            self.cache.data["dependencies"][p_abs] = unique_deps
-        else:
-            deps = []
-            try:
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read()
-                ast = asciidoctrine.parse_to_ast(content, base_dir=str(path.parent))
-                deps = ast.included_files
-            except Exception:
-                # Fallback to regex-based robust include parser
-                import re
-
-                include_regex = re.compile(r"^include::([^\[]+)\[(.*)\]\s*$")
-                seen = set()
-
-                def find_includes(f_path: Path):
-                    f_abs = str(f_path.resolve())
-                    if f_abs in seen:
-                        return
-                    seen.add(f_abs)
-                    if not f_path.exists():
-                        return
-                    try:
-                        with open(f_path, "r", encoding="utf-8", errors="replace") as f_in:
-                            for line in f_in:
-                                m = include_regex.match(line.strip())
-                                if m:
-                                    inc_name = m.group(1).strip()
-                                    inc_path = (f_path.parent / inc_name).resolve()
-                                    deps.append(str(inc_path))
-                                    find_includes(inc_path)
-                    except Exception:
-                        pass
-
-                find_includes(path)
-
-            # De-duplicate and make sure all are absolute paths as strings
-            unique_deps = list(dict.fromkeys(str(Path(d).resolve()) for d in deps))
-            self.cache.data["dependencies"][p_abs] = unique_deps
-
-        # Compute and record the SHA-256 hashes for all of the dependency files as well!
-        for dep in unique_deps:
-            dep_path = Path(dep)
-            if dep_path.exists():
-                try:
-                    self.cache.data["files"][dep] = self.cache.get_sha256(dep_path)
-                except Exception:
-                    pass
-
-        self.cache.save_cache()
 
     def _generate_canonical_link(self, rel_path: Path | str) -> str:
         """Generate a canonical relative HTML URL path for a document.
@@ -485,130 +197,16 @@ class BuildEngine:
             self._nav_tree_cache = self.nav_builder.discover_navigation()
         return self._nav_tree_cache
 
-    def _get_template_search_paths(self) -> list[Path]:
-        """Collect filesystem search paths for custom and theme templates.
-
-        Resolves template search paths in priority order:
-        1. Custom template directory (`config.templates_dir`) if configured.
-        2. Workspace theme directory (`themes/<theme>`) if configured.
-
-        [returns]
-        `list[Path]`:: Ordered list of existing `Path` objects to search for templates.
-
-        === Examples
-
-        [source,python]
-        ----
-        from golem.config import GolemConfig
-        from golem.engine import BuildEngine
-
-        config = GolemConfig(content_dir="content", output_dir="dist", theme="default")
-        engine = BuildEngine(config)
-        paths = engine._get_template_search_paths()
-        ----
-        """
-        paths: list[Path] = []
-        if hasattr(self.config, "templates_dir") and self.config.templates_dir:
-            tpl_path = Path(self.config.templates_dir)
-            paths.append(tpl_path.resolve() if tpl_path.exists() else tpl_path)
-
-        if hasattr(self.config, "theme") and self.config.theme:
-            theme_path = Path("themes") / self.config.theme
-            paths.append(theme_path.resolve() if theme_path.exists() else theme_path)
-
-        # 3. Built-in package templates (e.g. src/golem/templates/<theme> and src/golem/templates/default)
-        pkg_theme = Path(__file__).parent / "templates" / getattr(self.config, "theme", "default")
-        if pkg_theme.exists() and pkg_theme.is_dir():
-            paths.append(pkg_theme.resolve())
-        pkg_default = Path(__file__).parent / "templates" / "default"
-        if pkg_default != pkg_theme and pkg_default.exists() and pkg_default.is_dir():
-            paths.append(pkg_default.resolve())
-
-        return paths
-
-    def _get_template_files(self) -> list[Path]:
-        """Discover all template files across configured template search paths.
-
-        Scans directories returned by `_get_template_search_paths()` for template
-        files ending in `.html` or `.pt`. Excludes hidden files (starting with `.`)
-        and assets located in `static/` subdirectories.
-
-        [returns]
-        `list[Path]`:: List of paths to discovered template files.
-
-        === Examples
-
-        [source,python]
-        ----
-        from golem.config import GolemConfig
-        from golem.engine import BuildEngine
-
-        config = GolemConfig(content_dir="content", output_dir="dist", theme="default")
-        engine = BuildEngine(config)
-        templates = engine._get_template_files()
-        ----
-        """
-        templates: list[Path] = []
-        for search_dir in self._get_template_search_paths():
-            if search_dir.exists() and search_dir.is_dir():
-                for tpl_file in search_dir.rglob("*"):
-                    if tpl_file.is_file() and tpl_file.suffix in (".html", ".pt"):
-                        try:
-                            rel = tpl_file.relative_to(search_dir)
-                        except ValueError:
-                            rel = Path(tpl_file.name)
-                        if any(part.startswith(".") or part == "static" for part in rel.parts):
-                            continue
-                        templates.append(tpl_file)
-        return templates
-
-    def _get_template_fingerprints(self) -> dict[str, str]:
-        """Compute SHA-256 content digests for all discoverable template files.
-
-        Iterates through template files across template search paths, mapping each
-        template's relative POSIX path to its computed SHA-256 hexadecimal hash.
-
-        [returns]
-        `dict[str, str]`:: Dictionary mapping relative template paths to SHA-256 digests.
-
-        === Examples
-
-        [source,python]
-        ----
-        from golem.config import GolemConfig
-        from golem.engine import BuildEngine
-
-        config = GolemConfig(content_dir="content", output_dir="dist")
-        engine = BuildEngine(config)
-        fingerprints = engine._get_template_fingerprints()
-        ----
-        """
-        current_templates: dict[str, str] = {}
-        for search_dir in self._get_template_search_paths():
-            if search_dir.exists() and search_dir.is_dir():
-                for tpl_file in search_dir.rglob("*"):
-                    if tpl_file.is_file() and tpl_file.suffix in (".html", ".pt"):
-                        try:
-                            rel = tpl_file.relative_to(search_dir)
-                        except ValueError:
-                            rel = Path(tpl_file.name)
-                        if any(part.startswith(".") or part == "static" for part in rel.parts):
-                            continue
-                        key = rel.as_posix()
-                        if key not in current_templates:
-                            current_templates[key] = self.cache.get_sha256(tpl_file)
-        return current_templates
-
     def build_site(self) -> list[Path]:
         """Orchestrate the incremental compilation pipeline for outdated AsciiDoc documents.
 
         Executes the complete documentation compilation lifecycle:
         1. Generates automated API reference documentation via `golem.plugins.apidoc` if `config.api_packages` is configured.
-        2. Identifies stale or modified documents via `get_outdated_files()`.
+        2. Identifies stale or modified documents via `staleness_tracker.get_outdated_files()`.
         3. Synchronizes static assets into the output directory via `sync_static_assets()`.
         4. Compiles each outdated document through sequential AST parsing (`asciidoctrine`), ASG semantic resolution (`ASGResolver`), body rendering (`render_body`), navigation and TOC generation, and Chameleon template layout compilation (`PageCompiler`).
         5. Executes plugin hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_post_render`) across each lifecycle phase.
-        6. Writes compiled HTML files to disk and updates the DAG cache via `update_cache_for_file()`.
+        6. Writes compiled HTML files to disk and updates the DAG cache via `staleness_tracker.update_cache_for_file()`.
 
         [returns]
         `list[Path]`:: List of output `Path` objects for all compiled HTML documents.
@@ -652,22 +250,28 @@ class BuildEngine:
                 if getattr(self.config, "strict", False):
                     raise
 
-        outdated = self.get_outdated_files()
+        outdated = self.staleness_tracker.get_outdated_files()
 
         all_docs = (
-            [f for f in self.content_dir.glob("**/*.adoc") if not self.is_partial(f)] if self.content_dir.exists() else []
+            [f for f in self.content_dir.glob("**/*.adoc") if not is_partial(f, self.content_dir)]
+            if self.content_dir.exists()
+            else []
         )
-        to_build = {f for f in outdated if not self.is_partial(f)} if (outdated or self.cache.data["files"]) else set(all_docs)
+        to_build = (
+            {f for f in outdated if not is_partial(f, self.content_dir)}
+            if (outdated or self.cache.data["files"])
+            else set(all_docs)
+        )
 
         output_dir = Path(self.config.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         sync_static_assets(self.config, self.content_dir, Path(self.config.output_dir))
 
-        search_paths = self._get_template_search_paths()
+        search_paths = self.staleness_tracker._get_template_search_paths()
 
         for doc_path in to_build:
-            if self.is_partial(doc_path):
+            if is_partial(doc_path, self.content_dir):
                 continue
             try:
                 with open(doc_path, "r", encoding="utf-8", errors="replace") as f:
@@ -873,7 +477,9 @@ class BuildEngine:
                     f_out.write(final_html)
 
                 # 7. Update file dependency hash in DAG cache
-                self.update_cache_for_file(doc_path, getattr(ast, "included_files", []), node_types=page_node_types)
+                self.staleness_tracker.update_cache_for_file(
+                    doc_path, getattr(ast, "included_files", []), node_types=page_node_types
+                )
                 compiled_files.append(out_path)
 
                 # Progress logging
