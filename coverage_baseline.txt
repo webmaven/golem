@@ -1,0 +1,108 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.5, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/michaelbernstein/Documents/GitHub/golem
+configfile: pyproject.toml
+testpaths: tests
+plugins: cov-7.1.0, asciidoctest-0.2.0a3
+collected 276 items
+
+tests/test_asciidocapi_core.py ..........                                [  3%]
+tests/test_cli.py ......                                                 [  5%]
+tests/test_cli_functional.py ..................                          [ 12%]
+tests/test_cli_inspection.py .............                               [ 17%]
+tests/test_config.py ............................                        [ 27%]
+tests/test_derived_views.py F.....F......                                [ 31%]
+tests/test_diagnostics.py ...............                                [ 37%]
+tests/test_e2e.py .                                                      [ 37%]
+tests/test_e2e_plugins.py ........                                       [ 40%]
+tests/test_engine.py ..........................................          [ 55%]
+tests/test_engine_integration.py .                                       [ 56%]
+tests/test_highlighting.py .........                                     [ 59%]
+tests/test_hook_isolation.py ............                                [ 63%]
+tests/test_plugin_apidoc.py ........                                     [ 66%]
+tests/test_plugin_doctest.py ...........................                 [ 76%]
+tests/test_plugin_system.py .                                            [ 76%]
+tests/test_plugins.py ............                                       [ 81%]
+tests/test_plugins_package.py ..                                         [ 81%]
+tests/test_renderer.py ............................                      [ 92%]
+tests/test_server.py .....                                               [ 93%]
+tests/test_syntax_invariants.py ..                                       [ 94%]
+tests/test_templates.py ...............                                  [100%]
+
+=================================== FAILURES ===================================
+____________________ test_asciidoc_derived_views_rendering _____________________
+
+    def test_asciidoc_derived_views_rendering():
+        """Verify render='source,asg,html,preview' produces multi-tab container with all four representations."""
+        asg = {
+            "name": "listing",
+            "type": "block",
+            "title": "Admonition Example",
+            "value": "NOTE: This is a note.",
+            "attributes": {
+                "language": "asciidoc",
+                "render": "source,asg,html,preview",
+            },
+        }
+        html = render_body(asg)
+        assert 'class="listingblock multi-view"' in html
+        assert 'role="tablist"' in html
+        assert 'data-tab="source"' in html
+        assert 'data-tab="asg"' in html
+        assert 'data-tab="html"' in html
+        assert 'data-tab="preview"' in html
+        # Check that ASG tab contains JSON — Pygments HTML-escapes " as &quot; inside spans,
+        # so we match the highlighted form rather than raw JSON.
+>       assert "&quot;name&quot;" in html and ("&quot;document&quot;" in html or "&quot;admonition&quot;" in html)
+E       assert ('&quot;name&quot;' in '<figure class="listingblock multi-view" id="admonition-example-1">\n  \n    \n      <input type="radio"\n            ...t">\n            <p>This is a note.</p>\n        </div>\n    </div>\n\n\n</div></div>\n    </div>\n  \n  \n</figure>\n')
+
+tests/test_derived_views.py:32: AssertionError
+_____________________ test_generate_asciidoc_views_direct ______________________
+
+    def test_generate_asciidoc_views_direct():
+        """Verify generate_asciidoc_views produces valid view dicts with expected keys."""
+        views = generate_asciidoc_views("NOTE: Direct test.", ["source", "asg", "html", "preview"])
+        assert len(views) == 4
+    
+        v_source = views[0]
+        assert v_source["id"] == "source"
+        assert v_source["label"] == "AsciiDoc"
+        assert "NOTE: Direct test." in v_source["content"]
+    
+        v_asg = views[1]
+        assert v_asg["id"] == "asg"
+        assert v_asg["label"] == "ASG"
+>       assert "&quot;name&quot;" in v_asg["content"]  # Pygments escapes " as &quot; in highlighted JSON
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert '&quot;name&quot;' in '<pre class="highlight json"><code class="language-json"><span class="p">{</span>\n<span class="w">  </span><span clas...pan><span class="p">}</span>\n<span class="w">  </span><span class="p">]</span>\n<span class="p">}</span></code></pre>'
+
+tests/test_derived_views.py:185: AssertionError
+================================ tests coverage ================================
+_______________ coverage: platform darwin, python 3.14.5-final-0 _______________
+
+Name                                         Stmts   Miss  Cover   Missing
+--------------------------------------------------------------------------
+src/golem/__init__.py                            1      0   100%
+src/golem/cli.py                               447     57    87%   64-68, 101, 114-115, 121, 131, 137-138, 172-173, 185-186, 229-230, 357, 447, 508-509, 517, 541-542, 615, 693, 699-702, 706-707, 746-750, 752-753, 756-757, 805-806, 831-832, 837, 844, 862, 866, 936-937, 975-976, 987, 1003-1004, 1028
+src/golem/config.py                            119     15    87%   32-33, 105-106, 131, 133, 157, 159, 181, 185, 187, 290-292, 300
+src/golem/engine.py                            816     84    90%   78, 164-165, 191-193, 196, 201-202, 233, 254-255, 346-347, 374-377, 410-411, 417-418, 457-458, 513, 541, 583-587, 600-601, 619, 646, 649, 664-666, 747, 769, 772, 782-783, 797-798, 828-829, 874, 896, 901, 905-906, 929-930, 994-995, 1057, 1087, 1101, 1189, 1193, 1208, 1227, 1306-1307, 1341-1342, 1344, 1386-1387, 1392-1393, 1407-1408, 1475-1478, 1496, 1601-1603, 1628-1630
+src/golem/highlighting.py                       53      2    96%   223-224
+src/golem/plugins/__init__.py                   89     10    89%   128, 155, 182, 208, 237, 276, 313, 336, 353-354
+src/golem/plugins/apidoc/__init__.py           122      5    96%   92, 174-175, 178-179
+src/golem/plugins/apidoc/core/__init__.py        3      0   100%
+src/golem/plugins/apidoc/core/api.py            67      8    88%   46, 59, 62, 67-70, 127-128
+src/golem/plugins/apidoc/core/extractor.py      52      4    92%   28, 54-56, 73
+src/golem/plugins/apidoc/core/formatter.py     192      8    96%   70-71, 94, 164, 170-171, 275, 344
+src/golem/plugins/doctest/__init__.py           41      2    95%   48-49
+src/golem/plugins/doctest/runner.py            103      6    94%   73-75, 93, 133, 153
+src/golem/renderer.py                          356     69    81%   68, 72, 76-78, 81-83, 106, 113-116, 157, 173, 191, 195, 198, 208, 256, 283, 336, 360, 370, 372-381, 384, 403, 405-407, 434-435, 437-438, 455, 457, 464, 466, 475, 479-487, 503, 505-507, 524-525, 527-528, 532, 576, 579, 649-650
+src/golem/server.py                            152     23    85%   141-143, 148-149, 178-181, 209-216, 300-303, 334, 341-342, 360-361
+src/golem/templates.py                          57      9    84%   174-176, 243-244, 253-254, 264-265
+src/golem/views.py                             146     32    78%   55, 57-59, 70-78, 140, 151, 169, 173-177, 191-193, 221, 237, 278, 290-296
+--------------------------------------------------------------------------
+TOTAL                                         2816    334    88%
+Required test coverage of 70.0% reached. Total coverage: 88.14%
+=========================== short test summary info ============================
+FAILED tests/test_derived_views.py::test_asciidoc_derived_views_rendering - a...
+FAILED tests/test_derived_views.py::test_generate_asciidoc_views_direct - ass...
+================== 2 failed, 274 passed in 130.54s (0:02:10) ===================

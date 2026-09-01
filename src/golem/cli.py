@@ -762,7 +762,7 @@ def serve(port, host, strict, directory=None, test_only=False):
         server = LiveReloadServer(
             public_dir=Path(golem_config.output_dir),
             watch_dir=Path(golem_config.content_dir),
-            change_detected_func=lambda: bool(engine.get_outdated_files(commit=False)),
+            change_detected_func=lambda: bool(engine.staleness_tracker.get_outdated_files(commit=False)),
             rebuild_func=on_rebuild,
             port=port,
             errors_func=lambda: engine.errors,

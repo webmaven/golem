@@ -23,22 +23,22 @@ def test_incremental_rebuild_logic(tmp_path):
     engine = BuildEngine(config)
 
     # First compilation
-    rebuild_set = engine.get_outdated_files()
+    rebuild_set = engine.staleness_tracker.get_outdated_files()
     assert Path(file_a).resolve() in rebuild_set
     assert Path(file_b).resolve() in rebuild_set
 
     # Update cache mock state
-    engine.update_cache_for_file(file_a)
-    engine.update_cache_for_file(file_b)
+    engine.staleness_tracker.update_cache_for_file(file_a)
+    engine.staleness_tracker.update_cache_for_file(file_b)
 
     # Second check (unmodified)
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Edit file_b (the included sidebar)
     file_b.write_text("Modified Sidebar content")
 
     # Verify that file_a is flagged for recompilation because file_b is in its include-chain
-    new_rebuild_set = engine.get_outdated_files()
+    new_rebuild_set = engine.staleness_tracker.get_outdated_files()
     assert Path(file_a).resolve() in new_rebuild_set
 
 
@@ -74,18 +74,18 @@ def test_cache_file_deletion_propagation(tmp_path):
     engine.build_site()
 
     # Verify that the cache maps file_b as a dependency of file_a
-    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(str(file_a.resolve()), [])
+    assert str(file_b.resolve()) in engine.cache.data["dependencies"].get(str(file_a.resolve()), [])
 
     # Second check (unmodified) should be empty
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Delete the included sidebar.adoc on disk
     file_b.unlink()
 
     # The engine must detect the deletion, propagate it to parent index.adoc, and clean up the cache
-    outdated = engine.get_outdated_files()
+    outdated = engine.staleness_tracker.get_outdated_files()
     assert file_a.resolve() in outdated
-    assert str(file_b.resolve()) not in engine.cache_data["files"]
+    assert str(file_b.resolve()) not in engine.cache.data["files"]
 
 
 def test_cache_global_config_edit_propagation(tmp_path):
@@ -109,13 +109,13 @@ def test_cache_global_config_edit_propagation(tmp_path):
     engine.build_site()
 
     # Second check (unmodified) should be empty
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Modify the config file
     config_path.write_text("[site]\ntitle = 'New Title'\n", encoding="utf-8")
 
     # The engine must detect the global config edit and invalidate index.adoc
-    outdated = engine.get_outdated_files()
+    outdated = engine.staleness_tracker.get_outdated_files()
     assert file_a.resolve() in outdated
 
 
@@ -144,13 +144,13 @@ def test_cache_global_template_edit_propagation(tmp_path, monkeypatch):
     engine.build_site()
 
     # Second check (unmodified) should be empty
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Modify the template skeleton
     skeleton_pt.write_text("<html><body>NEW ${body_content}</body></html>", encoding="utf-8")
 
     # The engine must detect the global template edit and invalidate index.adoc
-    outdated = engine.get_outdated_files()
+    outdated = engine.staleness_tracker.get_outdated_files()
     assert file_a.resolve() in outdated
 
 
@@ -171,16 +171,16 @@ def test_cache_non_adoc_edit_propagation(tmp_path):
     engine.build_site()
 
     # Verify that the cache maps file_b as a dependency of file_a
-    assert str(file_b.resolve()) in engine.cache_data["dependencies"].get(str(file_a.resolve()), [])
+    assert str(file_b.resolve()) in engine.cache.data["dependencies"].get(str(file_a.resolve()), [])
 
     # Second check (unmodified) should be empty
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Edit the non-adoc file_b on disk
     file_b.write_text("print('hello modified')\n", encoding="utf-8")
 
     # The engine must detect the edit of code.py and invalidate parent index.adoc
-    outdated = engine.get_outdated_files()
+    outdated = engine.staleness_tracker.get_outdated_files()
     assert file_a.resolve() in outdated
 
 
@@ -196,14 +196,14 @@ def test_cache_file_addition(tmp_path):
 
     # Initial build
     engine.build_site()
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Add a brand new file
     file_b = content_dir / "about.adoc"
     file_b.write_text("= About\n\nAbout content\n", encoding="utf-8")
 
     # The engine must detect the addition of about.adoc and mark it as outdated
-    outdated = engine.get_outdated_files()
+    outdated = engine.staleness_tracker.get_outdated_files()
     assert file_b.resolve() in outdated
 
     # Compile site again
@@ -212,7 +212,7 @@ def test_cache_file_addition(tmp_path):
     assert compiled[0] == tmp_path / "dist" / "about.html"
 
     # Subsequent check should be empty
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
 
 def test_get_outdated_files_with_commit_false_does_not_mutate_cache(tmp_path):
@@ -235,7 +235,7 @@ def test_get_outdated_files_with_commit_false_does_not_mutate_cache(tmp_path):
     (content / "sub.adoc").unlink()
 
     # Query outdated files with commit=False
-    outdated = engine.get_outdated_files(commit=False)
+    outdated = engine.staleness_tracker.get_outdated_files(commit=False)
     assert len(outdated) > 0
     assert (content / "index.adoc").resolve() in outdated
 
@@ -247,7 +247,7 @@ def test_get_outdated_files_with_commit_false_does_not_mutate_cache(tmp_path):
     assert str((content / "sub.adoc").resolve()) in disk_cache["files"]
 
     # Query with commit=True should now mutate and purge sub.adoc
-    outdated_commit = engine.get_outdated_files(commit=True)
+    outdated_commit = engine.staleness_tracker.get_outdated_files(commit=True)
     assert len(outdated_commit) > 0
     with open(tmp_path / "cache.json", "r") as f:
         disk_cache_after = json.load(f)
@@ -269,7 +269,7 @@ def test_engine_corrupt_cache_handling(tmp_path):
     cache_file.write_text("Not valid JSON at all!!!", encoding="utf-8")
 
     engine = BuildEngine(config, cache_file=cache_file)
-    assert engine.cache_data == {"files": {}, "dependencies": {}, "metadata": {}}
+    assert engine.cache.data == {"files": {}, "dependencies": {}, "metadata": {}}
     # The corrupted file should have been deleted/cleared
     assert not cache_file.exists() or cache_file.read_text().strip() == ""
 
@@ -293,12 +293,12 @@ def test_engine_watcher_cpu_optimization(tmp_path):
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     # First call: populates the SHA-256 and caches it
-    h1 = engine._get_sha256(file_a)
+    h1 = engine.cache.get_sha256(file_a)
     assert len(h1) == 64
 
     # Second call: should retrieve from cache without reading file again
     with patch("builtins.open") as mock_open:
-        h2 = engine._get_sha256(file_a)
+        h2 = engine.cache.get_sha256(file_a)
         assert h2 == h1
         mock_open.assert_not_called()
 
@@ -319,7 +319,7 @@ def test_engine_cache_concurrency_lock(tmp_path):
     acquired = []
 
     def worker():
-        with engine._cache_lock():
+        with engine.cache._cache_lock():
             acquired.append("A")
             time.sleep(0.5)
             acquired.append("A_done")
@@ -330,7 +330,7 @@ def test_engine_cache_concurrency_lock(tmp_path):
     time.sleep(0.1)
 
     start_time = time.time()
-    with engine._cache_lock():
+    with engine.cache._cache_lock():
         acquired.append("B")
     duration = time.time() - start_time
 
@@ -352,7 +352,7 @@ def test_engine_watcher_deleted_file_handling(tmp_path):
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     # Accessing SHA-256 for a nonexistent/deleted file should return "" without raising OSError
-    h = engine._get_sha256(file_a)
+    h = engine.cache.get_sha256(file_a)
     assert h == ""
 
 
@@ -368,7 +368,7 @@ def test_engine_cache_lock_file_creation(tmp_path):
 
     # Assert that accessing lock_file creates cache.lock under the correct directory
     lock_path = tmp_path / "cache.lock"
-    with engine._cache_lock():
+    with engine.cache._cache_lock():
         assert lock_path.exists()
 
 
@@ -384,13 +384,13 @@ def test_engine_cache_lock_release_on_error(tmp_path):
 
     # Assert that if an exception is raised inside the lock block, lock is still released
     try:
-        with engine._cache_lock():
+        with engine.cache._cache_lock():
             raise ValueError("Intentional crash")
     except ValueError:
         pass
 
     # A second acquisition should succeed immediately (if lock was not released, it would block/crash)
-    with engine._cache_lock():
+    with engine.cache._cache_lock():
         pass
 
 
@@ -405,7 +405,7 @@ def test_navigation_auto_discovery_basic(tmp_path):
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
     assert len(nav) == 4
     # Index pinned at top
     assert nav[0]["title"] == "Golem Docs"
@@ -437,7 +437,7 @@ def test_navigation_auto_discovery_nested_hierarchy(tmp_path):
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
     assert len(nav) == 3
     # Root README pinned at top
     assert nav[0]["title"] == "Overview"
@@ -471,7 +471,7 @@ def test_navigation_explicit_override_with_navigation_nav(tmp_path):
     )
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
     assert len(nav) == 2
     assert nav[0]["title"] == "Architecture"
     assert nav[0]["url"] == "02-architecture.html"
@@ -637,19 +637,19 @@ def test_partials_exclusion_and_dependency_propagation(tmp_path):
     assert not (tmp_path / "dist" / "_snippets" / "note.html").exists()
 
     # Partials MUST be tracked in cache dependencies and files
-    assert str(file_partial.resolve()) in engine.cache_data["dependencies"].get(str(file_main.resolve()), [])
-    assert str(file_snippet.resolve()) in engine.cache_data["dependencies"].get(str(file_main.resolve()), [])
-    assert str(file_partial.resolve()) in engine.cache_data["files"]
-    assert str(file_snippet.resolve()) in engine.cache_data["files"]
+    assert str(file_partial.resolve()) in engine.cache.data["dependencies"].get(str(file_main.resolve()), [])
+    assert str(file_snippet.resolve()) in engine.cache.data["dependencies"].get(str(file_main.resolve()), [])
+    assert str(file_partial.resolve()) in engine.cache.data["files"]
+    assert str(file_snippet.resolve()) in engine.cache.data["files"]
 
     # Initial check (unmodified) should have no outdated files
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Modify the partial file _sidebar.adoc
     file_partial.write_text("Modified sidebar partial content\n", encoding="utf-8")
 
     # Modifying partial must flag parent index.adoc as outdated, but not partial itself as output
-    outdated = engine.get_outdated_files()
+    outdated = engine.staleness_tracker.get_outdated_files()
     assert file_main.resolve() in outdated
     assert file_partial.resolve() not in outdated
 
@@ -657,7 +657,7 @@ def test_partials_exclusion_and_dependency_propagation(tmp_path):
     recompiled = engine.build_site()
     assert tmp_path / "dist" / "index.html" in recompiled
     assert not (tmp_path / "dist" / "_sidebar.html").exists()
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
 
 def test_partials_excluded_from_navigation(tmp_path):
@@ -681,7 +681,7 @@ def test_partials_excluded_from_navigation(tmp_path):
     config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
 
     # Collect all titles and paths in nav recursively
     def collect_nav(items):
@@ -741,7 +741,9 @@ def test_sync_static_assets_user_and_theme(tmp_path, monkeypatch):
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
     # Test sync_static_assets directly
-    engine.sync_static_assets()
+    from golem.assets import sync_static_assets
+
+    sync_static_assets(config, content_dir, output_dir)
 
     dist_static = output_dir / "static"
     assert (dist_static / "theme.css").exists()
@@ -779,28 +781,28 @@ def test_metadata_caching_and_recovery(tmp_path):
     config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=cache_file)
 
-    # Calling discover_navigation populates cache_data["metadata"]
-    nav = engine.discover_navigation()
+    # Calling discover_navigation populates cache.data["metadata"]
+    nav = engine.nav_builder.discover_navigation()
     assert len(nav) == 2
 
-    assert "metadata" in engine.cache_data
-    meta1 = engine.cache_data["metadata"].get(str(doc1.resolve()))
+    assert "metadata" in engine.cache.data
+    meta1 = engine.cache.data["metadata"].get(str(doc1.resolve()))
     assert meta1 is not None
     assert meta1["title"] == "Custom Title"
     assert meta1["nav_title"] == "Short Nav"
     assert meta1["has_toc"] is True
 
-    meta2 = engine.cache_data["metadata"].get(str(doc2.resolve()))
+    meta2 = engine.cache.data["metadata"].get(str(doc2.resolve()))
     assert meta2 is not None
     assert meta2["title"] == "Other Doc"
     assert meta2["has_toc"] is False
 
-    engine.save_cache()
+    engine.cache.save_cache()
 
     # Re-instantiate engine with existing cache file
     engine2 = BuildEngine(config, cache_file=cache_file)
-    assert "metadata" in engine2.cache_data
-    assert str(doc1.resolve()) in engine2.cache_data["metadata"]
+    assert "metadata" in engine2.cache.data
+    assert str(doc1.resolve()) in engine2.cache.data["metadata"]
 
     # When files are unmodified, discover_navigation uses cached metadata without re-reading from disk
     orig_open = open
@@ -811,7 +813,7 @@ def test_metadata_caching_and_recovery(tmp_path):
         return orig_open(file, *args, **kwargs)
 
     with patch("builtins.open", side_effect=tracking_open):
-        nav2 = engine2.discover_navigation()
+        nav2 = engine2.nav_builder.discover_navigation()
         assert len(nav2) == 2
         # Neither doc1.adoc nor doc2.adoc should have been opened for reading
         assert not any(str(doc1.resolve()) in call or "doc1.adoc" in call for call in open_calls)
@@ -819,9 +821,9 @@ def test_metadata_caching_and_recovery(tmp_path):
 
     # When a file is modified, discover_navigation refreshes the cached metadata
     doc1.write_text("= Updated Title\n:nav_title: Updated Nav\n", encoding="utf-8")
-    nav3 = engine2.discover_navigation()
+    nav3 = engine2.nav_builder.discover_navigation()
     assert len(nav3) == 2
-    updated_meta1 = engine2.cache_data["metadata"].get(str(doc1.resolve()))
+    updated_meta1 = engine2.cache.data["metadata"].get(str(doc1.resolve()))
     assert updated_meta1["title"] == "Updated Title"
     assert updated_meta1["nav_title"] == "Updated Nav"
 
@@ -883,7 +885,7 @@ def test_navigation_empty_and_non_adoc_directory_pruning(tmp_path):
     config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
 
     def get_all_paths_and_titles(items):
         res = []
@@ -920,46 +922,46 @@ def test_navigation_empty_and_non_adoc_directory_pruning(tmp_path):
 
 
 def test_dir_has_adoc_content_helper(tmp_path):
-    from golem.engine import _dir_has_adoc_content
+    from golem.metadata import dir_has_adoc_content
 
     # Nonexistent path
-    assert _dir_has_adoc_content(tmp_path / "does_not_exist") is False
+    assert dir_has_adoc_content(tmp_path / "does_not_exist") is False
 
     # Empty dir
     empty = tmp_path / "empty"
     empty.mkdir()
-    assert _dir_has_adoc_content(empty) is False
+    assert dir_has_adoc_content(empty) is False
 
     # Dir with non-adoc files only
     non_adoc = tmp_path / "non_adoc"
     non_adoc.mkdir()
     (non_adoc / "readme.txt").write_text("hi")
     (non_adoc / "image.png").write_bytes(b"123")
-    assert _dir_has_adoc_content(non_adoc) is False
+    assert dir_has_adoc_content(non_adoc) is False
 
     # Dir with partial adoc files only
     partial_dir = tmp_path / "partial"
     partial_dir.mkdir()
     (partial_dir / "_partial.adoc").write_text("partial")
-    assert _dir_has_adoc_content(partial_dir) is False
+    assert dir_has_adoc_content(partial_dir) is False
 
     # Dir with adoc file inside hidden/partial subdir
     hidden_sub = tmp_path / "hidden_sub"
     (hidden_sub / "_sub").mkdir(parents=True)
     (hidden_sub / "_sub" / "valid.adoc").write_text("valid")
-    assert _dir_has_adoc_content(hidden_sub) is False
+    assert dir_has_adoc_content(hidden_sub) is False
 
     # Dir with valid adoc file directly inside
     valid_dir = tmp_path / "valid"
     valid_dir.mkdir()
     (valid_dir / "index.adoc").write_text("= Index")
-    assert _dir_has_adoc_content(valid_dir) is True
+    assert dir_has_adoc_content(valid_dir) is True
 
     # Dir with valid adoc file nested inside
     nested_valid = tmp_path / "nested_valid"
     (nested_valid / "sub1" / "sub2").mkdir(parents=True)
     (nested_valid / "sub1" / "sub2" / "doc.adoc").write_text("= Doc")
-    assert _dir_has_adoc_content(nested_valid) is True
+    assert dir_has_adoc_content(nested_valid) is True
 
 
 def test_discover_navigation_respects_nav_order(tmp_path):
@@ -981,7 +983,7 @@ def test_discover_navigation_respects_nav_order(tmp_path):
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    nav = engine.discover_navigation()
+    nav = engine.nav_builder.discover_navigation()
     # Home first, then Beta (nav_order: 10), then Alpha (nav_order: 20) despite alphabetical 'alpha' < 'beta'
     titles = [item["title"] for item in nav]
     assert titles == ["Home", "Beta Section", "Alpha Section"]
@@ -999,7 +1001,7 @@ def test_generate_nav_html_active_states(tmp_path):
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    html = engine.generate_nav_html(current_rel_path=Path("guide.adoc"))
+    html = engine.nav_builder.generate_nav_html(current_rel_path=Path("guide.adoc"))
     assert 'class="golem-nav-item active"' in html
     assert '<a href="guide.html" aria-current="page" class="active">Guide</a>' in html
 
@@ -1015,7 +1017,7 @@ def test_cache_records_node_types(tmp_path):
     engine.build_site()
 
     p_abs = str(doc.resolve())
-    metadata = engine.cache_data.get("metadata", {}).get(p_abs, {})
+    metadata = engine.cache.data.get("metadata", {}).get(p_abs, {})
     assert "node_types" in metadata
     assert "admonition" in metadata["node_types"]
     assert "listing" in metadata["node_types"]
@@ -1050,21 +1052,21 @@ def test_theme_template_fine_grained_invalidation(tmp_path, monkeypatch):
     engine.build_site()
 
     # Initial state should be clean (0 outdated)
-    assert len(engine.get_outdated_files(commit=False)) == 0
+    assert len(engine.staleness_tracker.get_outdated_files(commit=False)) == 0
 
     # Modify listing.html
     listing_tpl.write_text("<div class='code'><pre tal:content=\"node.get('value', '')\"></pre></div>", encoding="utf-8")
 
     # Recheck outdated files
     engine_recheck = BuildEngine(config, cache_file=tmp_path / "cache.json")
-    outdated = engine_recheck.get_outdated_files(commit=False)
+    outdated = engine_recheck.staleness_tracker.get_outdated_files(commit=False)
     assert doc1.resolve() in outdated
     assert doc2.resolve() not in outdated
 
 
 def test_extract_metadata_layout_classes(tmp_path):
-    """Test _extract_metadata_from_doc extracts body_class, page_class, and content_class."""
-    from golem.engine import _extract_metadata_from_doc
+    """Test extract_metadata_from_doc extracts body_class, page_class, and content_class."""
+    from golem.metadata import extract_metadata_from_doc
 
     doc1 = tmp_path / "doc1.adoc"
     doc1.write_text(
@@ -1088,12 +1090,12 @@ Page text.
         encoding="utf-8",
     )
 
-    meta1 = _extract_metadata_from_doc(doc1)
+    meta1 = extract_metadata_from_doc(doc1)
     assert meta1["body_class"] == "custom-body-layout"
     assert meta1["page_class"] == "custom-body-layout"
     assert meta1["content_class"] == "wide-content"
 
-    meta2 = _extract_metadata_from_doc(doc2)
+    meta2 = extract_metadata_from_doc(doc2)
     assert meta2["body_class"] == "doc-article"
     assert meta2["page_class"] == "doc-article"
     assert meta2["content_class"] == "prose-narrow"
@@ -1196,7 +1198,7 @@ def calculate_area(radius: float) -> float:
 
 
 def test_engine_clean(tmp_path):
-    """Verify engine.clean() purges output directory, cache file, lockfile, and resets in-memory cache."""
+    """Verify engine.cache.clean() purges cache file, lockfile, and resets in-memory cache."""
     content_dir = tmp_path / "content"
     content_dir.mkdir()
     (content_dir / "index.adoc").write_text("= Index\nContent here.", encoding="utf-8")
@@ -1213,24 +1215,23 @@ def test_engine_clean(tmp_path):
     assert output_dir.exists()
     assert (output_dir / "index.html").exists()
     assert cache_file.exists()
-    assert len(engine.cache_data["files"]) > 0
+    assert len(engine.cache.data["files"]) > 0
 
     # Create dummy lockfile to verify its removal
     lock_file.write_text("lock", encoding="utf-8")
     assert lock_file.exists()
 
     # Call clean()
-    engine.clean()
+    engine.cache.clean()
 
     # Verify everything purged and reset
-    assert not output_dir.exists()
     assert not cache_file.exists()
     assert not lock_file.exists()
-    assert engine.cache_data == {"files": {}, "dependencies": {}, "metadata": {}}
-    assert engine._sha_cache == {}
+    assert engine.cache.data == {"files": {}, "dependencies": {}, "metadata": {}}
+    assert engine.cache._sha_cache == {}
 
     # Calling clean() again on non-existent directories/files should execute without error
-    engine.clean()
+    engine.cache.clean()
 
 
 def test_engine_get_template_files_skipping(tmp_path):
@@ -1268,7 +1269,7 @@ def test_engine_get_template_files_skipping(tmp_path):
         templates_dir=str(templates_dir),
     )
     engine = BuildEngine(config)
-    found_templates = engine._get_template_files()
+    found_templates = engine.staleness_tracker._get_template_files()
 
     found_names = {t.name for t in found_templates}
     assert "base.html" in found_names
@@ -1297,7 +1298,7 @@ def test_build_site_caches_discover_navigation_single_call(tmp_path):
     )
     engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
 
-    original_discover = engine.discover_navigation
+    original_discover = engine.nav_builder.discover_navigation
     call_count = 0
 
     def spied_discover():
@@ -1305,7 +1306,7 @@ def test_build_site_caches_discover_navigation_single_call(tmp_path):
         call_count += 1
         return original_discover()
 
-    with patch.object(engine, "discover_navigation", side_effect=spied_discover):
+    with patch.object(engine.nav_builder, "discover_navigation", side_effect=spied_discover):
         engine.build_site()
 
     # With 4 pages, undiscovered navigation would call discover_navigation at least 3*4=12 times.
@@ -1327,24 +1328,76 @@ def test_nav_methods_accept_and_use_explicit_nav_tree(tmp_path):
         {"title": "Custom Page", "path": "page.adoc", "url": "page.html", "children": []},
     ]
 
-    with patch.object(engine, "discover_navigation", side_effect=AssertionError("discover_navigation should not be called")):
+    with patch.object(
+        engine.nav_builder, "discover_navigation", side_effect=AssertionError("discover_navigation should not be called")
+    ):
         # 1. generate_nav_html
-        html = engine.generate_nav_html(current_rel_path=Path("page.adoc"), nav_tree=custom_tree)
+        html = engine.nav_builder.generate_nav_html(current_rel_path=Path("page.adoc"), nav_tree=custom_tree)
         assert "Custom Home" in html
         assert "Custom Page" in html
         assert 'class="golem-nav-item active"' in html
 
         # 2. get_ordered_nav_pages
-        ordered = engine.get_ordered_nav_pages(nav_tree=custom_tree)
+        ordered = engine.nav_builder.get_ordered_nav_pages(nav_tree=custom_tree)
         assert len(ordered) == 2
         assert ordered[0]["title"] == "Custom Home"
         assert ordered[1]["title"] == "Custom Page"
 
         # 3. get_page_pagination
-        prev_p, next_p = engine.get_page_pagination(current_rel_path=Path("page.adoc"), nav_tree=custom_tree)
+        prev_p, next_p = engine.nav_builder.get_page_pagination(current_rel_path=Path("page.adoc"), nav_tree=custom_tree)
         assert prev_p is not None
         assert prev_p["title"] == "Custom Home"
         assert next_p is None
+
+
+def test_navigation_builder_direct_unit_tests(tmp_path):
+    """Directly verify NavigationBuilder methods with mock callbacks."""
+    from golem.navigation import NavigationBuilder
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Home\n", encoding="utf-8")
+    (content_dir / "guide.adoc").write_text("= Guide\n", encoding="utf-8")
+    (content_dir / "_partial.adoc").write_text("= Partial\n", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    builder = NavigationBuilder(
+        config=config,
+        content_dir=content_dir,
+        is_partial_fn=lambda p: p.name.startswith("_"),
+        get_metadata_fn=lambda p: {
+            "title": p.stem.capitalize(),
+            "nav_title": p.stem.capitalize(),
+            "nav_order": 1 if p.stem == "index" else 2,
+        },
+    )
+
+    # discover_navigation
+    nav_tree = builder.discover_navigation()
+    assert len(nav_tree) == 2
+    assert nav_tree[0]["title"] == "Index"
+    assert nav_tree[1]["title"] == "Guide"
+
+    # generate_nav_html
+    html = builder.generate_nav_html(current_rel_path=Path("guide.adoc"))
+    assert '<nav class="golem-nav">' in html
+    assert 'class="golem-nav-item active"' in html
+
+    # get_ordered_nav_pages
+    pages = builder.get_ordered_nav_pages()
+    assert len(pages) == 2
+    assert pages[0]["title"] == "Index"
+    assert pages[1]["title"] == "Guide"
+
+    # get_page_pagination
+    prev_p, next_p = builder.get_page_pagination(current_rel_path=Path("guide.adoc"))
+    assert prev_p is not None
+    assert prev_p["title"] == "Index"
+    assert next_p is None
+
+    # Empty path handling
+    assert builder.get_page_pagination(None) == (None, None)
+    assert builder.generate_nav_html(nav_tree=[]) == ""
 
 
 def test_get_cached_nav_tree_resets_per_build(tmp_path):
@@ -1411,8 +1464,9 @@ def test_sync_static_assets_copies_content_dir_media(tmp_path):
         content_dir=str(content_dir),
         output_dir=str(output_dir),
     )
-    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
-    engine.sync_static_assets()
+    from golem.assets import sync_static_assets
+
+    sync_static_assets(config, content_dir, output_dir)
 
     assert (output_dir / "images" / "diagram.png").exists()
     assert (output_dir / "images" / "diagram.png").read_bytes() == b"\x89PNG\r\n\x1a\nfake"
@@ -1438,9 +1492,177 @@ def test_package_template_modification_invalidates_cache(tmp_path):
     engine.build_site()
 
     # When no files changed, outdated should be empty
-    assert len(engine.get_outdated_files()) == 0
+    assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Simulate modifying a package template hash in cache
-    engine.cache_data["meta"]["theme_templates"]["skeleton.pt"] = "old_stale_hash"
-    outdated = engine.get_outdated_files(commit=False)
+    engine.cache.data["meta"]["theme_templates"]["skeleton.pt"] = "old_stale_hash"
+    outdated = engine.staleness_tracker.get_outdated_files(commit=False)
     assert doc_path.resolve() in outdated
+
+
+def test_metadata_title_from_filename():
+    from golem.metadata import title_from_filename
+
+    assert title_from_filename("01-getting-started.adoc") == "Getting Started"
+    assert title_from_filename("10_api_reference.adoc") == "Api Reference"
+    assert title_from_filename("02.deep-dive.adoc") == "Deep Dive"
+    assert title_from_filename("simple.adoc") == "Simple"
+    assert title_from_filename("my-cool-feature") == "My Cool Feature"
+    assert title_from_filename("99") == "99"
+
+
+def test_metadata_clean_index_url():
+    from golem.metadata import clean_index_url
+
+    assert clean_index_url("index.html") == "./"
+    assert clean_index_url("docs/guide/index.html") == "docs/guide/"
+    assert clean_index_url("docs/guide/about.html") == "docs/guide/about.html"
+    assert clean_index_url("index.adoc") == "index.adoc"
+
+
+def test_metadata_extract_metadata_and_title(tmp_path):
+    from golem.metadata import extract_metadata_from_doc, extract_title_from_doc
+
+    # Normal doc with full header
+    doc = tmp_path / "01-sample.adoc"
+    doc.write_text(
+        """= Sample Title
+:nav_title: Navigation Title
+:nav_order: 5
+:toc:
+:page_class: page-style
+:body_class: body-style
+:content_class: content-style
+
+== First Section
+Some content.
+""",
+        encoding="utf-8",
+    )
+
+    meta = extract_metadata_from_doc(doc)
+    assert meta["title"] == "Sample Title"
+    assert meta["nav_title"] == "Navigation Title"
+    assert meta["nav_order"] == 5
+    assert meta["has_toc"] is True
+    assert meta["page_class"] == "page-style"
+    assert meta["body_class"] == "body-style"
+    assert meta["content_class"] == "content-style"
+    assert extract_title_from_doc(doc) == "Sample Title"
+
+    # Doc with disabled TOC and title fallback
+    doc_no_header = tmp_path / "02-no-header.adoc"
+    doc_no_header.write_text(
+        """:!toc:
+:nav-order: not-an-int
+
+== Section One
+Body text.
+""",
+        encoding="utf-8",
+    )
+    meta2 = extract_metadata_from_doc(doc_no_header)
+    assert meta2["title"] == "No Header"
+    assert meta2["nav_title"] == "No Header"
+    assert meta2["nav_order"] is None
+    assert meta2["has_toc"] is False
+    assert extract_title_from_doc(doc_no_header) == "No Header"
+
+    # Doc that does not exist
+    nonexistent = tmp_path / "does_not_exist.adoc"
+    meta_none = extract_metadata_from_doc(nonexistent)
+    assert meta_none["title"] == "Does Not Exist"
+    assert meta_none["has_toc"] is False
+
+
+def test_build_cache_direct_operations(tmp_path):
+    """Verify BuildCache class direct initialization, saving, loading, hashing, and clean operations."""
+    from golem.cache import BuildCache
+
+    cache_file = tmp_path / ".golem" / "cache.json"
+    cache = BuildCache(cache_file)
+
+    assert cache.data == {"files": {}, "dependencies": {}, "metadata": {}}
+    assert cache._sha_cache == {}
+
+    # File hashing
+    sample_file = tmp_path / "test.adoc"
+    sample_file.write_text("= Test Document\n", encoding="utf-8")
+    h1 = cache.get_sha256(sample_file)
+    assert len(h1) == 64
+    assert str(sample_file.resolve()) in cache._sha_cache
+
+    # Save cache
+    cache.data["files"][str(sample_file.resolve())] = h1
+    cache.data["dependencies"][str(sample_file.resolve())] = []
+    cache.data["metadata"][str(sample_file.resolve())] = {"title": "Test Document"}
+    cache.save_cache()
+
+    assert cache_file.exists()
+
+    # Load into new cache instance
+    cache2 = BuildCache(cache_file)
+    assert cache2.data["files"][str(sample_file.resolve())] == h1
+    assert str(sample_file.resolve()) in cache2._sha_cache
+
+    # Clean cache
+    cache2.clean()
+    assert not cache_file.exists()
+    assert cache2.data == {"files": {}, "dependencies": {}, "metadata": {}}
+    assert cache2._sha_cache == {}
+
+
+def test_sync_static_assets_all_layers(tmp_path, monkeypatch):
+    """Verify sync_static_assets layered precedence and templates_dir static copying."""
+    monkeypatch.chdir(tmp_path)
+    from golem.assets import sync_static_assets
+
+    # Layer 1: Workspace theme static
+    theme_dir = tmp_path / "themes" / "modern" / "static"
+    (theme_dir / "css").mkdir(parents=True)
+    (theme_dir / "css" / "base.css").write_text("/* theme base */", encoding="utf-8")
+    (theme_dir / "css" / "theme.css").write_text("/* theme custom */", encoding="utf-8")
+
+    # Layer 2: Custom templates_dir static
+    custom_tpl = tmp_path / "custom_tpl"
+    tpl_static = custom_tpl / "static"
+    (tpl_static / "css").mkdir(parents=True)
+    (tpl_static / "css" / "theme.css").write_text("/* tpl custom overrides theme */", encoding="utf-8")
+    (tpl_static / "tpl_asset.js").write_text("// tpl js", encoding="utf-8")
+
+    # Layer 3: User static_dir
+    user_static = tmp_path / "my_static"
+    (user_static / "css").mkdir(parents=True)
+    (user_static / "css" / "theme.css").write_text("/* user static overrides tpl */", encoding="utf-8")
+    (user_static / "user.txt").write_text("user content", encoding="utf-8")
+
+    # Content dir with media and non-adoc files
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Index", encoding="utf-8")
+    (content_dir / ".hidden.png").write_bytes(b"hidden")
+    (content_dir / "img" / "photo.jpg").parent.mkdir(parents=True)
+    (content_dir / "img" / "photo.jpg").write_bytes(b"jpeg-data")
+
+    output_dir = tmp_path / "dist"
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(output_dir),
+        theme="modern",
+        templates_dir=str(custom_tpl),
+        static_dir=str(user_static),
+    )
+
+    sync_static_assets(config, content_dir, output_dir)
+
+    out_static = output_dir / "static"
+    assert (out_static / "css" / "base.css").read_text(encoding="utf-8") == "/* theme base */"
+    assert (out_static / "css" / "theme.css").read_text(encoding="utf-8") == "/* user static overrides tpl */"
+    assert (out_static / "tpl_asset.js").read_text(encoding="utf-8") == "// tpl js"
+    assert (out_static / "user.txt").read_text(encoding="utf-8") == "user content"
+
+    # Content media assets preserved
+    assert (output_dir / "img" / "photo.jpg").read_bytes() == b"jpeg-data"
+    assert not (output_dir / ".hidden.png").exists()
+    assert not (output_dir / "index.adoc").exists()

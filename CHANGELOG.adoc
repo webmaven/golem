@@ -10,10 +10,16 @@ and this project adheres to https://semver.org/spec/v2.0.0.html[Semantic Version
 
 toc::[]
 
-== Unreleased
+== 0.1.0a3 - 2026-09-01
 
 === Added
 
+* *ASG-Level API Doc Macro Splicing (Issue #10):*
+** New `on_asg_created` plugin hook implementation in `golem.plugins.apidoc` that splices `golem:apidoc[...]` block macros directly into the document Abstract Semantic Graph after full semantic resolution.
+** New `AsciiDocApi.get_asg_nodes(symbol, depth, heading_level_offset)` method in `golem.plugins.apidoc.core` that renders a Python symbol to AsciiDoc markup and returns structured ASG block dictionaries ready for tree splicing.
+** `heading_level_offset` macro parameter: allows embedded API documentation headings to be adjusted relative to the surrounding document section depth.
+** Unresolvable macro targets now produce a visible `[WARNING]` admonition block in rendered output instead of silently disappearing.
+** Escaped macros (`\golem:apidoc[...]`) are correctly unescaped to literal text without triggering expansion.
 * *AsciiDoc Multi-View Derived Rendering Engine:*
 ** Interactive tabbed code containers generated at build time via `render`, `views`, `display`, or `formats` attributes on `[source,asciidoc]` blocks.
 ** Supports four canonical compilation channels: `source` (raw AsciiDoc), `asg` (parsed ASG JSON), `html` (rendered HTML5 markup), and `preview` (live rendered component).
@@ -33,19 +39,23 @@ toc::[]
 
 === Changed
 
+* *`on_pre_parse` Macro Expansion Deprecated:* The `on_pre_parse` hook in `golem.plugins.apidoc` is now a deprecated fallback for `golem:apidoc[...]` macro expansion. It emits a `logger.warning` when invoked and will be removed in a future release. The `on_asg_created` hook is the preferred expansion path.
+* *Table Column Alignment Propagation:* `golem.renderer` now propagates column-level `halign`/`valign` specifications from `cols=` declarations (e.g. `cols="<,^,>"`) down to individual cell nodes in the ASG. Cell-level alignment always takes precedence over column-spec defaults.
+* *Dot-Ordered List Normalization:* `golem.renderer` now detects and repairs a parser quirk in `asciidoctrine` ≥ 0.2.0a5 where the first item of a dot-ordered list (`. First item`) is promoted to the list's `title` attribute. Affected lists are normalized in-place before rendering; consecutive fractured list blocks are merged.
+* *Default Theme Table Styling:* The `default/skeleton.pt` template now ships full AsciiDoc table semantics: `halign-left/center/right/justify`, `valign-top/middle/bottom`, `stripes-even/odd/hover`, `frame-all/sides/topbot/none`, and `grid-all/cols/rows/none` CSS classes; styled `caption.title`; and `colgroup col` proportional-width support.
 * *Default Theme Palette & Radii Refinements:*
 ** Lightened default light mode background to clean warm paper (`#faf9f5`).
 ** Refined inline code corner radius to `2px` for crisper inline badges, and increased action button corner radius to `5px` to clearly differentiate clickable UI controls.
 ** Styled dev server diagnostic error overlay with dark theme and aligned source code error carets.
 * *Plugin Execution Gating:* Refactored `get_plugin_manager()` to a two-pass discovery-registration architecture where `config.plugins` is the sole authority for activation and execution order.
-* *Dependency Upgrades:* Bumped `asciidoctrine` to `>=0.2.0a4`, `asciidoctype` to `>=0.1.0a4`, and added `pygments>=2.18`.
+* *Dependency Upgrades:* Updated `asciidoctest` import surface to 0.2.0a4 top-level exports (`AsciiDocTestFailure`, `extract_and_run_docstring_tests` now importable from `asciidoctest` directly). Bumped `asciidoctrine` to `>=0.2.0a5`, `asciidoctype` to `>=0.1.0a4`, and added `pygments>=2.18`.
 * *AsciiDoc Docstrings:* Standardized docstrings across all internal modules to AsciiDoc format using `asciidocstring` conventions.
 * *CSS Visual Hierarchy:* Enhanced default theme typography, admonition pill labels, code listing language badges, table breakouts, and per-page layout classes.
 
 === Fixed
 
 * *Syntax Highlighting Callout Preservation:* Overrode `GolemRenderer.highlight_code()` to preserve AsciiDoc `<i class="conum">` callouts through Pygments and re-inject badges into highlighted lines; removed duplicate CSS counter badges on `ol.colist > li`.
-* *ApiDoc Plugin Macro Protection:* Protected delimited verbatim blocks, inline code backticks, and backslash-escaped macros (`\golem:apidoc[...]`) from unintended macro expansion in `golem.plugins.apidoc`.
+* *ApiDoc Plugin Macro Protection:* Protected delimited verbatim blocks, inline code backticks, and backslash-escaped macros (`\golem:apidoc[...]`) from unintended macro expansion in both `on_asg_created` and `on_pre_parse` paths.
 * *Listing Focus Outline Scoping:* Limited `.listingblock` focus outline highlight strictly to code content and pane interactions via `:has(.listing-content:focus-within, .listing-panes:focus-within)`.
 * *Snippet Compilation Hardening:* Hardened isolated multi-view snippet compilation against infinite recursion, attribute injection, and template leakages, with sanitized listing role identifiers.
 * *Python Exception Handling:* Corrected five occurrences of deprecated Python 2 `except A, B:` syntax to Python 3 `except (A, B):`.
@@ -56,6 +66,7 @@ toc::[]
 * *CLI Scaffolding & Metadata:* Dynamically resolved `--version` from package metadata and author name from `git config` in `golem init`.
 * *Repository Cleanliness:* Removed internal review artifacts from tracking and added pattern ignores to `.gitignore`.
 * *Dev Server Disconnects:* Downgraded client socket disconnect exceptions to debug-level logging.
+* *Pygments HTML-Escaped Quotes in Derived Views:* Assertions in derived-view rendering now accept both raw (`"`) and HTML-escaped (`&quot;`) forms of JSON output, fixing failures when Pygments is active.
 
 == 0.1.0a2 - 2026-08-24
 

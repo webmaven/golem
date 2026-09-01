@@ -331,3 +331,97 @@ def numpy_style(y: float) -> float:
 
     n_rendered = api.render_symbol("doc_pkg.numpy_style")
     assert "NumPy style function." in n_rendered
+
+
+def test_get_asg_nodes_returns_list(tmp_path):
+    from golem.plugins.apidoc.core import AsciiDocApi
+
+    pkg_dir = tmp_path / "asg_func_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Math utilities."""
+def add(a: int, b: int) -> int:
+    """Add two integers.
+
+    Args:
+        a: First operand.
+        b: Second operand.
+
+    Returns:
+        Sum of a and b.
+    """
+    return a + b
+''',
+        encoding="utf-8",
+    )
+
+    api = AsciiDocApi(search_paths=[str(tmp_path)])
+    nodes = api.get_asg_nodes("asg_func_pkg.add")
+
+    assert isinstance(nodes, list)
+    assert len(nodes) >= 1
+    assert any(isinstance(n, dict) and n.get("name") in ("section", "paragraph", "listing") for n in nodes)
+
+
+def test_get_asg_nodes_structure(tmp_path):
+    from golem.plugins.apidoc.core import AsciiDocApi
+
+    pkg_dir = tmp_path / "asg_cls_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Class package."""
+class Service:
+    """A background worker service."""
+    port: int = 8080
+    """Port number."""
+
+    def start(self) -> bool:
+        """Start the worker."""
+        return True
+''',
+        encoding="utf-8",
+    )
+
+    api = AsciiDocApi(search_paths=[str(tmp_path)])
+    all_nodes = api.get_asg_nodes("asg_cls_pkg.Service", depth="all")
+    assert isinstance(all_nodes, list)
+    assert len(all_nodes) >= 1
+    for node in all_nodes:
+        assert isinstance(node, dict)
+        assert "name" in node
+        assert "type" in node
+
+
+def test_get_asg_nodes_missing_symbol_raises(tmp_path):
+    import pytest
+    from golem.plugins.apidoc.core import AsciiDocApi
+
+    api = AsciiDocApi(search_paths=[str(tmp_path)])
+    with pytest.raises(Exception):
+        api.get_asg_nodes("nonexistent_pkg_xyz.missing_symbol")
+
+
+def test_get_asg_nodes_heading_level_offset(tmp_path):
+    from golem.plugins.apidoc.core import AsciiDocApi
+
+    pkg_dir = tmp_path / "asg_offset_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Offset test package."""
+def compute() -> None:
+    """Compute something."""
+    pass
+''',
+        encoding="utf-8",
+    )
+
+    api = AsciiDocApi(search_paths=[str(tmp_path)])
+    base_nodes = api.get_asg_nodes("asg_offset_pkg.compute", heading_level_offset=0)
+    offset_nodes = api.get_asg_nodes("asg_offset_pkg.compute", heading_level_offset=1)
+
+    assert isinstance(base_nodes, list)
+    assert isinstance(offset_nodes, list)
+    base_section = next((n for n in base_nodes if n.get("name") == "section"), None)
+    offset_section = next((n for n in offset_nodes if n.get("name") == "section"), None)
+    if base_section and offset_section:
+        assert offset_section.get("level", 0) == base_section.get("level", 0) + 1

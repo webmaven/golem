@@ -157,7 +157,65 @@ Golem's multi-view tab system is engineered with progressive enhancement and acc
 == Other AsciiDoc Constructs
 
 === 3. Structured Tables
-Tables support explicit column widths, header alignment, and embedded formatting:
+
+Tables support explicit column widths, header alignment, cell-level alignment, and embedded formatting.
+
+==== Column Widths & Alignment
+
+Use the `cols=` attribute to define column proportions and alignment per column:
+
+.Alignment Specifiers
+[cols="1,1,3"]
+|===
+| Specifier | Meaning | CSS class applied
+
+| `<` | Left-align  | `halign-left`
+| `^` | Center-align | `halign-center`
+| `>` | Right-align  | `halign-right`
+| (none) | Default (left) | —
+|===
+
+.Column Alignment Example
+[source,asciidoc,render="source,preview"]
+----
+[cols="<,^,>"]
+|===
+| Left | Center | Right
+
+| a | b | c
+| d | e | f
+|===
+----
+
+Proportional widths can be combined with alignment:
+
+[source,asciidoc]
+----
+[cols="2<,1^,1>"]
+|===
+| Wide Left | Narrow Center | Narrow Right
+|===
+----
+
+Golem propagates column-level `halign`/`valign` values down to each cell automatically. Cell-level attributes always take precedence over column-spec defaults.
+
+==== Table Striping, Frame & Grid
+
+Control the visual style of table borders and row striping with standard AsciiDoc table attributes:
+
+[source,asciidoc]
+----
+[cols="1,2", stripes="even", frame="all", grid="rows"]
+|===
+| Name | Value
+| alpha | 1
+| beta  | 2
+|===
+----
+
+Supported `stripes` values: `even`, `odd`, `hover`, `none` (default). +
+Supported `frame` values: `all`, `sides`, `topbot`, `none`. +
+Supported `grid` values: `all`, `cols`, `rows`, `none`.
 
 .CLI Commands Summary
 [source,asciidoc,render="source,preview"]
@@ -170,6 +228,23 @@ Tables support explicit column widths, header alignment, and embedded formatting
 | `golem build` | Compile static site to `dist/` | N/A
 |===
 ----
+
+
+=== 3a. Dot-Ordered Lists
+
+Dot-ordered (numbered) lists use a leading period (`.`) as the marker:
+
+[source,asciidoc,render="source,preview"]
+----
+. First item
+. Second item
+. Third item
+----
+
+[NOTE]
+====
+A parser quirk in `asciidoctrine` ≥ 0.2.0a5 can cause the first item of a dot-ordered list to be mistakenly treated as the list's title, making it disappear from rendered output. Golem automatically detects and repairs this during the ASG post-processing pass — authors do not need to work around it.
+====
 
 === 4. Mathematical Expressions (STEM)
 Inline formulas and block equations:

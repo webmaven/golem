@@ -257,6 +257,8 @@ def render_body(
 
     _ensure_section_ids(node_dict)
     _reattach_block_titles(node_dict)
+    _normalize_dot_list_items(node_dict)
+    _propagate_table_alignments(node_dict)
     active_highlighter = highlighter if highlighter is not None else make_highlighter()
     active_search_paths: list[Path] = []
     if search_paths:
@@ -316,9 +318,8 @@ def _is_block_title_paragraph(block: dict[str, Any]) -> bool:
     Detects the asciidoctrine parser limitation where a block title line
     (``.Title``) following another block is parsed as a standalone paragraph
     instead of being attached as the ``title`` attribute of the following block.
-    A paragraph qualifies as an orphaned block title when it has exactly one
-    text-type inline whose value begins with a single ``.`` followed by
-    non-whitespace content.
+    A paragraph qualifies as an orphaned block title when it has inlines whose
+    first inline begins with a single ``.`` followed by non-whitespace content.
 
     [parameters]
     `block` (dict[str, Any]):: ASG node dictionary to inspect.
@@ -329,27 +330,21 @@ def _is_block_title_paragraph(block: dict[str, Any]) -> bool:
     if not isinstance(block, dict) or block.get("name") != "paragraph":
         return False
     inlines = block.get("inlines", [])
-    if len(inlines) != 1:
+    if not inlines or not isinstance(inlines, list):
         return False
-    inline = inlines[0]
-    if not isinstance(inline, dict):
+    first = inlines[0]
+    if not isinstance(first, dict):
         return False
-    value = inline.get("value", "")
+    value = first.get("value", "")
     return isinstance(value, str) and value.startswith(".") and len(value) > 1 and not value[1:2].isspace()
 
 
 def _reattach_block_titles(node: Any) -> None:
     """Post-process an ASG dictionary to reattach orphaned block-title paragraphs.
 
-    Fixes an ``asciidoctrine`` parser limitation where block titles (``.Title``
-    syntax) appearing after other blocks are parsed as standalone paragraphs
-    instead of being attached as the ``title`` attribute of the following block.
-    This pass traverses all block lists recursively and, for each consecutive
-    pair where the first block is an orphaned block-title paragraph (detected
-    via `_is_block_title_paragraph`) and the second block has no title, strips
-    the leading ``.`` from the first inline's value, promotes the remaining
-    inlines as the ``title`` of the second block, and removes the orphaned
-    paragraph from the block list.
+    Accounts for AsciiDoctrine 0.2.0a5 upstream block title attachment logic
+    while retaining fallback reattachment for any orphaned block-title paragraphs
+    left by parser edge cases.
 
     NOTE: Modifies the ASG dictionary in-place.
 
@@ -377,7 +372,11 @@ def _reattach_block_titles(node: Any) -> None:
                         raw = first.get("value", "")
                         if raw.startswith("."):
                             first["value"] = raw[1:]
-                        next_block["title"] = [first] + [dict(il) for il in inlines[1:]]
+                        rem = [dict(il) if isinstance(il, dict) else il for il in inlines[1:]]
+                        if first.get("value") == "" and first.get("name") == "text":
+                            next_block["title"] = rem
+                        else:
+                            next_block["title"] = [first] + rem
                         to_remove.add(i)
 
         if to_remove:
@@ -385,6 +384,193 @@ def _reattach_block_titles(node: Any) -> None:
 
         for block in node[key]:
             _reattach_block_titles(block)
+
+
+def _is_dot_list_title(title: Any) -> bool:
+    """Return True if a title attribute was parsed from a dot list item.
+
+    AsciiDoctrine 0.2.0a5 elevated block_title grammar priority, causing
+    dot-ordered list items (e.g. '. First item') to be parsed as the list's
+    title with a leading whitespace character instead of a list item.
+    """
+    if not title:
+        return False
+    if isinstance(title, str):
+        return title.startswith(" ") or title.startswith("\t")
+    if isinstance(title, list) and len(title) > 0:
+        first = title[0]
+        if isinstance(first, dict):
+            val = first.get("value", "")
+            return isinstance(val, str) and (val.startswith(" ") or val.startswith("\t"))
+        if hasattr(first, "value"):
+            val = getattr(first, "value", "")
+            return isinstance(val, str) and (val.startswith(" ") or val.startswith("\t"))
+    return False
+
+
+def _title_to_list_item(title: Any, marker: str = ".") -> dict[str, Any]:
+    """Convert a dot-list title attribute into a structured listItem block node."""
+    if isinstance(title, str):
+        inlines = [{"name": "text", "type": "string", "value": title.lstrip()}]
+    elif isinstance(title, list):
+        inlines = []
+        stripped_leading_space = False
+        for inl in title:
+            if isinstance(inl, dict):
+                inl_copy = dict(inl)
+                if not stripped_leading_space:
+                    val = inl_copy.get("value")
+                    if isinstance(val, str) and (val.startswith(" ") or val.startswith("\t")):
+                        new_val = val[1:]
+                        inl_copy["value"] = new_val
+                        stripped_leading_space = True
+                        if new_val == "" and inl_copy.get("name") == "text":
+                            continue
+                inlines.append(inl_copy)
+            elif hasattr(inl, "to_dict"):
+                inl_dict = inl.to_dict()
+                if not stripped_leading_space:
+                    val = inl_dict.get("value")
+                    if isinstance(val, str) and (val.startswith(" ") or val.startswith("\t")):
+                        new_val = val[1:]
+                        inl_dict["value"] = new_val
+                        stripped_leading_space = True
+                        if new_val == "" and inl_dict.get("name") == "text":
+                            continue
+                inlines.append(inl_dict)
+            else:
+                inlines.append(inl)
+    else:
+        inlines = [{"name": "text", "type": "string", "value": str(title).lstrip()}]
+
+    return {
+        "name": "listItem",
+        "type": "block",
+        "marker": marker,
+        "principal": inlines,
+        "blocks": [],
+    }
+
+
+def _normalize_dot_list_items(node: Any) -> None:
+    """Normalize dot-ordered lists where initial items were misparsed as block titles.
+
+    Under AsciiDoctrine 0.2.0a5, dot-ordered lists without explicit titles
+    (e.g., '. First item\n. Second item') have their first item parsed as a
+    `title` on the `list` node. This function:
+    1. Detects `title` attributes that originated from dot list items (indicated
+       by leading whitespace).
+    2. Converts such titles into initial `listItem` blocks prepended to `items`.
+    3. Merges consecutive dot-ordered list blocks that were fractured by the parser.
+
+    NOTE: Modifies the ASG dictionary in-place.
+    """
+    if not isinstance(node, dict):
+        return
+
+    # If the root node itself is a list with a dot-list title, normalize it
+    if node.get("name") == "list":
+        marker = node.get("marker", "")
+        if (marker == "." or node.get("variant") == "ordered") and _is_dot_list_title(node.get("title")):
+            new_item = _title_to_list_item(node.get("title"), marker=marker if marker else ".")
+            node.setdefault("items", []).insert(0, new_item)
+            node["title"] = None
+
+    for key in ("blocks", "children"):
+        blocks = node.get(key)
+        if not isinstance(blocks, list) or not blocks:
+            continue
+
+        for block in blocks:
+            if isinstance(block, dict) and block.get("name") == "list":
+                marker = block.get("marker", "")
+                if (marker == "." or block.get("variant") == "ordered") and _is_dot_list_title(block.get("title")):
+                    new_item = _title_to_list_item(block.get("title"), marker=marker if marker else ".")
+                    block.setdefault("items", []).insert(0, new_item)
+                    block["title"] = None
+
+        merged: list[Any] = []
+        for block in blocks:
+            if (
+                merged
+                and isinstance(merged[-1], dict)
+                and isinstance(block, dict)
+                and merged[-1].get("name") == "list"
+                and block.get("name") == "list"
+                and merged[-1].get("variant") == "ordered"
+                and block.get("variant") == "ordered"
+                and merged[-1].get("marker") == "."
+                and block.get("marker") == "."
+                and merged[-1].get("title") is None
+                and block.get("title") is None
+            ):
+                merged[-1].setdefault("items", []).extend(block.get("items", []))
+            else:
+                merged.append(block)
+
+        node[key] = merged
+
+        for block in node[key]:
+            _normalize_dot_list_items(block)
+
+    for item in node.get("items", []) if isinstance(node.get("items"), list) else []:
+        _normalize_dot_list_items(item)
+
+
+def _propagate_table_alignments(node: Any) -> None:
+    """Propagate table column-level alignments and widths to child cells.
+
+    Traverses an ASG dictionary tree. When encountering a `table` block with a `columns`
+    specification list (e.g. from `cols="<,^,>"` or `cols="1,2,1"`), ensures each child
+    `cell` inherits the corresponding column's `halign` and `valign` values if they are not
+    already explicitly defined at the cell level.
+
+    NOTE: Modifies the ASG dictionary in-place.
+
+    [parameters]
+    `node` (Any):: ASG root dictionary or any sub-node to recursively process.
+    """
+    if not node:
+        return
+    if isinstance(node, list):
+        for item in node:
+            _propagate_table_alignments(item)
+        return
+    if not isinstance(node, dict):
+        return
+
+    if node.get("name") == "table":
+        columns = node.get("columns")
+        if isinstance(columns, list) and columns:
+            for row_key in ("rows", "header_rows", "body_rows", "footer_rows"):
+                rows = node.get(row_key)
+                if isinstance(rows, list):
+                    for row in rows:
+                        if not isinstance(row, dict):
+                            continue
+                        cells = row.get("cells")
+                        if not isinstance(cells, list):
+                            continue
+                        col_idx = 0
+                        for cell in cells:
+                            if not isinstance(cell, dict):
+                                col_idx += 1
+                                continue
+                            colspan = cell.get("colspan", 1) or 1
+                            if 0 <= col_idx < len(columns):
+                                col_spec = columns[col_idx]
+                                if isinstance(col_spec, dict):
+                                    if not cell.get("halign") and col_spec.get("halign"):
+                                        cell["halign"] = col_spec["halign"]
+                                    if not cell.get("valign") and col_spec.get("valign"):
+                                        cell["valign"] = col_spec["valign"]
+                            col_idx += colspan
+
+    for key in ("blocks", "children", "items", "rows", "header_rows", "body_rows", "footer_rows", "cells"):
+        val = node.get(key)
+        if isinstance(val, list):
+            for child in val:
+                _propagate_table_alignments(child)
 
 
 def _ensure_section_ids(node: Any) -> None:
