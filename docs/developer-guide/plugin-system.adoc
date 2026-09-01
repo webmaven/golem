@@ -31,8 +31,13 @@ class MyPlugin:
         return ast
 
     @hookimpl
-    def on_asg_created(self, asg: dict[str, Any]) -> dict[str, Any]:
-        """Called after semantic ASG resolution into a structured dictionary."""
+    def on_asg_created(self, asg: dict[str, Any], doc_path: Path | None = None) -> dict[str, Any]:
+        """Called after semantic ASG resolution. Return a modified copy or the same dict.
+
+        `doc_path` is the source file path of the document being compiled, or None
+        for in-memory snippets. This hook is the preferred site for block-level
+        ASG transformations such as macro splicing.
+        """
         return asg
 
     @hookimpl
@@ -60,6 +65,12 @@ class MyPlugin:
         """
         return []
 ----
+
+[NOTE]
+====
+*`on_pre_parse` for macro expansion is deprecated.* The `golem.plugins.apidoc` plugin previously expanded `golem:apidoc[...]` macros in the `on_pre_parse` hook (text substitution before parsing). As of 0.1.0a3, `on_asg_created` is the correct hook for block-level macro splicing — it operates on the fully resolved ASG and preserves document structure. `on_pre_parse` still fires as a fallback but emits a deprecation warning.
+====
+
 
 == Registering Plugins via Entry Points
 

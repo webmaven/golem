@@ -14,26 +14,40 @@ Golem operates as a deterministic, compiler-grade document processing pipeline b
 ----
  Source .adoc File
        │
+       ▼ [on_pre_parse hook] ← Plugin text pre-processing (deprecated for macro use)
+       │
        ▼ [1. Parse] (asciidoctrine.parse_to_ast / Lark)
  Concrete Syntax Tree (AST)
+       │
+       ▼ [on_ast_created hook] ← Plugin AST transforms
        │
        ▼ [2. Resolve] (asciidoctrine.resolve_to_asg / Semantic Analysis)
  Abstract Semantic Graph (ASG Node Dictionary)
        │
+       ▼ [on_asg_created hook] ← Plugin ASG transforms & macro splicing ★
+       │
        ▼ [3. Render] (asciidoctype.AsciiDoctypeRenderer / Chameleon ZPT)
  HTML5 Fragment (body_html)
+       │
+       ▼ [on_post_render hook] ← Plugin HTML post-processing
        │
        ▼ [4. Layout Template] (skeleton.pt / TAL Slot Insertion)
  Full Static HTML5 Document (dist/*.html)
 ----
 
+★ `on_asg_created` is the preferred hook for block-level structural transforms such as `golem:apidoc[]` macro splicing. It receives the fully resolved ASG after all cross-references and include directives are settled.
+
 == Pipeline Stages
 
-1. *Lark AST Parsing:* `asciidoctrine` parses raw text into a lossless concrete syntax tree.
-2. *Semantic ASG Resolution:* Resolves document attributes, include directives, callout numbering, cross-references, and footnote indexing into a clean Abstract Semantic Graph (ASG).
-3. *Node Rendering:* `asciidoctype` renders each ASG block using dedicated Chameleon TAL templates.
-4. *Layout Integration:* Golem injects `page_title`, `site_title`, `body_html`, `nav_tree`, `nav_html`, `toc_html`, `custom_css`, and `custom_js` into the theme's `skeleton.pt`.
-5. *Fine-Grained Cache Invalidation:* During build planning, Golem triggers the `golem_mark_stale` hook, allowing themes and plugins to selectively invalidate cache for specific templates or document nodes based on metadata.
+1. *`on_pre_parse`:* Plugins may mutate raw AsciiDoc text before parsing. _Deprecated for macro expansion — use `on_asg_created` instead._
+2. *Lark AST Parsing:* `asciidoctrine` parses raw text into a lossless concrete syntax tree.
+3. *`on_ast_created`:* Plugins may inspect or transform the raw AST before semantic resolution.
+4. *Semantic ASG Resolution:* Resolves document attributes, include directives, callout numbering, cross-references, and footnote indexing into a clean Abstract Semantic Graph (ASG).
+5. *`on_asg_created`:* Plugins may splice, reorder, or augment ASG block nodes — the primary macro expansion site.
+6. *Node Rendering:* `asciidoctype` renders each ASG block using dedicated Chameleon TAL templates.
+7. *`on_post_render`:* Plugins may post-process the final HTML fragment before layout injection.
+8. *Layout Integration:* Golem injects `page_title`, `site_title`, `body_html`, `nav_tree`, `nav_html`, `toc_html`, `custom_css`, and `custom_js` into the theme's `skeleton.pt`.
+9. *Fine-Grained Cache Invalidation:* During build planning, Golem triggers the `golem_mark_stale` hook, allowing themes and plugins to selectively invalidate cache for specific templates or document nodes based on metadata.
 
 == Core Dependencies
 
