@@ -4,14 +4,21 @@ import logging
 from pathlib import Path
 import re
 import sys
-from typing import Sequence
+from typing import Any, Sequence
 
 import click
 
 from golem.plugins import hookimpl
 from .core import ApiGenOptions, AsciiDocApi
 
-__all__ = ["AsciiDocApi", "ApiGenOptions", "on_pre_parse", "golem_add_subcommands", "generate_api_docs"]
+__all__ = [
+    "AsciiDocApi",
+    "ApiGenOptions",
+    "on_asg_created",
+    "on_pre_parse",
+    "golem_add_subcommands",
+    "generate_api_docs",
+]
 
 logger = logging.getLogger("golem.plugins.apidoc")
 
@@ -79,11 +86,220 @@ def _parse_macro_args(args_str: str) -> dict[str, str]:
     return kwargs
 
 
+def _extract_plain_text(inlines: Any) -> str:
+    """Extract plain string content from nested inlines or dictionaries."""
+    if not inlines:
+        return ""
+    if isinstance(inlines, str):
+        return inlines
+    if isinstance(inlines, list):
+        return "".join(_extract_plain_text(item) for item in inlines)
+    if isinstance(inlines, dict):
+        if inlines.get("name") == "text":
+            return str(inlines.get("value", ""))
+        if "value" in inlines and isinstance(inlines["value"], (str, int, float)):
+            return str(inlines["value"])
+        if "inlines" in inlines:
+            return _extract_plain_text(inlines["inlines"])
+    return ""
+
+
+def _create_warning_block(target: str, error_msg: str) -> dict[str, Any]:
+    """Create a structured ASG warning admonition block for unresolved symbols."""
+    return {
+        "name": "admonition",
+        "variant": "warning",
+        "type": "block",
+        "blocks": [
+            {
+                "name": "paragraph",
+                "type": "block",
+                "inlines": [
+                    {
+                        "name": "text",
+                        "type": "string",
+                        "value": f"Golem ApiDoc: Could not resolve target '{target}': {error_msg}",
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def _expand_macro_target(args_str: str) -> list[dict[str, Any]]:
+    """Resolve a macro target and return ASG block structures."""
+    kwargs = _parse_macro_args(args_str)
+    target = kwargs.get("target")
+    if not target:
+        return []
+
+    depth = kwargs.get("depth", "all")
+    style = kwargs.get("style", "auto")
+    offset_str = kwargs.get("heading_level_offset") or kwargs.get("heading_offset") or kwargs.get("offset") or "0"
+    try:
+        heading_offset = int(offset_str)
+    except ValueError:
+        heading_offset = 0
+
+    options = ApiGenOptions(docstring_style=style, depth=depth)
+    api = AsciiDocApi(search_paths=sys.path, options=options)
+    try:
+        nodes = api.get_asg_nodes(target, depth=depth, heading_level_offset=heading_offset)
+        return nodes
+    except Exception as e:
+        logger.warning("Golem ApiDoc macro error for target '%s': %s", target, e)
+        return [_create_warning_block(target, str(e))]
+
+
+def _process_paragraph_inlines_for_escapes(inlines: list[Any]) -> None:
+    """Unescape escaped \\golem:apidoc[...] macros within inline collections in-place."""
+    for inline in inlines:
+        if isinstance(inline, dict):
+            val = inline.get("value")
+            if isinstance(val, str) and r"\golem:apidoc[" in val:
+                inline["value"] = val.replace(r"\golem:apidoc[", "golem:apidoc[")
+            if "inlines" in inline and isinstance(inline["inlines"], list):
+                _process_paragraph_inlines_for_escapes(inline["inlines"])
+
+
+def _has_macro_in_plain_text(inlines: list[Any]) -> bool:
+    """Check if any non-code inline text node contains an active golem:apidoc macro."""
+    if not inlines:
+        return False
+    for inline in inlines:
+        if not isinstance(inline, dict):
+            continue
+        # Code spans or verbatim inlines are ignored
+        if inline.get("variant") in ("code", "monospace") or inline.get("name") in ("code", "monospace", "literal"):
+            continue
+        if inline.get("name") == "text":
+            val = str(inline.get("value", ""))
+            val_no_escapes = val.replace(r"\golem:apidoc[", "")
+            if "golem:apidoc[" in val_no_escapes:
+                return True
+        if "inlines" in inline and isinstance(inline["inlines"], list):
+            if _has_macro_in_plain_text(inline["inlines"]):
+                return True
+    return False
+
+
+def _splice_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Traverse and splice macro directives into ASG block collections."""
+    new_blocks: list[dict[str, Any]] = []
+
+    for block in blocks:
+        if not isinstance(block, dict):
+            new_blocks.append(block)
+            continue
+
+        block_name = block.get("name", "")
+
+        # Verbatim blocks (listing, literal, verse) are protected from macro expansion
+        if block_name in ("listing", "literal", "verse"):
+            new_blocks.append(block)
+            continue
+
+        # Check if block is a block macro (e.g. name is macro / blockMacro or target is apidoc)
+        if block_name in ("macro", "blockMacro", "block_macro"):
+            target_name = block.get("target") or block.get("name") or ""
+            if "golem:apidoc" in str(target_name) or block.get("macro_name") == "golem:apidoc":
+                args_str = block.get("arguments") or block.get("value") or ""
+                expanded = _expand_macro_target(str(args_str))
+                new_blocks.extend(expanded)
+                continue
+
+        # Check if block is a paragraph containing golem:apidoc[...]
+        if block_name == "paragraph":
+            inlines = block.get("inlines", [])
+
+            has_unescaped = _has_macro_in_plain_text(inlines)
+            _process_paragraph_inlines_for_escapes(inlines)
+
+            if not has_unescaped:
+                new_blocks.append(block)
+                continue
+
+            # Active macro in plain text
+            raw_text = _extract_plain_text(inlines)
+            match = re.search(r"golem:apidoc\[(.*?)\]", raw_text, re.DOTALL)
+            if match:
+                stripped = raw_text.strip()
+                if stripped.startswith("golem:apidoc[") and stripped.endswith("]"):
+                    args_str = match.group(1)
+                    expanded = _expand_macro_target(args_str)
+                    new_blocks.extend(expanded)
+                    continue
+                else:
+                    args_str = match.group(1)
+                    expanded = _expand_macro_target(args_str)
+                    before_text = raw_text[: match.start()].strip()
+                    after_text = raw_text[match.end() :].strip()
+                    if before_text:
+                        new_blocks.append(
+                            {
+                                "name": "paragraph",
+                                "type": "block",
+                                "inlines": [{"name": "text", "type": "string", "value": before_text}],
+                            }
+                        )
+                    new_blocks.extend(expanded)
+                    if after_text:
+                        new_blocks.append(
+                            {
+                                "name": "paragraph",
+                                "type": "block",
+                                "inlines": [{"name": "text", "type": "string", "value": after_text}],
+                            }
+                        )
+                    continue
+
+        # Recursively process nested blocks inside sections, admonitions, sidebars, etc.
+        for child_key in ("blocks", "children"):
+            child_blocks = block.get(child_key)
+            if isinstance(child_blocks, list) and child_blocks:
+                block[child_key] = _splice_blocks(child_blocks)
+
+        # Recursively process list items
+        items = block.get("items")
+        if isinstance(items, list) and items:
+            for item in items:
+                if isinstance(item, dict):
+                    item_blocks = item.get("blocks")
+                    if isinstance(item_blocks, list) and item_blocks:
+                        item["blocks"] = _splice_blocks(item_blocks)
+
+        new_blocks.append(block)
+
+    return new_blocks
+
+
+@hookimpl
+def on_asg_created(asg: dict[str, Any], doc_path: Path | None = None) -> dict[str, Any]:
+    """ASG transform hook: splices golem:apidoc block macros into the document ASG."""
+    if not isinstance(asg, dict):
+        return asg
+
+    blocks = asg.get("blocks")
+    if isinstance(blocks, list) and blocks:
+        asg["blocks"] = _splice_blocks(blocks)
+
+    return asg
+
+
 @hookimpl
 def on_pre_parse(raw_content: str) -> str:
-    """Pre-parse hook: replaces golem apidoc block macros with rendered AsciiDoc."""
+    """Pre-parse hook: replaces golem apidoc block macros with rendered AsciiDoc (deprecated fallback).
+
+    .. deprecated::
+        Direct AST/ASG macro splicing via `on_asg_created` is preferred.
+    """
     if "golem:apidoc[" not in raw_content:
         return raw_content
+
+    logger.warning(
+        "on_pre_parse macro expansion in golem.plugins.apidoc is deprecated; "
+        "use on_asg_created for AST-level ASG macro splicing."
+    )
 
     def _expand_macro(args_str: str) -> str:
         kwargs = _parse_macro_args(args_str)
