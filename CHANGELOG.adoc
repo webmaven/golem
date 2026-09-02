@@ -15,15 +15,15 @@ toc::[]
 === Added
 
 * *ASG-Level API Doc Macro Splicing (Issue #10):*
-** New `on_asg_created` plugin hook implementation in `golem.plugins.apidoc` that splices `golem:apidoc[...]` block macros directly into the document Abstract Semantic Graph after full semantic resolution.
+** New `on_asg_created` plugin hook implementation in `golem.plugins.apidoc` that splices `golem:apidoc[pass:[...]]` block macros directly into the document Abstract Semantic Graph after full semantic resolution.
 ** New `AsciiDocApi.get_asg_nodes(symbol, depth, heading_level_offset)` method in `golem.plugins.apidoc.core` that renders a Python symbol to AsciiDoc markup and returns structured ASG block dictionaries ready for tree splicing.
 ** `heading_level_offset` macro parameter: allows embedded API documentation headings to be adjusted relative to the surrounding document section depth.
 ** Unresolvable macro targets now produce a visible `[WARNING]` admonition block in rendered output instead of silently disappearing.
-** Escaped macros (`\golem:apidoc[...]`) are correctly unescaped to literal text without triggering expansion.
+** Escaped macros (`\golem:apidoc[pass:[...]]`) are correctly unescaped to literal text without triggering expansion.
 * *AsciiDoc Multi-View Derived Rendering Engine:*
 ** Interactive tabbed code containers generated at build time via `render`, `views`, `display`, or `formats` attributes on `[source,asciidoc]` blocks.
 ** Supports four canonical compilation channels: `source` (raw AsciiDoc), `asg` (parsed ASG JSON), `html` (rendered HTML5 markup), and `preview` (live rendered component).
-** Zero-JS tab switching using modern declarative CSS `:has()` and `<input type="radio">` controls with physical folder tab styling.
+** Zero-JS tab switching using modern declarative CSS `:has()` and `input[type=radio]` controls with physical folder tab styling.
 ** Deterministic unique listing identifiers (`get_listing_uid`) for stable anchor targeting and navigation.
 * *Enhanced Code Listing Headers & Actions:*
 ** Semantic `<header class="listing-header">` featuring listing titles, uppercase language badges (`.badge-lang`), role badges (`.badge-test`, `.badge-shared`, `.badge-reset`), and a one-click clipboard copy button (`.listing-copy-btn`).
@@ -63,7 +63,7 @@ toc::[]
 * *Cross-Platform File Locking:* Replaced POSIX-only `fcntl` cache locking with cross-platform `filelock`.
 * *Configuration Normalization:* Deduplicated TOML parsing across `golem.toml` and `pyproject.toml` into a centralized normalizer helper.
 * *Navigation & TOC Performance:* Cached `discover_navigation()` tree during build cycles and eliminated duplicated text in TOC anchor generation.
-* *CLI Scaffolding {amp} Metadata:*
+* *CLI Scaffolding and Package Info:*
 ** Dynamically resolved `--version` from package metadata and author name from `git config` in `golem init`.
 * *Repository Cleanliness:* Removed internal review artifacts from tracking and added pattern ignores to `.gitignore`.
 * *Dev Server Disconnects:* Downgraded client socket disconnect exceptions to debug-level logging.
