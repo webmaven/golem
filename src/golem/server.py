@@ -21,8 +21,8 @@ The background watcher thread executes a polling loop:
 
 Connected browser clients receive live updates via standard Server-Sent Events (SSE):
 1. Browsers establish a persistent SSE connection to the `/golem-reload` endpoint.
-2. The server registers a thread-safe message queue for the client and streams `data: reload\n\n` frames upon rebuild events.
-3. Periodic `: ping\n\n` comments are transmitted during idle intervals to maintain socket liveness and prevent client timeouts.
+2. The server registers a thread-safe message queue for the client and streams `data: reload\\n\\n` frames upon rebuild events.
+3. Periodic `: ping\\n\\n` comments are transmitted during idle intervals to maintain socket liveness and prevent client timeouts.
 4. When serving HTML files, `send_head()` automatically injects a lightweight client JavaScript snippet that subscribes to `/golem-reload` and reloads the active viewport on event receipt.
 5. If build errors or warnings are detected, `send_head()` dynamically injects a top-level error overlay banner (`#golem-error-overlay`) displaying formatted diagnostic messages.
 """

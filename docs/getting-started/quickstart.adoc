@@ -27,7 +27,7 @@ my-project/
     └── index.adoc      # Homepage entry point
 ----
 
-The scaffolded `content/index.adoc` starter document includes standard AsciiDoc metadata:
+The scaffolded `content/index.adoc` starter document includes standard AsciiDoc document headers:
 
 .content/index.adoc
 [source,asciidoc,render="source,preview"]
