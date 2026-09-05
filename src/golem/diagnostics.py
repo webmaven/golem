@@ -174,7 +174,7 @@ class Diagnostic(dict[str, Any]):
         line: int | None = None,
         column: int | None = None,
         message: str = "",
-        severity: str = "error",
+        severity: str | None = None,
         error_type: str | None = None,
         context: str | None = None,
         exception: Exception | None = None,
@@ -197,7 +197,7 @@ class Diagnostic(dict[str, Any]):
             self["message"] = message
         elif "message" not in self:
             self["message"] = ""
-        if severity:
+        if severity is not None:
             self["severity"] = severity
         elif "severity" not in self:
             self["severity"] = "error"

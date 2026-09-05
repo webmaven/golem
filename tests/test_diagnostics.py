@@ -414,3 +414,11 @@ def test_diagnostic_object_dict_and_attr_compatibility():
 
     # Test str formatting
     assert "Error in doc.adoc:10:5" in str(d)
+
+
+def test_diagnostic_positional_dict_preserves_severity():
+    from golem.diagnostics import Diagnostic
+
+    d = Diagnostic({"severity": "warning", "message": "test"})
+    assert d["severity"] == "warning"
+    assert d.severity == "warning"
