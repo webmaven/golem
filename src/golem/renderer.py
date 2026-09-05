@@ -39,6 +39,21 @@ from golem.highlighting import make_highlighter
 
 
 DEFAULT_TEMPLATES_DIR: Path = Path(__file__).parent / "templates" / "default"
+_DEFAULT_RENDERER: Optional["GolemRenderer"] = None
+
+
+def _get_default_renderer() -> "GolemRenderer":
+    """Retrieve or initialize the cached singleton GolemRenderer for default settings."""
+    global _DEFAULT_RENDERER
+    if _DEFAULT_RENDERER is None:
+        active_search_paths: list[Path] = []
+        if DEFAULT_TEMPLATES_DIR.exists():
+            active_search_paths.append(DEFAULT_TEMPLATES_DIR)
+        _DEFAULT_RENDERER = GolemRenderer(
+            search_paths=active_search_paths,
+            highlighter=make_highlighter(),
+        )
+    return _DEFAULT_RENDERER
 
 
 class GolemRenderer(asciidoctype.AsciiDoctypeRenderer):
@@ -259,17 +274,25 @@ def render_body(
     _reattach_block_titles(node_dict)
     _normalize_dot_list_items(node_dict)
     _propagate_table_alignments(node_dict)
-    active_highlighter = highlighter if highlighter is not None else make_highlighter()
-    active_search_paths: list[Path] = []
-    if search_paths:
-        active_search_paths.extend(search_paths)
-    if DEFAULT_TEMPLATES_DIR.exists() and DEFAULT_TEMPLATES_DIR not in active_search_paths:
-        active_search_paths.append(DEFAULT_TEMPLATES_DIR)
 
-    renderer = GolemRenderer(
-        search_paths=active_search_paths,
-        highlighter=active_highlighter,
+    is_default_search_paths = search_paths is None or (
+        len(search_paths) == 1 and Path(search_paths[0]).resolve() == DEFAULT_TEMPLATES_DIR.resolve()
     )
+    if is_default_search_paths and highlighter is None:
+        renderer = _get_default_renderer()
+    else:
+        active_highlighter = highlighter if highlighter is not None else make_highlighter()
+        active_search_paths: list[Path] = []
+        if search_paths:
+            active_search_paths.extend(search_paths)
+        if DEFAULT_TEMPLATES_DIR.exists() and DEFAULT_TEMPLATES_DIR not in active_search_paths:
+            active_search_paths.append(DEFAULT_TEMPLATES_DIR)
+
+        renderer = GolemRenderer(
+            search_paths=active_search_paths,
+            highlighter=active_highlighter,
+        )
+
     if node_dict.get("name") == "document":
         blocks = node_dict.get("blocks", [])
         rendered_blocks = [renderer.render(block) for block in blocks]

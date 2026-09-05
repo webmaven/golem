@@ -276,6 +276,26 @@ class GolemSpecs:
         return []
 
 
+_CACHED_ENTRY_POINTS: dict[str, tuple[str, Any]] | None = None
+
+
+def _get_entry_point_plugins(clear_cache: bool = False) -> dict[str, tuple[str, Any]]:
+    """Discover and cache entry points from installed distributions."""
+    global _CACHED_ENTRY_POINTS
+    if _CACHED_ENTRY_POINTS is None or clear_cache:
+        eps: dict[str, tuple[str, Any]] = {}
+        for group in ("golem.plugins", HOOK_NAMESPACE):
+            for ep in importlib.metadata.entry_points(group=group):
+                ep_name = getattr(ep, "name", str(ep))
+                ep_value = getattr(ep, "value", "")
+                if ep_name not in eps:
+                    eps[ep_name] = ("entrypoint", ep)
+                if ep_value and ep_value not in eps:
+                    eps[ep_value] = ("entrypoint", ep)
+        _CACHED_ENTRY_POINTS = eps
+    return _CACHED_ENTRY_POINTS
+
+
 def get_plugin_manager(
     config: GolemConfig | None = None,
     plugins_dir: Path | None = None,
@@ -319,16 +339,7 @@ def get_plugin_manager(
 
     # --- PASS 1: DISCOVERY ---
     # Build a name → (kind, source) lookup. Nothing is registered here.
-    available: dict[str, tuple[str, Any]] = {}
-
-    for group in ("golem.plugins", HOOK_NAMESPACE):
-        for ep in importlib.metadata.entry_points(group=group):
-            ep_name = getattr(ep, "name", str(ep))
-            ep_value = getattr(ep, "value", "")
-            if ep_name not in available:
-                available[ep_name] = ("entrypoint", ep)
-            if ep_value and ep_value not in available:
-                available[ep_value] = ("entrypoint", ep)
+    available: dict[str, tuple[str, Any]] = dict(_get_entry_point_plugins())
 
     if target_plugins_dir and target_plugins_dir.exists() and target_plugins_dir.is_dir():
         for file in target_plugins_dir.glob("*.py"):

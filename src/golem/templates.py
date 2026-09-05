@@ -132,6 +132,22 @@ DEFAULT_TEMPLATE = """\
 </html>
 """
 
+_CACHED_SKELETON_TEMPLATE: PageTemplate | None = None
+
+
+def _get_builtin_skeleton_template() -> PageTemplate | None:
+    """Load and cache default package skeleton template from src/golem/templates/default/skeleton.pt."""
+    global _CACHED_SKELETON_TEMPLATE
+    if _CACHED_SKELETON_TEMPLATE is None:
+        pkg_template = Path(__file__).parent / "templates" / "default" / "skeleton.pt"
+        if pkg_template.exists():
+            try:
+                with open(pkg_template, "r", encoding="utf-8") as f:
+                    _CACHED_SKELETON_TEMPLATE = PageTemplate(f.read())
+            except Exception:
+                pass
+    return _CACHED_SKELETON_TEMPLATE
+
 
 class PageCompiler:
     """
@@ -166,14 +182,7 @@ class PageCompiler:
 
     def _load_builtin_template(self) -> PageTemplate | None:
         """Load default package skeleton template from src/golem/templates/default/skeleton.pt."""
-        pkg_template = Path(__file__).parent / "templates" / "default" / "skeleton.pt"
-        if pkg_template.exists():
-            try:
-                with open(pkg_template, "r", encoding="utf-8") as f:
-                    return PageTemplate(f.read())
-            except Exception:
-                pass
-        return None
+        return _get_builtin_skeleton_template()
 
     def compile_page(
         self,

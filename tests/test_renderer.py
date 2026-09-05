@@ -735,3 +735,31 @@ def test_skeleton_table_alignment_styles():
     assert ".valign-bottom" in content
     assert "colgroup col" in content
     assert "caption.title" in content
+
+
+def test_render_body_reuses_cached_renderer(monkeypatch):
+    """Verify render_body reuses the cached GolemRenderer instance across multiple calls with default settings."""
+    import golem.renderer as renderer_mod
+
+    # Ensure cached renderer is initialized
+    r1 = renderer_mod._get_default_renderer()
+    assert r1 is not None
+    assert renderer_mod._get_default_renderer() is r1
+
+    # Track instantiations of GolemRenderer
+    init_called = 0
+    orig_init = renderer_mod.GolemRenderer.__init__
+
+    def spy_init(self, *args, **kwargs):
+        nonlocal init_called
+        init_called += 1
+        return orig_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(renderer_mod.GolemRenderer, "__init__", spy_init)
+
+    asg = {"name": "paragraph", "type": "block", "inlines": [{"name": "text", "value": "test"}]}
+    renderer_mod.render_body(asg)
+    renderer_mod.render_body(asg)
+
+    # Since default renderer is cached, GolemRenderer should NOT be re-instantiated
+    assert init_called == 0

@@ -77,7 +77,8 @@ output_dir = "api"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--ignore=ARCHITECTURE.adoc --ignore=docs"
+addopts = "-n auto --ignore=ARCHITECTURE.adoc --ignore=docs"
+
 
 [tool.ruff]
 line-length = 127

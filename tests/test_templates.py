@@ -391,3 +391,22 @@ def test_skeleton_copy_button_preview_targeting(tmp_path):
     assert "data-tab" in tpl_content
     assert "rendered-preview" in tpl_content
     assert '.tab-pane[data-tab="source"] pre code' in tpl_content
+
+
+def test_page_compiler_reuses_cached_skeleton_template(tmp_path):
+    """Verify PageCompiler reuses the module-level cached skeleton template across instances."""
+    import golem.templates as templates_mod
+
+    config1 = GolemConfig(output_dir=str(tmp_path / "dist1"))
+    config2 = GolemConfig(output_dir=str(tmp_path / "dist2"))
+
+    c1 = templates_mod.PageCompiler(config1)
+    c2 = templates_mod.PageCompiler(config2)
+
+    # Both compilers should share the exact same template instance
+    assert c1._pkg_default_template is not None
+    assert c1._pkg_default_template is c2._pkg_default_template
+    assert c1.default_template is c2.default_template
+
+    # And _CACHED_SKELETON_TEMPLATE exists at module level
+    assert getattr(templates_mod, "_CACHED_SKELETON_TEMPLATE", None) is c1._pkg_default_template
