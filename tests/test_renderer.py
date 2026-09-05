@@ -763,3 +763,29 @@ def test_render_body_reuses_cached_renderer(monkeypatch):
 
     # Since default renderer is cached, GolemRenderer should NOT be re-instantiated
     assert init_called == 0
+
+
+def test_render_body_with_path_search_paths(tmp_path: Path):
+    from golem.renderer import render_body
+    from asciidoctrine import parse_to_ast
+
+    custom_tpl_dir = tmp_path / "custom_tpls"
+    custom_tpl_dir.mkdir()
+    (custom_tpl_dir / "paragraph.html").write_text(
+        '<p class="custom-p">${structure:node.inlines}</p>',
+        encoding="utf-8",
+    )
+
+    ast = parse_to_ast("Hello custom templates.")
+    html = render_body(ast, search_paths=[custom_tpl_dir])
+    assert '<p class="custom-p">' in html
+
+    # Sequence of str/Path (tuple or list) and dot-list preservation
+    tuple_html = render_body(ast, search_paths=(str(custom_tpl_dir),))
+    assert '<p class="custom-p">' in tuple_html
+
+    dot_list_ast = parse_to_ast(". Item 1\n. Item 2")
+    dot_html = render_body(dot_list_ast, search_paths=[custom_tpl_dir])
+    assert '<ol class="olist">' in dot_html
+    assert "<li>Item 1</li>" in dot_html
+    assert "<li>Item 2</li>" in dot_html

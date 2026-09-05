@@ -32,7 +32,7 @@ HTML structure that mirrors the hierarchical document outline.
 
 import re
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, Optional, Sequence, Union
 import asciidoctype  # type: ignore[import-untyped]
 from asciidoctrine.nodes import Node
 from golem.highlighting import make_highlighter
@@ -238,7 +238,7 @@ class GolemRenderer(asciidoctype.AsciiDoctypeRenderer):
 
 def render_body(
     asg_root: Union[Node, dict[str, Any]],
-    search_paths: Optional[List[Path]] = None,
+    search_paths: Optional[Sequence[Path | str]] = None,
     highlighter: Optional[Callable[[str, str], Optional[str]]] = None,
 ) -> str:
     """Render an ASG dictionary or AST Node structure into static HTML5 markup.
@@ -254,7 +254,7 @@ def render_body(
 
     [parameters]
     `asg_root` (Node | dict[str, Any]):: AST Node or ASG dictionary representation of the document or fragment.
-    `search_paths` (list[Path] | None, optional):: Optional list of directory paths containing custom Chameleon template overrides. Defaults to including `src/golem/templates/default`.
+    `search_paths` (Sequence[Path | str] | None, optional):: Optional sequence of directory paths containing custom Chameleon template overrides. Defaults to including `src/golem/templates/default`.
     `highlighter` (Callable[[str, str], Optional[str]] | None, optional):: Optional syntax highlighter callable. Defaults to default Fired Clay Pygments highlighter.
 
     [returns]
@@ -284,7 +284,7 @@ def render_body(
         active_highlighter = highlighter if highlighter is not None else make_highlighter()
         active_search_paths: list[Path] = []
         if search_paths:
-            active_search_paths.extend(search_paths)
+            active_search_paths.extend(Path(p) for p in search_paths)
         if DEFAULT_TEMPLATES_DIR.exists() and DEFAULT_TEMPLATES_DIR not in active_search_paths:
             active_search_paths.append(DEFAULT_TEMPLATES_DIR)
 
@@ -412,9 +412,11 @@ def _reattach_block_titles(node: Any) -> None:
 def _is_dot_list_title(title: Any) -> bool:
     """Return True if a title attribute was parsed from a dot list item.
 
-    AsciiDoctrine 0.2.0a5 elevated block_title grammar priority, causing
-    dot-ordered list items (e.g. '. First item') to be parsed as the list's
-    title with a leading whitespace character instead of a list item.
+    In earlier AsciiDoctrine versions (0.2.0a5), elevated block_title grammar
+    priority caused dot-ordered list items (e.g. '. First item') to be parsed
+    as the list's title with a leading whitespace character instead of a list
+    item. While natively handled in AsciiDoctrine 0.2.0a7+, this check is
+    retained as a safe defensive fallback.
     """
     if not title:
         return False
@@ -478,13 +480,14 @@ def _title_to_list_item(title: Any, marker: str = ".") -> dict[str, Any]:
 def _normalize_dot_list_items(node: Any) -> None:
     """Normalize dot-ordered lists where initial items were misparsed as block titles.
 
-    Under AsciiDoctrine 0.2.0a5, dot-ordered lists without explicit titles
-    (e.g., '. First item\n. Second item') have their first item parsed as a
-    `title` on the `list` node. This function:
-    1. Detects `title` attributes that originated from dot list items (indicated
+    Maintained as a defensive normalization pass. While AsciiDoctrine 0.2.0a7+
+    provides native dot-ordered list parsing without fracturing or misinterpreting
+    initial items as block titles, this function safely preserves backward
+    compatibility and handles any legacy or edge-case ASG structures where:
+    1. A `title` attribute originated from a dot list item (indicated
        by leading whitespace).
     2. Converts such titles into initial `listItem` blocks prepended to `items`.
-    3. Merges consecutive dot-ordered list blocks that were fractured by the parser.
+    3. Merges consecutive dot-ordered list blocks that were fractured by earlier parsers.
 
     NOTE: Modifies the ASG dictionary in-place.
     """
