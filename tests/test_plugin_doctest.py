@@ -127,6 +127,199 @@ def test_run_adoc_file_eager_mode(tmp_path: Path):
     assert failed == 0
 
 
+def test_run_adoc_file_split_sections(tmp_path: Path):
+    from golem.plugins.doctest.runner import run_adoc_file
+
+    doc = tmp_path / "multi_section.adoc"
+    doc.write_text(
+        """= Document Title
+
+== Section One
+
+[source,python,role="test"]
+----
+>>> a = 1
+>>> a + 1
+2
+----
+
+== Section Two
+
+[source,python,role="test"]
+----
+>>> b = 10
+>>> b * 2
+20
+----
+""",
+        encoding="utf-8",
+    )
+
+    passed, failed, errors = run_adoc_file(doc, split_sections=True)
+    assert passed == 2
+    assert failed == 0
+
+
+def test_run_adoc_file_split_sections_partial_failure(tmp_path: Path):
+    from golem.plugins.doctest.runner import run_adoc_file
+
+    doc = tmp_path / "partial_fail.adoc"
+    doc.write_text(
+        """= Document Title
+
+== Section One
+
+[source,python,role="test"]
+----
+>>> 1 + 1
+2
+----
+
+== Section Two
+
+[source,python,role="test"]
+----
+>>> 1 + 1
+999
+----
+""",
+        encoding="utf-8",
+    )
+
+    # Without split_sections: failure in section two aborts, passed=0, failed=1
+    passed, failed, errors = run_adoc_file(doc, split_sections=False)
+    assert passed == 0
+    assert failed == 1
+    assert len(errors) == 1
+
+    # With split_sections: section one passes (1), section two fails (1)
+    passed, failed, errors = run_adoc_file(doc, split_sections=True)
+    assert passed == 1
+    assert failed == 1
+    assert len(errors) == 1
+
+
+def test_run_path_split_sections(tmp_path: Path):
+    from golem.plugins.doctest.runner import run_path
+
+    doc = tmp_path / "multi_section.adoc"
+    doc.write_text(
+        """= Document Title
+
+== Section One
+
+[source,python,role="test"]
+----
+>>> 10 + 20
+30
+----
+
+== Section Two
+
+[source,python,role="test"]
+----
+>>> 5 * 5
+25
+----
+""",
+        encoding="utf-8",
+    )
+
+    passed, failed, errors = run_path(doc, split_sections=True)
+    assert passed == 2
+    assert failed == 0
+
+    dir_path = tmp_path / "docs"
+    dir_path.mkdir()
+    (dir_path / "doc.adoc").write_text(
+        """= Doc
+
+== Section A
+
+[source,python,role="test"]
+----
+>>> 'hello'.title()
+'Hello'
+----
+""",
+        encoding="utf-8",
+    )
+    passed, failed, errors = run_path(dir_path, split_sections=True)
+    assert passed == 1
+    assert failed == 0
+
+
+def test_run_all_and_run_doctests_split_sections(tmp_path: Path):
+    from golem.plugins.doctest import run_doctests
+    from golem.plugins.doctest.runner import run_all
+
+    doc = tmp_path / "multi_section.adoc"
+    doc.write_text(
+        """= Document Title
+
+== Section One
+
+[source,python,role="test"]
+----
+>>> 2 * 10
+20
+----
+
+== Section Two
+
+[source,python,role="test"]
+----
+>>> 3 * 10
+30
+----
+""",
+        encoding="utf-8",
+    )
+
+    exit_code = run_all(paths=[doc], split_sections=True)
+    assert exit_code == 0
+
+    exit_code = run_doctests(paths=[doc], split_sections=True)
+    assert exit_code == 0
+
+
+def test_cli_subcommand_split_sections(tmp_path: Path):
+    from golem.plugins import doctest
+
+    doc = tmp_path / "multi_section.adoc"
+    doc.write_text(
+        """= Title
+
+== Section One
+
+[source,python,role="test"]
+----
+>>> 3 * 3
+9
+----
+
+== Section Two
+
+[source,python,role="test"]
+----
+>>> 4 * 4
+16
+----
+""",
+        encoding="utf-8",
+    )
+
+    @click.group()
+    def cli():
+        pass
+
+    doctest.golem_add_subcommands(cli)
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["doctest", "--split-sections", str(doc)])
+    assert result.exit_code == 0
+
+
 def test_run_docstring_tests_passing(tmp_path: Path):
     from golem.plugins.doctest.runner import run_docstring_tests
 
