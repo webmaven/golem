@@ -676,3 +676,168 @@ And \\golem:apidoc[target="escaped"] is escaped.
     # Escaped macro unescaped
     assert 'golem:apidoc[target="escaped"]' in html
     assert "\\golem:apidoc" not in html
+
+
+def test_apidoc_format_composite_types(tmp_path):
+    from golem.plugins import apidoc
+    import sys
+
+    pkg_dir = tmp_path / "typed_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Typed module."""
+from typing import Union, Optional
+
+def process_data(data: Union[dict[str, int], list[str]], timeout: Optional[float] = None) -> dict[str, Any]:
+    """Process incoming data payload.
+
+    Args:
+        data (dict[str, int] or list[str]): Input payload.
+        timeout (float, optional): Optional timeout in seconds. Defaults to 1.0.
+
+    Returns:
+        result (dict[str, Any]): Processed result mapping.
+    """
+    return {}
+''',
+        encoding="utf-8",
+    )
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        raw_doc = """= Typed Guide
+
+golem:apidoc[target="typed_pkg.process_data"]
+"""
+        res = apidoc.on_pre_parse(raw_content=raw_doc)
+        assert "process_data" in res
+        assert "data" in res
+        assert "timeout" in res
+
+        # Verify signature has composite and optional types
+        assert (
+            "def process_data(data: Union[dict[str, int], list[str]], timeout: Optional[float] = None) -> dict[str, Any]:"
+            in res
+        )
+
+        # Verify docstring parameter composite type conversion
+        assert "`data`:: (dict[str, int] or list[str]) Input payload." in res
+        assert "`timeout`:: (float, optional) Optional timeout in seconds." in res
+
+        # Verify docstring named return value and composite return type
+        assert "`result` (dict[str, Any]):: Processed result mapping." in res
+    finally:
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+
+
+def test_format_docstring_composite_types_and_named_returns():
+    from golem.plugins.apidoc.core.formatter import format_docstring
+
+    doc = """Process incoming data payload.
+
+Args:
+    payload (Union[dict[str, int], list[str]]): Input payload data.
+    timeout (Optional[float]): Optional timeout in seconds.
+
+Returns:
+    result (dict[str, Any]): Processed result mapping.
+
+Yields:
+    item (Union[str, int]): Streamed progress item.
+"""
+    adoc = format_docstring(doc, style="google")
+    assert "[parameters]" in adoc
+    assert "`payload`:: (Union[dict[str, int], list[str]]) Input payload data." in adoc
+    assert "`timeout`:: (Optional[float]) Optional timeout in seconds." in adoc
+    assert "[returns]" in adoc
+    assert "`result` (dict[str, Any]):: Processed result mapping." in adoc
+    assert "[yields]" in adoc
+    assert "`item` (Union[str, int]):: Streamed progress item." in adoc
+
+
+def test_on_asg_created_composite_types(tmp_path):
+    import asciidoctrine
+    from asciidoctrine.resolver import ASGResolver
+    from golem.plugins import apidoc
+    from golem.renderer import render_body
+    import sys
+
+    pkg_dir = tmp_path / "asg_typed_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Typed module."""
+from typing import Union, Optional
+
+def process_data(data: Union[dict[str, int], list[str]], timeout: Optional[float] = None) -> dict[str, Any]:
+    """Process incoming data payload.
+
+    Args:
+        data (dict[str, int] or list[str]): Input payload.
+        timeout (float, optional): Optional timeout in seconds. Defaults to 1.0.
+
+    Returns:
+        result (dict[str, Any]): Processed result mapping.
+    """
+    return {}
+''',
+        encoding="utf-8",
+    )
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        raw_doc = """= Typed Guide
+
+golem:apidoc[target="asg_typed_pkg.process_data"]
+"""
+        ast = asciidoctrine.parse_to_ast(raw_doc)
+        asg = ASGResolver(ast).resolve(ast)
+        spliced_asg = apidoc.on_asg_created(asg=asg)
+        html = render_body(spliced_asg)
+        assert "process_data" in html
+        assert "dict[str, int]" in html
+        assert "result" in html
+    finally:
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+
+
+def test_format_docstring_defensive_fallback():
+    from unittest.mock import patch
+    from golem.plugins.apidoc.core.formatter import format_docstring
+
+    doc = "Some plain text docstring."
+    # If griffe.parse raises an exception
+    with patch("griffe.parse", side_effect=RuntimeError("Parsing error")):
+        res = format_docstring(doc)
+        assert res == "Some plain text docstring."
+
+    # If asciidocstring.griffe_bridge.to_asciidoc raises an exception
+    with patch("asciidocstring.griffe_bridge.to_asciidoc", side_effect=RuntimeError("Bridge error")):
+        res = format_docstring(doc)
+        assert res == "Some plain text docstring."
+
+    # If to_asciidoc returns empty string for non-empty docstring
+    with patch("asciidocstring.griffe_bridge.to_asciidoc", return_value=""):
+        res = format_docstring(doc)
+        assert res == "Some plain text docstring."
+
+
+def test_format_docstring_style_variants():
+    import griffe
+    from golem.plugins.apidoc.core.formatter import format_docstring
+
+    doc = """Process data.
+
+Args:
+    x (int): Value.
+"""
+    # Parser enum
+    res1 = format_docstring(doc, style=griffe.Parser.google)
+    assert "[parameters]" in res1
+    assert "`x`:: (int) Value." in res1
+
+    # Uppercase string
+    res2 = format_docstring(doc, style="GOOGLE")
+    assert "[parameters]" in res2
+    assert "`x`:: (int) Value." in res2

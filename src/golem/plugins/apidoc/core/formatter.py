@@ -140,10 +140,13 @@ def format_attribute_signature(attr: griffe.Attribute) -> str:
 
 def format_docstring(
     docstring: griffe.Docstring | str | None,
-    style: str = "auto",
+    style: str | griffe.DocstringStyle | griffe.Parser = "auto",
     heading_offset: int = 0,
 ) -> str:
     """Convert a docstring into clean AsciiDoc markup using asciidocstring and Griffe.
+
+    Handles composite and union type annotations (e.g. `Union[dict[str, int], list[str]]`,
+    `Optional[float]`) and named return structures cleanly via asciidocstring.
 
     Args:
         docstring: The docstring to convert.
@@ -163,12 +166,20 @@ def format_docstring(
     else:
         doc_obj = griffe.Docstring(str(docstring))
 
+    raw_val = str(doc_obj.value).strip() if doc_obj.value is not None else ""
+    if not raw_val:
+        return ""
+
     try:
-        style_lit: Any = style if style in ("google", "numpy", "sphinx", "auto") else "auto"
+        norm_style = getattr(style, "value", style)
+        style_str = str(norm_style).lower() if norm_style is not None else "auto"
+        style_lit: Any = style_str if style_str in ("google", "numpy", "sphinx", "auto") else "auto"
         sections = griffe.parse(doc_obj, style_lit)
         result = asciidocstring.griffe_bridge.to_asciidoc(sections)
+        if not result and raw_val:
+            result = raw_val
     except Exception:
-        result = str(doc_obj.value).strip()
+        result = raw_val
 
     return _offset_headings(result, heading_offset)
 
