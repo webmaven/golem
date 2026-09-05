@@ -10,6 +10,24 @@ and this project adheres to https://semver.org/spec/v2.0.0.html[Semantic Version
 
 toc::[]
 
+== Unreleased
+
+=== Added
+
+* *Per-Section Doctest Isolation:* Added `--split-sections` flag to doctest plugin (`golem doctest --split-sections`) for per-section test isolation across section boundaries.
+* *Composite and Union Type Documentation:* Added composite and union type annotation support in `apidoc` formatter (lossless `Union`, `Optional`, named returns).
+* *Human-Readable Syntax Diagnostics:* Added human-readable build diagnostics in `BuildEngine.check()` using `AsciiDocSyntaxError` file/line/column info and `ASGResolver.warnings`.
+
+=== Changed
+
+* *Search Paths Typing Modernization:* `render_body` `search_paths` parameter now natively accepts `Sequence[Path | str]` (AsciiDoctype 0.1.0a6 alignment).
+* *Renderer, Template & Plugin Caching:* `GolemRenderer`, `PageCompiler` skeleton, and plugin entry-point discovery are now cached for significant build and test performance improvement.
+* *Upstream Dependency Upgrades:* Upgraded upstream dependencies: AsciiDoctrine 0.2.0a7, AsciiDocstring 0.1.0a9, AsciiDoctype 0.1.0a6, AsciiDoctest 0.2.0a5.
+
+=== Fixed
+
+* *Diagnostic Severity Preservation:* `Diagnostic` positional dict initialization no longer clobbers `"severity"` from the input mapping.
+
 == 0.1.0a3 - 2026-09-01
 
 === Added

@@ -17,6 +17,50 @@ Run doctest verification across your documentation:
 golem doctest
 ----
 
+=== Per-Section Test Isolation (`--split-sections`)
+
+By default, `golem doctest` executes all test blocks within a document in a single runner session. When any test block encounters a failure, test execution for that document halts.
+
+Pass the `--split-sections` flag to partition test blocks by document section (`==` headings) and execute each section in its own isolated execution environment:
+
+.Terminal
+[source,bash]
+----
+golem doctest --split-sections
+----
+
+==== What It Does
+
+When `--split-sections` is enabled:
+
+* Each section defined by a section heading (`==`) receives a dedicated namespace and execution context.
+* A test failure in one section does not abort test execution for subsequent sections in the same document.
+* Test pass/fail counts and diagnostics are aggregated and reported per section.
+
+==== When to Use It
+
+* *Comprehensive test runs:* When you want full visibility into test status across an entire document rather than halting on the first failure in an early section.
+* *Independent document chapters and tutorials:* In guides where each section represents a self-contained tutorial or workflow with its own variables and setup.
+* *State isolation:* To guarantee that variables, monkey-patching, or environment modifications from one section do not leak into downstream sections.
+
+==== Usage Examples
+
+Run doctest verification with section splitting across all documents:
+
+.Terminal
+[source,bash]
+----
+golem doctest --split-sections
+----
+
+Combine `--split-sections` with a specific file path and verbose output:
+
+.Terminal
+[source,bash]
+----
+golem doctest --split-sections -v docs/reference/doctest.adoc
+----
+
 == Authoring Executable Doctest Blocks
 
 In your AsciiDoc source:
@@ -80,6 +124,8 @@ base_url = "https://example.com"
 === Section Boundary Scoping
 
 Shared state automatically resets at top-level section boundaries (`==`), isolating independent document chapters or topics while preserving sequential state flow within each section.
+
+When running doctests with the `--split-sections` CLI flag, each section is additionally executed in its own isolated runner invocation, so a failure in one section does not abort test execution for subsequent sections.
 
 === Named Context Scopes
 
