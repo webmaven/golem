@@ -344,3 +344,73 @@ def test_format_diagnostic_three_digit_line_numbers(tmp_path):
     assert "101 |" in formatted
     assert "102 | Invalid [token" in formatted
     assert "^-- Unclosed token bracket" in formatted
+
+
+def test_build_engine_diagnostic_formatting(tmp_path: Path):
+    from golem.engine import BuildEngine
+    from golem.config import GolemConfig
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "bad.adoc").write_text("= Bad Doc\n\n[source\nUnclosed attribute list", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(docs_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config)
+    diagnostics = engine.check()
+    assert len(diagnostics) > 0
+    assert any("bad.adoc" in str(d) for d in diagnostics)
+
+
+def test_build_engine_diagnostic_resolver_warnings(tmp_path: Path):
+    from golem.engine import BuildEngine
+    from golem.config import GolemConfig
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "xref.adoc").write_text(
+        "= Warning Doc\n\nSee <<missing_target,here>> for details.\n",
+        encoding="utf-8",
+    )
+
+    config = GolemConfig(content_dir=str(docs_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config)
+    diagnostics = engine.check()
+    assert len(diagnostics) == 1
+    diag = diagnostics[0]
+    assert diag.severity == "warning"
+    assert "missing_target" in diag.message
+    assert "xref.adoc" in str(diag)
+    assert diag.line == 3
+    assert diag.column is not None
+    assert diag["severity"] == "warning"
+
+
+def test_diagnostic_object_dict_and_attr_compatibility():
+    from golem.diagnostics import Diagnostic
+
+    d = Diagnostic(
+        file="doc.adoc",
+        line=10,
+        column=5,
+        message="Test error",
+        severity="error",
+        error_type="SyntaxError",
+    )
+    # Test attribute access
+    assert d.file == "doc.adoc"
+    assert d.line == 10
+    assert d.column == 5
+    assert d.message == "Test error"
+    assert d.severity == "error"
+    assert d.error_type == "SyntaxError"
+
+    # Test dict compatibility
+    assert d["file"] == "doc.adoc"
+    assert d["line"] == 10
+    assert d["column"] == 5
+    assert d["message"] == "Test error"
+    assert d.get("severity") == "error"
+    assert d.get("error_type") == "SyntaxError"
+
+    # Test str formatting
+    assert "Error in doc.adoc:10:5" in str(d)

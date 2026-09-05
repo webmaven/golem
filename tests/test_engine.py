@@ -1666,3 +1666,35 @@ def test_sync_static_assets_all_layers(tmp_path, monkeypatch):
     assert (output_dir / "img" / "photo.jpg").read_bytes() == b"jpeg-data"
     assert not (output_dir / ".hidden.png").exists()
     assert not (output_dir / "index.adoc").exists()
+
+
+def test_build_engine_check_valid_and_broken_docs(tmp_path: Path):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "valid.adoc").write_text("= Valid\n\nValid body text.", encoding="utf-8")
+    (content_dir / "broken.adoc").write_text("= Broken\n\n[source\nUnclosed block", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config)
+    diagnostics = engine.check()
+
+    assert len(diagnostics) == 1
+    assert "broken.adoc" in diagnostics[0].file
+    assert diagnostics[0].line == 3
+    assert diagnostics[0].severity == "error"
+
+
+def test_build_engine_build_site_captures_resolver_warnings(tmp_path: Path):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "page.adoc").write_text(
+        "= Page Title\n\nRefer to <<unknown_section_anchor,the docs>>.\n",
+        encoding="utf-8",
+    )
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config)
+    compiled = engine.build_site()
+
+    assert len(compiled) == 1
+    assert any(d.severity == "warning" and "unknown_section_anchor" in d.message for d in engine.diagnostics)

@@ -23,8 +23,11 @@ import time
 from typing import Any, Iterator
 import click
 from golem.config import GolemConfig, load_config, find_default_config_path
+from golem.diagnostics import Diagnostic, format_diagnostic
 from golem.engine import BuildEngine
 from golem.plugins import get_plugin_manager
+
+__all__ = ["Diagnostic", "format_diagnostic", "main"]
 
 BUILTIN_PLUGINS: list[str] = ["golem.plugins.doctest", "golem.plugins.apidoc"]
 
@@ -43,123 +46,6 @@ def change_working_dir(directory: Path | str | None) -> Iterator[None]:
         yield
     finally:
         os.chdir(old_cwd)
-
-
-def format_diagnostic(error: dict[str, Any] | Exception, content_dir: Path | str | None = None) -> str:
-    """
-
-    Format clean AsciiDoc compiler diagnostics with source coordinates and context snippets.
-
-    === Examples
-
-    [source,python]
-    ----
-    >>> err = {"file": "docs/02-architecture.adoc", "line": 14, "column": 5, "message": "Unclosed attribute list"}
-    >>> "Error in docs/02-architecture.adoc:14:5" in format_diagnostic(err)
-    True
-
-    ----
-    """
-    if isinstance(error, Exception):
-        exc: Any = error
-        message = str(exc)
-        file_path_raw = getattr(exc, "filename", getattr(exc, "file", None))
-        line = getattr(exc, "lineno", getattr(exc, "line", None))
-        column = getattr(exc, "offset", getattr(exc, "column", getattr(exc, "col_offset", None)))
-    else:
-        exc = error.get("exception")
-        message = str(error.get("message", ""))
-        file_path_raw = error.get("file") or (getattr(exc, "filename", getattr(exc, "file", None)) if exc else None)
-        line = error.get("line") or (getattr(exc, "lineno", getattr(exc, "line", None)) if exc else None)
-        column = (
-            error.get("column")
-            or error.get("col")
-            or (
-                getattr(
-                    exc,
-                    "offset",
-                    getattr(exc, "column", getattr(exc, "col_offset", None)),
-                )
-                if exc
-                else None
-            )
-        )
-
-    # If line / column not found, parse coordinates from message if present
-    if (line is None or column is None) and message:
-        import re
-
-        m_coord = re.search(r"(?:line\s*|:)(\d+)(?:,\s*col(?:umn)?\s*|:)(\d+)", message, re.IGNORECASE)
-        if m_coord:
-            if line is None:
-                line = int(m_coord.group(1))
-            if column is None:
-                column = int(m_coord.group(2))
-        else:
-            m_line = re.search(r"(?:line\s*|:)(\d+)", message, re.IGNORECASE)
-            if m_line and line is None:
-                line = int(m_line.group(1))
-
-    file_display = str(file_path_raw) if file_path_raw else "unknown"
-    if file_path_raw:
-        try:
-            p = Path(file_path_raw)
-            if p.is_absolute():
-                try:
-                    file_display = str(p.relative_to(Path.cwd()))
-                except ValueError:
-                    file_display = str(p)
-            else:
-                file_display = str(p)
-        except Exception:
-            file_display = str(file_path_raw)
-
-    if line is not None and line > 0:
-        if column is not None and column > 0:
-            header = f"Error in {file_display}:{line}:{column}"
-        else:
-            header = f"Error in {file_display}:{line}"
-    else:
-        header = f"Error in {file_display}: {message}"
-
-    lines: list[str] = []
-    if file_path_raw:
-        target_path = Path(file_path_raw)
-        if not target_path.exists() and content_dir:
-            alt_path = Path(content_dir) / target_path
-            if alt_path.exists():
-                target_path = alt_path
-
-        if target_path.exists() and target_path.is_file():
-            try:
-                with open(target_path, "r", encoding="utf-8", errors="replace") as f:
-                    lines = f.read().splitlines()
-            except Exception:
-                lines = []
-
-    if lines and line is not None and 1 <= line <= len(lines):
-        start_line = max(1, line - 2)
-        end_line = line
-        margin_width = len(str(end_line))
-
-        out_lines = [header]
-        for ln in range(start_line, end_line + 1):
-            line_text = lines[ln - 1]
-            ln_str = str(ln).rjust(margin_width)
-            if line_text:
-                out_lines.append(f"{ln_str} | {line_text}")
-            else:
-                out_lines.append(f"{ln_str} |")
-
-        col = column if (column is not None and column > 0) else 1
-        col_idx = max(0, col - 1)
-        pointer_margin = " " * margin_width
-        out_lines.append(f"{pointer_margin} | {' ' * col_idx}^-- {message}")
-        return "\n".join(out_lines)
-
-    if line is not None and line > 0:
-        return f"{header}\n  ^-- {message}"
-    return header
 
 
 class GolemGroup(click.Group):

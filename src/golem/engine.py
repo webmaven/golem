@@ -49,6 +49,7 @@ import click
 from golem.assets import sync_static_assets
 from golem.cache import BuildCache
 from golem.config import GolemConfig
+from golem.diagnostics import Diagnostic
 from golem.metadata import (
     clean_index_url,
     extract_metadata_from_doc,
@@ -134,8 +135,8 @@ class BuildEngine:
             lambda p: is_partial(p, self.content_dir),
             self.get_file_metadata,
         )
-        self.errors: list[dict[str, Any]] = []
-        self.diagnostics: list[dict[str, Any]] = self.errors
+        self.errors: list[Diagnostic] = []
+        self.diagnostics: list[Diagnostic] = self.errors
         self._nav_tree_cache: list[dict[str, Any]] | None = None
 
     def get_file_metadata(self, path: Path) -> dict[str, Any]:
@@ -342,6 +343,11 @@ class BuildEngine:
                 resolver = ASGResolver(ast)
                 asg = resolver.resolve(ast)
 
+                if hasattr(resolver, "warnings") and resolver.warnings:
+                    for warn in resolver.warnings:
+                        warn_diag = Diagnostic.from_resolver_warning(warn, file=str(doc_path), content=content)
+                        self.diagnostics.append(warn_diag)
+
                 # Trigger ASG hooks sequentially (chain modifications)
                 _asg_modifiers: list[str] = []
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
@@ -501,22 +507,133 @@ class BuildEngine:
 
                     click.echo(f"  [COMPILE] {rel_doc} -> {rel_out}")
             except Exception as e:
-                error_info = {
-                    "file": str(doc_path),
-                    "message": str(e),
-                    "error_type": type(e).__name__,
-                    "exception": e,
-                    "line": getattr(e, "line", getattr(e, "lineno", None)),
-                    "column": getattr(
-                        e,
-                        "column",
-                        getattr(e, "offset", getattr(e, "col_offset", None)),
-                    ),
-                    "context": getattr(e, "context", None),
-                }
+                error_info = Diagnostic.from_exception(e, file=str(doc_path))
                 self.errors.append(error_info)
                 logging.error(f"Failed to build file {doc_path}: {e}")
                 if getattr(self.config, "strict", False):
                     raise e
 
         return compiled_files
+
+    def check(self, files: list[Path] | None = None) -> list[Diagnostic]:
+        """Perform syntax parsing and semantic graph resolution diagnostics.
+
+        Parses document ASTs and resolves ASGs to capture AsciiDoc syntax errors,
+        malformed block structures, and semantic resolver warnings (such as unresolved
+        cross-references) without compiling HTML or writing output files.
+
+        [parameters]
+        `files` (list[Path] | None, optional):: Optional explicit list of document files to check.
+            If None, checks all non-partial `.adoc` documents in `content_dir`.
+
+        [returns]
+        `list[Diagnostic]`:: Collected diagnostic entries (errors and warnings).
+
+        === Examples
+
+        [source,python]
+        ----
+        >>> from golem.config import GolemConfig
+        >>> from golem.engine import BuildEngine
+        >>> from pathlib import Path
+        >>> config = GolemConfig(content_dir="content", output_dir="dist")
+        >>> engine = BuildEngine(config)
+        >>> diagnostics = engine.check()
+        >>> isinstance(diagnostics, list)
+        True
+        ----
+        """
+        self.errors = []
+        self.diagnostics = self.errors
+        diagnostics: list[Diagnostic] = []
+
+        if files is None:
+            all_docs = (
+                [f for f in sorted(self.content_dir.glob("**/*.adoc")) if not is_partial(f, self.content_dir)]
+                if self.content_dir.exists()
+                else []
+            )
+        else:
+            all_docs = files
+
+        for doc_path in all_docs:
+            if files is None and is_partial(doc_path, self.content_dir):
+                continue
+
+            try:
+                with open(doc_path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+            except Exception as e:
+                diag = Diagnostic.from_exception(e, file=str(doc_path))
+                diagnostics.append(diag)
+                continue
+
+            # Trigger pre-parse hooks sequentially
+            if hasattr(self, "pm") and self.pm:
+                for impl in self.pm.hook.on_pre_parse.get_hookimpls():
+                    try:
+                        result = impl.function(raw_content=content)
+                        if result is not None:
+                            content = result  # type: ignore[assignment]
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_pre_parse for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+
+            # 1. Parse using asciidoctrine
+            try:
+                ast = asciidoctrine.parse_to_ast(content, base_dir=str(doc_path.parent))
+            except Exception as e:
+                diag = Diagnostic.from_exception(e, file=str(doc_path))
+                diagnostics.append(diag)
+                continue
+
+            # Trigger AST hooks sequentially
+            if hasattr(self, "pm") and self.pm:
+                for impl in self.pm.hook.on_ast_created.get_hookimpls():
+                    try:
+                        result = impl.function(ast=ast)
+                        if result is not None:
+                            ast = result  # type: ignore[assignment]
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_ast_created for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+
+            # 2. Resolve AST to ASG
+            try:
+                resolver = ASGResolver(ast)
+                asg = resolver.resolve(ast)
+                if hasattr(resolver, "warnings") and resolver.warnings:
+                    for warn in resolver.warnings:
+                        warn_diag = Diagnostic.from_resolver_warning(warn, file=str(doc_path), content=content)
+                        diagnostics.append(warn_diag)
+            except Exception as e:
+                diag = Diagnostic.from_exception(e, file=str(doc_path))
+                diagnostics.append(diag)
+                continue
+
+            # Trigger ASG hooks sequentially
+            if hasattr(self, "pm") and self.pm:
+                for impl in self.pm.hook.on_asg_created.get_hookimpls():
+                    try:
+                        result = impl.function(asg=asg)
+                        if result is not None:
+                            asg = result  # type: ignore[assignment]
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_asg_created for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+
+        self.diagnostics = diagnostics
+        self.errors = diagnostics
+        return diagnostics
