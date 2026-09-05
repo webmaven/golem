@@ -14,7 +14,6 @@ from .runner import (
 
 __all__ = [
     "golem_add_subcommands",
-    "run_asciidoc_doctests",
     "run_doctests",
     "run_adoc_file",
     "run_docstring_tests",
@@ -63,10 +62,6 @@ def run_doctests(
         fail_fast=fail_fast,
         split_sections=split_sections,
     )
-
-
-# Alias for backward compatibility / explicit naming
-run_asciidoc_doctests = run_doctests
 
 
 @hookimpl

@@ -39,7 +39,7 @@ def run_adoc_file(
     if split_sections:
         sections_map: dict[Any, list[Any]] = {}
         for block in blocks:
-            sec_id = getattr(block, "attributes", {}).get("__section_id__")
+            sec_id = (getattr(block, "attributes", None) or {}).get("__section_id__")
             sections_map.setdefault(sec_id, []).append(block)
 
         total_passed = 0

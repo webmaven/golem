@@ -199,6 +199,92 @@ def test_run_adoc_file_split_sections_partial_failure(tmp_path: Path):
     assert len(errors) == 1
 
 
+def test_run_adoc_file_split_sections_namespace_isolation(tmp_path: Path):
+    """Verify variables defined in Section 1 raise NameError or are absent from globals in Section 2 when split_sections=True."""
+    from golem.plugins.doctest.runner import run_adoc_file
+
+    doc = tmp_path / "namespace_isolation.adoc"
+    doc.write_text(
+        """= Document Title
+
+== Section One
+
+[source,python,role="test"]
+----
+>>> secret_x = 42
+>>> secret_x
+42
+----
+
+== Section Two
+
+[source,python,role="test"]
+----
+>>> 'secret_x' in dir()
+False
+>>> secret_x
+Traceback (most recent call last):
+    ...
+NameError: name 'secret_x' is not defined
+----
+""",
+        encoding="utf-8",
+    )
+
+    passed, failed, errors = run_adoc_file(doc, split_sections=True)
+    assert passed == 2
+    assert failed == 0
+    assert not errors
+
+    # Also assert that referencing the variable expecting a value fails due to NameError
+    failing_doc = tmp_path / "namespace_fail.adoc"
+    failing_doc.write_text(
+        """= Document Title
+
+== Section One
+
+[source,python,role="test"]
+----
+>>> secret_y = 100
+>>> secret_y
+100
+----
+
+== Section Two
+
+[source,python,role="test"]
+----
+>>> secret_y
+100
+----
+""",
+        encoding="utf-8",
+    )
+    passed_fail, failed_fail, errors_fail = run_adoc_file(failing_doc, split_sections=True)
+    assert passed_fail == 1
+    assert failed_fail == 1
+    assert len(errors_fail) == 1
+    assert "NameError: name 'secret_y' is not defined" in errors_fail[0]
+
+
+def test_run_adoc_file_split_sections_none_attributes(tmp_path: Path, monkeypatch):
+    """Verify split_sections gracefully handles blocks where attributes is explicitly None."""
+    from types import SimpleNamespace
+    import golem.plugins.doctest.runner as runner_mod
+
+    dummy_block = SimpleNamespace(attributes=None)
+    monkeypatch.setattr(runner_mod, "parse_adoc_tests", lambda content, mode="explicit": [dummy_block])
+    monkeypatch.setattr(runner_mod, "run_test_blocks", lambda blocks, globs: None)
+
+    doc = tmp_path / "none_attr.adoc"
+    doc.write_text("= Test\n", encoding="utf-8")
+
+    passed, failed, errors = runner_mod.run_adoc_file(doc, split_sections=True)
+    assert passed == 1
+    assert failed == 0
+    assert not errors
+
+
 def test_run_path_split_sections(tmp_path: Path):
     from golem.plugins.doctest.runner import run_path
 
@@ -605,8 +691,8 @@ True
 
 
 def test_run_doctests_auto_discovery_with_config(tmp_path: Path, monkeypatch):
-    """Verify run_doctests() auto-discovers content_dir from golem.yaml config."""
-    from golem.plugins.doctest import run_asciidoc_doctests, run_doctests
+    """Verify run_doctests() auto-discovers content_dir from golem.toml config."""
+    from golem.plugins.doctest import run_doctests
 
     monkeypatch.chdir(tmp_path)
     content_dir = tmp_path / "custom_content"
@@ -626,7 +712,6 @@ def test_run_doctests_auto_discovery_with_config(tmp_path: Path, monkeypatch):
     config_file.write_text('[build]\ncontent_dir = "custom_content"\n', encoding="utf-8")
 
     assert run_doctests() == 0
-    assert run_asciidoc_doctests() == 0
 
 
 def test_run_doctests_auto_discovery_docs_dir(tmp_path: Path, monkeypatch):
@@ -855,9 +940,9 @@ def broken() -> int:
     assert "FAIL: Docstring tests for" in captured_fail.out
 
 
-def test_run_asciidoc_doctests_auto_discovery_config(tmp_path: Path, monkeypatch):
-    """Verify run_asciidoc_doctests auto-discovers content_dir from golem.toml."""
-    from golem.plugins.doctest import run_asciidoc_doctests
+def test_run_doctests_auto_discovery_config(tmp_path: Path, monkeypatch):
+    """Verify run_doctests auto-discovers content_dir from golem.toml."""
+    from golem.plugins.doctest import run_doctests
 
     monkeypatch.chdir(tmp_path)
     content_dir = tmp_path / "custom_docs"
@@ -877,13 +962,13 @@ def test_run_asciidoc_doctests_auto_discovery_config(tmp_path: Path, monkeypatch
     config_file = tmp_path / "golem.toml"
     config_file.write_text('[build]\ncontent_dir = "custom_docs"\n', encoding="utf-8")
 
-    result = run_asciidoc_doctests()
+    result = run_doctests()
     assert result == 0
 
 
-def test_run_asciidoc_doctests_auto_discovery_docs_fallback(tmp_path: Path, monkeypatch):
-    """Verify run_asciidoc_doctests falls back to docs directory when no config exists."""
-    from golem.plugins.doctest import run_asciidoc_doctests
+def test_run_doctests_auto_discovery_docs_fallback(tmp_path: Path, monkeypatch):
+    """Verify run_doctests falls back to docs directory when no config exists."""
+    from golem.plugins.doctest import run_doctests
 
     monkeypatch.chdir(tmp_path)
     docs_dir = tmp_path / "docs"
@@ -900,7 +985,7 @@ def test_run_asciidoc_doctests_auto_discovery_docs_fallback(tmp_path: Path, monk
         encoding="utf-8",
     )
 
-    result = run_asciidoc_doctests()
+    result = run_doctests()
     assert result == 0
 
 
