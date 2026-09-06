@@ -2,6 +2,7 @@ import requests
 import threading
 import time
 import socket
+from golem.diagnostics import Diagnostic
 from golem.server import LiveReloadServer
 
 
@@ -149,10 +150,10 @@ def test_dev_server_error_overlay_injection(tmp_path):
         rebuild_func=lambda: None,
         port=port,
         errors_func=lambda: [
-            {
-                "file": "docs/bad.adoc",
-                "message": "Syntax error: Unclosed attribute",
-            }
+            Diagnostic(
+                file="docs/bad.adoc",
+                message="Syntax error: Unclosed attribute",
+            )
         ],
     )
 

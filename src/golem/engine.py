@@ -83,8 +83,7 @@ class BuildEngine:
     `staleness_tracker` (StalenessTracker):: Staleness tracker and DAG dependency analyzer.
     `compiler` (PageCompiler):: Page template compiler instance.
     `nav_builder` (NavigationBuilder):: Hierarchical navigation builder and pagination generator.
-    `errors` (list[dict[str, Any]]):: Errors and diagnostics captured during compilation.
-    `diagnostics` (list[dict[str, Any]]):: Diagnostic entries (alias to `errors`).
+    `diagnostics` (list[Diagnostic]):: Diagnostic entries captured during compilation.
     `pm` (pluggy.PluginManager):: Plugin manager instance for build lifecycle hooks.
 
     === Examples
@@ -135,8 +134,7 @@ class BuildEngine:
             lambda p: is_partial(p, self.content_dir),
             self.get_file_metadata,
         )
-        self.errors: list[Diagnostic] = []
-        self.diagnostics: list[Diagnostic] = self.errors
+        self.diagnostics: list[Diagnostic] = []
         self._nav_tree_cache: list[dict[str, Any]] | None = None
 
     def get_file_metadata(self, path: Path) -> dict[str, Any]:
@@ -237,8 +235,7 @@ class BuildEngine:
         compiled_pages = engine.build_site()
         ----
         """
-        self.errors = []
-        self.diagnostics = self.errors
+        self.diagnostics = []
         self._nav_tree_cache = None
         compiled_files = []
 
@@ -506,7 +503,7 @@ class BuildEngine:
                     click.echo(f"  [COMPILE] {rel_doc} -> {rel_out}")
             except Exception as e:
                 error_info = Diagnostic.from_exception(e, file=str(doc_path))
-                self.errors.append(error_info)
+                self.diagnostics.append(error_info)
                 logging.error(f"Failed to build file {doc_path}: {e}")
                 if getattr(self.config, "strict", False):
                     raise e
@@ -541,8 +538,7 @@ class BuildEngine:
         True
         ----
         """
-        self.errors = []
-        self.diagnostics = self.errors
+        self.diagnostics = []
         diagnostics: list[Diagnostic] = []
 
         if files is None:
@@ -555,9 +551,6 @@ class BuildEngine:
             all_docs = files
 
         for doc_path in all_docs:
-            if files is None and is_partial(doc_path, self.content_dir):
-                continue
-
             try:
                 with open(doc_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
@@ -633,5 +626,4 @@ class BuildEngine:
                         )
 
         self.diagnostics = diagnostics
-        self.errors = diagnostics
         return diagnostics

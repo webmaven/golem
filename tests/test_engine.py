@@ -531,10 +531,10 @@ def test_engine_error_interception_permissive_mode(tmp_path, monkeypatch):
     # In permissive mode, valid page is built and broken page error is intercepted
     assert len(compiled) == 1
     assert compiled[0] == tmp_path / "dist" / "valid.html"
-    assert len(engine.errors) == 1
-    assert "broken.adoc" in engine.errors[0]["file"]
-    assert "AsciiDoc syntax parse error simulated" in engine.errors[0]["message"]
-    assert engine.errors[0]["error_type"] == "ValueError"
+    assert len(engine.diagnostics) == 1
+    assert "broken.adoc" in engine.diagnostics[0].file
+    assert "AsciiDoc syntax parse error simulated" in engine.diagnostics[0].message
+    assert engine.diagnostics[0].error_type == "ValueError"
 
 
 def test_engine_error_interception_strict_mode(tmp_path, monkeypatch):
@@ -561,8 +561,8 @@ def test_engine_error_interception_strict_mode(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="Fatal syntax error in strict mode"):
         engine.build_site()
 
-    assert len(engine.errors) >= 1
-    assert "broken.adoc" in engine.errors[0]["file"]
+    assert len(engine.diagnostics) >= 1
+    assert "broken.adoc" in engine.diagnostics[0].file
 
 
 def test_engine_passes_template_search_paths_to_render_body(tmp_path, monkeypatch):

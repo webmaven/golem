@@ -35,6 +35,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Callable, List
+from golem.diagnostics import Diagnostic, format_diagnostic
 
 logger = logging.getLogger("golem.server")
 
@@ -52,7 +53,7 @@ class LiveReloadServer:
     `change_detected_func` (Callable[[], bool]):: Predicate function returning `True` when source changes are detected.
     `rebuild_func` (Callable[[], None]):: Callback function invoked to recompile the static site upon detected modifications.
     `port` (int):: TCP port on which the HTTP server listens. Defaults to `8000`.
-    `errors_func` (Callable[[], list[dict]] | None):: Optional callback returning a list of build error dictionaries for overlay rendering. Defaults to `None`.
+    `errors_func` (Callable[[], list[Diagnostic]] | None):: Optional callback returning a list of build diagnostic entries for overlay rendering. Defaults to `None`.
     `reload_queues` (list[queue.Queue]):: Active client message queues for connected SSE browser streams.
     `queues_lock` (threading.Lock):: Mutex lock protecting concurrent access to `reload_queues`.
     `is_running` (bool):: Flag indicating whether the server and background watcher threads are active.
@@ -85,7 +86,7 @@ class LiveReloadServer:
         change_detected_func: Callable[[], bool],
         rebuild_func: Callable[[], None],
         port: int = 8000,
-        errors_func: Callable[[], list[dict]] | None = None,
+        errors_func: Callable[[], list[Diagnostic]] | None = None,
     ):
         """Initialize a LiveReloadServer instance.
 
@@ -98,7 +99,7 @@ class LiveReloadServer:
         `change_detected_func` (Callable[[], bool]):: Predicate callable returning `True` when source changes are detected.
         `rebuild_func` (Callable[[], None]):: Callback callable invoked to trigger site recompilation upon detected changes.
         `port` (int, optional):: TCP port on which the HTTP server listens. Defaults to `8000`.
-        `errors_func` (Callable[[], list[dict]] | None, optional):: Optional callable returning a list of build error dictionaries. Defaults to `None`.
+        `errors_func` (Callable[[], list[Diagnostic]] | None, optional):: Optional callable returning a list of build diagnostic entries. Defaults to `None`.
         """
         self.public_dir = Path(public_dir)
         self.watch_dir = Path(watch_dir)
@@ -251,10 +252,9 @@ class LiveReloadServer:
                         if not err_msg and server_instance.errors_func is not None:
                             errs = server_instance.errors_func()
                             if errs:
-                                from golem.cli import format_diagnostic
-
+                                err_items = [Diagnostic(**e) if isinstance(e, dict) else e for e in errs]
                                 err_msg = "\n\n".join(
-                                    format_diagnostic(e, content_dir=server_instance.watch_dir) for e in errs
+                                    format_diagnostic(e, content_dir=server_instance.watch_dir) for e in err_items
                                 )
 
                         if err_msg:

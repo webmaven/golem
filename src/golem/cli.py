@@ -23,11 +23,11 @@ import time
 from typing import Any, Iterator
 import click
 from golem.config import GolemConfig, load_config, find_default_config_path
-from golem.diagnostics import Diagnostic, format_diagnostic
+from golem.diagnostics import format_diagnostic
 from golem.engine import BuildEngine
 from golem.plugins import get_plugin_manager
 
-__all__ = ["Diagnostic", "format_diagnostic", "main"]
+__all__ = ["main"]
 
 BUILTIN_PLUGINS: list[str] = ["golem.plugins.doctest", "golem.plugins.apidoc"]
 
@@ -523,13 +523,13 @@ def build(config, clean, strict, verbose, quiet, directory=None):
             engine = BuildEngine(golem_config)
             compiled = engine.build_site()
         except Exception as e:
-            if hasattr(engine, "errors") and engine.errors:
-                for err in engine.errors:
+            if hasattr(engine, "diagnostics") and engine.diagnostics:
+                for err in engine.diagnostics:
                     click.echo(format_diagnostic(err), err=True)
             raise click.ClickException(f"Compilation Error: {e}")
 
-        if engine.errors:
-            for err in engine.errors:
+        if engine.diagnostics:
+            for err in engine.diagnostics:
                 click.echo(format_diagnostic(err))
 
         elapsed = time.perf_counter() - start_time
@@ -602,13 +602,13 @@ def serve(port, host, strict, directory=None, test_only=False):
             engine = BuildEngine(golem_config)
             compiled = engine.build_site()
         except Exception as e:
-            if hasattr(engine, "errors") and engine.errors:
-                for err in engine.errors:
+            if hasattr(engine, "diagnostics") and engine.diagnostics:
+                for err in engine.diagnostics:
                     click.echo(format_diagnostic(err), err=True)
             raise click.ClickException(f"Compilation Error: {e}")
 
-        if engine.errors:
-            for err in engine.errors:
+        if engine.diagnostics:
+            for err in engine.diagnostics:
                 click.echo(format_diagnostic(err))
 
         elapsed = time.perf_counter() - start_time
@@ -630,12 +630,12 @@ def serve(port, host, strict, directory=None, test_only=False):
             try:
                 recompiled = engine.build_site()
             except Exception:
-                if hasattr(engine, "errors") and engine.errors:
-                    for err in engine.errors:
+                if hasattr(engine, "diagnostics") and engine.diagnostics:
+                    for err in engine.diagnostics:
                         click.echo(format_diagnostic(err), err=True)
                 raise
-            if engine.errors:
-                for err in engine.errors:
+            if engine.diagnostics:
+                for err in engine.diagnostics:
                     click.echo(format_diagnostic(err))
             dt = time.perf_counter() - t0
             if recompiled:
@@ -651,7 +651,7 @@ def serve(port, host, strict, directory=None, test_only=False):
             change_detected_func=lambda: bool(engine.staleness_tracker.get_outdated_files(commit=False)),
             rebuild_func=on_rebuild,
             port=port,
-            errors_func=lambda: engine.errors,
+            errors_func=lambda: engine.diagnostics,
         )
         server.run()
 

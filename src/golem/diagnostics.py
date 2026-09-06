@@ -8,38 +8,29 @@ modern compiler diagnostics.
 
 from __future__ import annotations
 
-import re
-import sys
-import types
+from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Any
 
-# Ensure asciidoctrine.exceptions can be imported even if not exposed directly upstream
 try:
     from asciidoctrine.exceptions import AsciiDocSyntaxError  # type: ignore[import-not-found,import-untyped]
 except ImportError:
     try:
         from asciidoctrine import AsciiDocSyntaxError  # type: ignore[assignment]
     except ImportError:
-        try:
-            from asciidoctrine.lark_parser import AsciiDocSyntaxError  # type: ignore[assignment]
-        except ImportError:
-            AsciiDocSyntaxError = None  # type: ignore[assignment,misc]
-
-if "asciidoctrine.exceptions" not in sys.modules and AsciiDocSyntaxError is not None:
-    mod = types.ModuleType("asciidoctrine.exceptions")
-    mod.AsciiDocSyntaxError = AsciiDocSyntaxError  # type: ignore[attr-defined]
-    sys.modules["asciidoctrine.exceptions"] = mod
+        AsciiDocSyntaxError = None  # type: ignore[assignment,misc]
 
 
-def format_diagnostic(error: dict[str, Any] | Exception, content_dir: Path | str | None = None) -> str:
+def format_diagnostic(error: Diagnostic | Exception, content_dir: Path | str | None = None) -> str:
     """Format clean AsciiDoc compiler diagnostics with source coordinates and context snippets.
 
     === Examples
 
     [source,python]
     ----
-    >>> err = {"file": "docs/02-architecture.adoc", "line": 14, "column": 5, "message": "Unclosed attribute list"}
+    >>> from golem.diagnostics import Diagnostic
+    >>> err = Diagnostic(file="docs/02-architecture.adoc", line=14, column=5, message="Unclosed attribute list")
     >>> "Error in docs/02-architecture.adoc:14:5" in format_diagnostic(err)
     True
 
@@ -56,29 +47,21 @@ def format_diagnostic(error: dict[str, Any] | Exception, content_dir: Path | str
         severity = getattr(exc, "severity", "error")
         context_str = getattr(exc, "context", None)
     else:
-        exc = error.get("exception")
-        message = str(error.get("message", ""))
-        file_path_raw = error.get("file") or (
+        exc = error.exception
+        message = error.message or (getattr(exc, "message", str(exc)) if exc else "")
+        file_path_raw = error.file or (
             getattr(exc, "filepath", None)
             if (getattr(exc, "filepath", None) and getattr(exc, "filepath", None) != "<root>")
             else (getattr(exc, "filename", getattr(exc, "file", None)) if exc else None)
         )
-        line = error.get("line") or (getattr(exc, "lineno", getattr(exc, "line", None)) if exc else None)
+        line = error.line if error.line is not None else (getattr(exc, "lineno", getattr(exc, "line", None)) if exc else None)
         column = (
-            error.get("column")
-            or error.get("col")
-            or (
-                getattr(
-                    exc,
-                    "offset",
-                    getattr(exc, "column", getattr(exc, "col_offset", None)),
-                )
-                if exc
-                else None
-            )
+            error.column
+            if error.column is not None
+            else (getattr(exc, "offset", getattr(exc, "column", getattr(exc, "col_offset", None))) if exc else None)
         )
-        severity = error.get("severity", "error")
-        context_str = error.get("context") or (getattr(exc, "context", None) if exc else None)
+        severity = error.severity or "error"
+        context_str = error.context or (getattr(exc, "context", None) if exc else None)
 
     # If line / column not found, parse coordinates from message if present
     if (line is None or column is None) and message:
@@ -160,123 +143,26 @@ def format_diagnostic(error: dict[str, Any] | Exception, content_dir: Path | str
     return header
 
 
-class Diagnostic(dict[str, Any]):
-    """Compiler diagnostic entry representing an error or warning.
+@dataclass(repr=False)
+class Diagnostic:
+    """Compiler diagnostic entry representing an error or warning."""
 
-    Maintains full dict compatibility while providing structured attribute access
-    and compiler-grade string formatting.
-    """
+    file: str = ""
+    line: int | None = None
+    column: int | None = None
+    message: str = ""
+    severity: str = "error"
+    error_type: str | None = None
+    context: str | None = None
+    exception: Exception | None = None
 
-    def __init__(
-        self,
-        *args: Any,
-        file: str | Path | None = None,
-        line: int | None = None,
-        column: int | None = None,
-        message: str = "",
-        severity: str | None = None,
-        error_type: str | None = None,
-        context: str | None = None,
-        exception: Exception | None = None,
-        **kwargs: Any,
-    ) -> None:
-        super().__init__(*args, **kwargs)
-        if file is not None:
-            self["file"] = str(file)
-        elif "file" not in self:
-            self["file"] = ""
-        if line is not None:
-            self["line"] = line
-        elif "line" not in self:
-            self["line"] = None
-        if column is not None:
-            self["column"] = column
-        elif "column" not in self:
-            self["column"] = None
-        if message:
-            self["message"] = message
-        elif "message" not in self:
-            self["message"] = ""
-        if severity is not None:
-            self["severity"] = severity
-        elif "severity" not in self:
-            self["severity"] = "error"
-        if error_type is not None:
-            self["error_type"] = error_type
-        elif "error_type" not in self:
-            self["error_type"] = None
-        if context is not None:
-            self["context"] = context
-        elif "context" not in self:
-            self["context"] = None
-        if exception is not None:
-            self["exception"] = exception
-        elif "exception" not in self:
-            self["exception"] = None
-
-    @property
-    def file(self) -> str:
-        return self.get("file", "")
-
-    @file.setter
-    def file(self, val: str | Path | None) -> None:
-        self["file"] = str(val) if val is not None else ""
-
-    @property
-    def line(self) -> int | None:
-        return self.get("line")
-
-    @line.setter
-    def line(self, val: int | None) -> None:
-        self["line"] = val
-
-    @property
-    def column(self) -> int | None:
-        return self.get("column")
-
-    @column.setter
-    def column(self, val: int | None) -> None:
-        self["column"] = val
-
-    @property
-    def message(self) -> str:
-        return self.get("message", "")
-
-    @message.setter
-    def message(self, val: str) -> None:
-        self["message"] = val
-
-    @property
-    def severity(self) -> str:
-        return self.get("severity", "error")
-
-    @severity.setter
-    def severity(self, val: str) -> None:
-        self["severity"] = val
-
-    @property
-    def error_type(self) -> str | None:
-        return self.get("error_type")
-
-    @error_type.setter
-    def error_type(self, val: str | None) -> None:
-        self["error_type"] = val
-
-    @property
-    def context(self) -> str | None:
-        return self.get("context")
-
-    @context.setter
-    def context(self, val: str | None) -> None:
-        self["context"] = val
-
-    @property
-    def exception(self) -> Exception | None:
-        return self.get("exception")
-
-    @exception.setter
-    def exception(self, val: Exception | None) -> None:
-        self["exception"] = val
+    def __post_init__(self) -> None:
+        if self.file:
+            self.file = str(self.file)
+        else:
+            self.file = ""
+        if not self.severity:
+            self.severity = "error"
 
     @classmethod
     def from_exception(
@@ -284,13 +170,13 @@ class Diagnostic(dict[str, Any]):
         exc: Exception,
         file: str | Path | None = None,
         severity: str = "error",
-    ) -> "Diagnostic":
+    ) -> Diagnostic:
         """Construct a Diagnostic from an upstream syntax error or generic compilation exception."""
         exc_file = getattr(exc, "filepath", None)
         if exc_file == "<root>" or not exc_file:
             exc_file = getattr(exc, "filename", getattr(exc, "file", None))
 
-        target_file = exc_file or file or ""
+        target_file = str(exc_file or file or "")
         msg = getattr(exc, "message", str(exc))
         line = getattr(exc, "line", getattr(exc, "lineno", None))
         column = getattr(
@@ -326,14 +212,25 @@ class Diagnostic(dict[str, Any]):
     @classmethod
     def from_resolver_warning(
         cls,
-        warning: dict[str, Any],
+        warning: Any,
         file: str | Path | None = None,
         content: str | None = None,
-    ) -> "Diagnostic":
-        """Construct a Diagnostic from an ASGResolver warning dictionary."""
-        line = warning.get("line")
-        column = warning.get("column")
-        target = warning.get("target")
+    ) -> Diagnostic:
+        """Construct a Diagnostic from an ASGResolver warning dictionary or object."""
+
+        def _get_val(obj: Any, key: str, default: Any = None) -> Any:
+            if hasattr(obj, "get") and callable(getattr(obj, "get", None)):
+                try:
+                    val = obj.get(key)
+                    if val is not None:
+                        return val
+                except Exception:
+                    pass
+            return getattr(obj, key, default)
+
+        line = _get_val(warning, "line")
+        column = _get_val(warning, "column")
+        target = _get_val(warning, "target")
         if (line is None or column is None) and content and target:
             for idx, line_str in enumerate(content.splitlines(), start=1):
                 if target in line_str:
@@ -342,14 +239,17 @@ class Diagnostic(dict[str, Any]):
                     column = col_idx + 1 if col_idx != -1 else 1
                     break
 
+        warn_file = _get_val(warning, "file", "")
+        target_file = str(file or warn_file or "")
+
         return cls(
-            file=file or warning.get("file", ""),
+            file=target_file,
             line=line,
             column=column,
-            message=warning.get("message", "Resolver warning"),
+            message=str(_get_val(warning, "message", "Resolver warning")),
             severity="warning",
-            error_type=warning.get("type", "ResolverWarning"),
-            context=warning.get("context"),
+            error_type=str(_get_val(warning, "type", "ResolverWarning")),
+            context=_get_val(warning, "context"),
         )
 
     def __str__(self) -> str:
