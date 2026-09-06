@@ -19,6 +19,11 @@ import asciidoctrine  # type: ignore[import-untyped]
 from asciidoctrine.resolver import ASGResolver  # type: ignore[import-untyped]
 
 from golem.highlighting import make_highlighter
+from golem.views_protocol import (
+    BodyRendererProtocol,
+    extract_plain_text,
+    get_default_renderer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +123,8 @@ def generate_asciidoc_views(
     code_text: str,
     views: Union[str, Sequence[str]],
     highlighter: Optional[Callable[[str, str], Optional[str]]] = None,
+    renderer_func: Optional[Union[BodyRendererProtocol, Callable[..., str]]] = None,
+    renderer: Optional[Union[BodyRendererProtocol, Callable[..., str]]] = None,
 ) -> list[dict[str, str]]:
     """Synthesize multi-representation derived views for an AsciiDoc snippet.
 
@@ -130,8 +137,9 @@ def generate_asciidoc_views(
     [parameters]
     `code_text` (str):: Raw AsciiDoc source snippet to compile.
     `views` (str | Sequence[str]):: Comma-separated string or sequence of requested view names.
-    `highlighter` (Callable[[str, str], Optional[str]] | None, optional):: Syntax highlighter callable.
-        Defaults to `make_highlighter()`.
+    `highlighter` (Callable[[str, str], Optional[str]] | None, optional):: Syntax highlighter callable. Defaults to `None`.
+    `renderer_func` (BodyRendererProtocol | Callable[..., str] | None, optional):: Body renderer callable or protocol implementation. Defaults to `None`.
+    `renderer` (BodyRendererProtocol | Callable[..., str] | None, optional):: Body renderer callable or protocol implementation alias. Defaults to `None`.
 
     [returns]
     `list[dict[str, str]]`:: List of view dictionaries, each containing `id`, `label`, `content`, and `language`.
@@ -151,6 +159,9 @@ def generate_asciidoc_views(
         return []
 
     active_highlighter = highlighter if highlighter is not None else make_highlighter()
+    active_renderer = renderer if renderer is not None else renderer_func
+    if active_renderer is None:
+        active_renderer = get_default_renderer()
 
     # Cached intermediate representations
     asg_obj: Optional[Any] = None
@@ -183,11 +194,13 @@ def generate_asciidoc_views(
             return rendered_html_str
         resolved_asg, _ = _get_asg()
         try:
-            from golem.renderer import render_body
-
-            asg_to_render = copy.deepcopy(resolved_asg)
-            _strip_view_attributes(asg_to_render)
-            rendered_html_str = render_body(asg_to_render, highlighter=active_highlighter)
+            if active_renderer is not None:
+                asg_to_render = copy.deepcopy(resolved_asg)
+                _strip_view_attributes(asg_to_render)
+                rendered_html_str = active_renderer(asg_to_render, highlighter=active_highlighter)
+            else:
+                logger.warning("No HTML body renderer provided for derived view rendering")
+                rendered_html_str = '<div class="rendered-preview"><!-- HTML renderer not configured --></div>'
         except Exception as err:
             logger.warning("Failed to render ASG to HTML: %s", err)
             rendered_html_str = f'<div class="error">{html.escape(str(err))}</div>'
@@ -264,12 +277,16 @@ def generate_asciidoc_views(
 def extract_listing_views(
     node: dict[str, Any],
     highlighter: Optional[Callable[[str, str], Optional[str]]] = None,
+    renderer_func: Optional[Union[BodyRendererProtocol, Callable[..., str]]] = None,
+    renderer: Optional[Union[BodyRendererProtocol, Callable[..., str]]] = None,
 ) -> list[dict[str, str]]:
     """Extract requested derived views from an ASG listing block node.
 
     [parameters]
     `node` (dict[str, Any]):: ASG listing node dictionary.
-    `highlighter` (Callable[[str, str], Optional[str]] | None, optional):: Syntax highlighter callable.
+    `highlighter` (Callable[[str, str], Optional[str]] | None, optional):: Syntax highlighter callable. Defaults to `None`.
+    `renderer_func` (BodyRendererProtocol | Callable[..., str] | None, optional):: Body renderer callable or protocol implementation. Defaults to `None`.
+    `renderer` (BodyRendererProtocol | Callable[..., str] | None, optional):: Body renderer callable or protocol implementation alias. Defaults to `None`.
 
     [returns]
     `list[dict[str, str]]`:: List of derived view representations, or an empty list if no views were requested.
@@ -285,13 +302,13 @@ def extract_listing_views(
     if not views:
         return []
 
+    active_renderer = renderer if renderer is not None else renderer_func
+
     code_text = node.get("value")
     if code_text is None:
         inlines = node.get("inlines", [])
         if inlines:
-            from golem.renderer import _extract_plain_text
-
-            code_text = _extract_plain_text(inlines)
+            code_text = extract_plain_text(inlines)
         else:
             code_text = ""
 
@@ -299,4 +316,5 @@ def extract_listing_views(
         code_text=str(code_text),
         views=views,
         highlighter=highlighter,
+        renderer=active_renderer,
     )

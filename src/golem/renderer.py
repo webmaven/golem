@@ -36,6 +36,11 @@ from typing import Any, Callable, Optional, Sequence, Union
 import asciidoctype  # type: ignore[import-untyped]
 from asciidoctrine.nodes import Node
 from golem.highlighting import make_highlighter
+from golem.views import extract_listing_views
+from golem.views_protocol import (
+    _extract_plain_text,
+    set_default_renderer,
+)
 
 
 DEFAULT_TEMPLATES_DIR: Path = Path(__file__).parent / "templates" / "default"
@@ -65,9 +70,7 @@ class GolemRenderer(asciidoctype.AsciiDoctypeRenderer):
         context: Optional[dict[str, Any]] = None,
     ) -> list[dict[str, str]]:
         """Extract multi-view derived representations for a listing node."""
-        from golem.views import extract_listing_views
-
-        return extract_listing_views(node, highlighter=self.highlighter)
+        return extract_listing_views(node, highlighter=self.highlighter, renderer=render_body)
 
     def get_listing_uid(
         self,
@@ -320,6 +323,9 @@ def render_body(
     return renderer.render(node_dict)
 
 
+set_default_renderer(render_body)
+
+
 def _slugify(text: str) -> str:
     """Generate a clean URL-friendly and HTML id-friendly slug from text.
 
@@ -443,56 +449,6 @@ def _ensure_section_ids(node: Any) -> None:
     elif hasattr(node, "items") and node.items:
         for child in node.items:
             _ensure_section_ids(child)
-
-
-def _extract_plain_text(node: Any) -> str:
-    """Recursively extract plain string representations from nested inlines or AST nodes.
-
-    Traverses string literals, lists, dictionaries, or AST `Node` instances to extract
-    and concatenate plain text content from `value`, `text`, `inlines`, `children`,
-    `title`, or child collections while ignoring structural markup.
-
-    [parameters]
-    `node` (Any):: AST Node, ASG dictionary, list of nodes, string, or primitive value to extract text from.
-
-    [returns]
-    `str`:: Concatenated plain text string extracted from the node hierarchy.
-    """
-    if not node:
-        return ""
-    if isinstance(node, str):
-        return node
-    if isinstance(node, list):
-        return "".join(_extract_plain_text(item) for item in node)
-    if isinstance(node, dict):
-        if node.get("name") == "text":
-            return str(node.get("value", ""))
-        if "value" in node and isinstance(node["value"], (str, int, float)):
-            return str(node["value"])
-        if "text" in node and isinstance(node["text"], (str, int, float)):
-            return str(node["text"])
-        res = []
-        for key in ("inlines", "children", "title"):
-            if key in node and isinstance(node[key], (list, dict, str)):
-                res.append(_extract_plain_text(node[key]))
-        return "".join(res)
-    if hasattr(node, "value") and node.value is not None:
-        return str(node.value)
-    if hasattr(node, "text") and node.text is not None:
-        return str(node.text)
-    res = []
-    if hasattr(node, "inlines") and node.inlines:
-        res.append(_extract_plain_text(node.inlines))
-    elif hasattr(node, "title") and node.title:
-        res.append(_extract_plain_text(node.title))
-    elif hasattr(node, "get_child_collections"):
-        for collection in node.get_child_collections().values():
-            for child in collection:
-                res.append(_extract_plain_text(child))
-    elif hasattr(node, "children") and node.children:
-        for child in node.children:
-            res.append(_extract_plain_text(child))
-    return "".join(res)
 
 
 def _collect_sections(node: Any, sections: list) -> None:
