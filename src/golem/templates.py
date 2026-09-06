@@ -50,8 +50,31 @@ class PageCompiler:
         Initialize the compiler with a Golem configuration.
         """
         self.config = config
+        self._disk_template_cache: dict[Path, tuple[float, PageTemplate]] = {}
         self._pkg_default_template = self._load_builtin_template()
         self.default_template = self._load_builtin_template()
+
+    def _get_disk_template(self, template_path: Path) -> PageTemplate:
+        """Load and cache a PageTemplate from disk with mtime invalidation.
+
+        [parameters]
+        `template_path` (Path):: Path to the template file on disk.
+
+        [returns]
+        `PageTemplate`:: Compiled Chameleon PageTemplate instance.
+        """
+        template_path = Path(template_path)
+        mtime = template_path.stat().st_mtime
+        if template_path in self._disk_template_cache:
+            cached_mtime, cached_template = self._disk_template_cache[template_path]
+            if cached_mtime == mtime:
+                return cached_template
+
+        with open(template_path, "r", encoding="utf-8") as f:
+            template_content = f.read()
+        template = PageTemplate(template_content)
+        self._disk_template_cache[template_path] = (mtime, template)
+        return template
 
     def _load_builtin_template(self) -> PageTemplate:
         """Load default package skeleton template from src/golem/templates/default/skeleton.pt."""
@@ -112,24 +135,18 @@ class PageCompiler:
         generator_version = getattr(golem, "__version__", "0.1.0a2")
 
         if template_path is not None:
-            with open(template_path, "r", encoding="utf-8") as f:
-                template_content = f.read()
-            template = PageTemplate(template_content)
+            template = self._get_disk_template(template_path)
         else:
             # Check for user's scaffolded custom templates directory first
             user_pt = Path(self.config.templates_dir) / "page.pt" if getattr(self.config, "templates_dir", None) else None
             if user_pt and user_pt.exists():
-                with open(user_pt, "r", encoding="utf-8") as f:
-                    template_content = f.read()
-                template = PageTemplate(template_content)
+                template = self._get_disk_template(user_pt)
             else:
                 # Fallback to configured themes folder override if exists
                 theme_dir = Path("themes") / self.config.theme
                 skeleton_pt = theme_dir / "skeleton.pt"
                 if skeleton_pt.exists():
-                    with open(skeleton_pt, "r", encoding="utf-8") as f:
-                        template_content = f.read()
-                    template = PageTemplate(template_content)
+                    template = self._get_disk_template(skeleton_pt)
                 else:
                     template = self.default_template
 

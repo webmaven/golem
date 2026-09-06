@@ -5,6 +5,9 @@ This module contains unit tests for verifying the Chameleon page layout compilat
 rich structured context passing, default built-in package templates, and theme/template overrides.
 """
 
+import os
+from pathlib import Path
+
 import pytest
 from golem.templates import PageCompiler
 from golem.config import GolemConfig
@@ -394,8 +397,6 @@ def test_compile_page_includes_client_interaction_script(tmp_path):
 
 def test_skeleton_copy_button_preview_targeting(tmp_path):
     """Verify skeleton client script scopes copy to active pane and falls back to source pane for preview tab."""
-    from pathlib import Path
-
     tpl_path = Path(__file__).parent.parent / "src" / "golem" / "templates" / "default" / "skeleton.pt"
     tpl_content = tpl_path.read_text(encoding="utf-8")
     assert "activePane" in tpl_content
@@ -503,3 +504,123 @@ def test_corrupt_theme_skeleton_pt_raises(tmp_path, monkeypatch):
 
     with pytest.raises(Exception):
         compiler.compile_page(title="Test Title", body_html="<p>Main Body</p>", toc_html="")
+
+
+def test_custom_template_path_caching_and_mtime_invalidation(tmp_path):
+    """Verify compiling with a custom template_path reuses PageTemplate until mtime changes."""
+    custom_tpl = tmp_path / "custom.pt"
+    custom_tpl.write_text(
+        '<html><body><h1>V1: ${title}</h1><div tal:content="structure body_html" /></body></html>',
+        encoding="utf-8",
+    )
+
+    compiler = PageCompiler(GolemConfig())
+
+    # Compile first page
+    html1 = compiler.compile_page(title="Page 1", body_html="<p>Body 1</p>", template_path=custom_tpl)
+    assert "V1: Page 1" in html1
+    assert custom_tpl in compiler._disk_template_cache
+    cached_mtime1, tpl_instance1 = compiler._disk_template_cache[custom_tpl]
+
+    # Compile second page - should reuse exact same PageTemplate instance
+    html2 = compiler.compile_page(title="Page 2", body_html="<p>Body 2</p>", template_path=custom_tpl)
+    assert "V1: Page 2" in html2
+    cached_mtime2, tpl_instance2 = compiler._disk_template_cache[custom_tpl]
+    assert tpl_instance2 is tpl_instance1
+    assert cached_mtime2 == cached_mtime1
+
+    # Modify file and update mtime using os.utime
+    new_mtime = custom_tpl.stat().st_mtime + 10.0
+    custom_tpl.write_text(
+        '<html><body><h1>V2: ${title}</h1><div tal:content="structure body_html" /></body></html>',
+        encoding="utf-8",
+    )
+    os.utime(custom_tpl, (new_mtime, new_mtime))
+
+    # Compile third page - cache must invalidate and reload updated template
+    html3 = compiler.compile_page(title="Page 3", body_html="<p>Body 3</p>", template_path=custom_tpl)
+    assert "V2: Page 3" in html3
+    cached_mtime3, tpl_instance3 = compiler._disk_template_cache[custom_tpl]
+    assert tpl_instance3 is not tpl_instance1
+    assert cached_mtime3 == new_mtime
+
+
+def test_theme_skeleton_caching_and_mtime_invalidation(tmp_path, monkeypatch):
+    """Verify theme skeleton.pt reuses PageTemplate until mtime changes."""
+    monkeypatch.chdir(tmp_path)
+    theme_dir = tmp_path / "themes" / "customtheme"
+    theme_dir.mkdir(parents=True)
+    skeleton_pt = theme_dir / "skeleton.pt"
+    skeleton_pt.write_text(
+        '<html><body><header>Theme V1</header><div tal:content="structure body_html" /></body></html>',
+        encoding="utf-8",
+    )
+
+    compiler = PageCompiler(GolemConfig(theme="customtheme"))
+
+    # Compile first page
+    html1 = compiler.compile_page(title="Page 1", body_html="<p>Body 1</p>")
+    assert "<header>Theme V1</header>" in html1
+
+    disk_key = Path("themes") / "customtheme" / "skeleton.pt"
+    assert disk_key in compiler._disk_template_cache
+    cached_mtime1, tpl_instance1 = compiler._disk_template_cache[disk_key]
+
+    # Compile second page - should reuse cached template
+    html2 = compiler.compile_page(title="Page 2", body_html="<p>Body 2</p>")
+    assert "<header>Theme V1</header>" in html2
+    assert compiler._disk_template_cache[disk_key][1] is tpl_instance1
+
+    # Invalidate via os.utime
+    new_mtime = skeleton_pt.stat().st_mtime + 10.0
+    skeleton_pt.write_text(
+        '<html><body><header>Theme V2</header><div tal:content="structure body_html" /></body></html>',
+        encoding="utf-8",
+    )
+    os.utime(skeleton_pt, (new_mtime, new_mtime))
+
+    # Compile third page - cache invalidates
+    html3 = compiler.compile_page(title="Page 3", body_html="<p>Body 3</p>")
+    assert "<header>Theme V2</header>" in html3
+    cached_mtime3, tpl_instance3 = compiler._disk_template_cache[disk_key]
+    assert tpl_instance3 is not tpl_instance1
+    assert cached_mtime3 == new_mtime
+
+
+def test_user_templates_dir_page_pt_caching_and_mtime_invalidation(tmp_path):
+    """Verify templates_dir/page.pt reuses PageTemplate until mtime changes."""
+    custom_tpl_dir = tmp_path / "custom_templates"
+    custom_tpl_dir.mkdir()
+    user_pt = custom_tpl_dir / "page.pt"
+    user_pt.write_text(
+        '<html><body><h1>User V1: ${title}</h1><div tal:content="structure body_html" /></body></html>',
+        encoding="utf-8",
+    )
+
+    compiler = PageCompiler(GolemConfig(templates_dir=str(custom_tpl_dir)))
+
+    # Compile first page
+    html1 = compiler.compile_page(title="Page 1", body_html="<p>Body 1</p>")
+    assert "User V1: Page 1" in html1
+    assert user_pt in compiler._disk_template_cache
+    cached_mtime1, tpl_instance1 = compiler._disk_template_cache[user_pt]
+
+    # Compile second page - reuses template
+    html2 = compiler.compile_page(title="Page 2", body_html="<p>Body 2</p>")
+    assert "User V1: Page 2" in html2
+    assert compiler._disk_template_cache[user_pt][1] is tpl_instance1
+
+    # Invalidate via os.utime
+    new_mtime = user_pt.stat().st_mtime + 10.0
+    user_pt.write_text(
+        '<html><body><h1>User V2: ${title}</h1><div tal:content="structure body_html" /></body></html>',
+        encoding="utf-8",
+    )
+    os.utime(user_pt, (new_mtime, new_mtime))
+
+    # Compile third page
+    html3 = compiler.compile_page(title="Page 3", body_html="<p>Body 3</p>")
+    assert "User V2: Page 3" in html3
+    cached_mtime3, tpl_instance3 = compiler._disk_template_cache[user_pt]
+    assert tpl_instance3 is not tpl_instance1
+    assert cached_mtime3 == new_mtime
