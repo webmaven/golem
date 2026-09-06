@@ -10,27 +10,17 @@ and this project adheres to https://semver.org/spec/v2.0.0.html[Semantic Version
 
 toc::[]
 
-== Unreleased
+== 0.1.0a3 - 2026-09-05
 
 === Added
 
+* *Headless Syntax & Diagnostic Check Command:* Added `golem check` CLI subcommand with `--strict`, `-C/--directory`, and `-v/--verbose` options for headless, non-writing compiler and resolver diagnostic verification.
+* *Event-Driven File Watching & Port Collision Fallback:* Added event-driven filesystem monitoring supporting `watchfiles` and `watchdog` with sub-100ms rebuild detection and low-latency adaptive polling fallback; added automatic port collision fallback (`port + 1` up to 10 attempts) when binding the development server.
+* *Document Path in Plugin ASG Hook:* Added `doc_path: Path | None = None` parameter to `@hookspec def on_asg_created` in `golem.plugins`, passing the active document's filesystem path to plugins with argument filtering for legacy plugins.
+* *Custom & Theme Template Caching:* Added mtime-invalidated disk `PageTemplate` caching in `PageCompiler` for user templates (`templates/page.pt`), custom template paths, and theme skeletons (`themes/<theme>/skeleton.pt`).
 * *Per-Section Doctest Isolation:* Added `--split-sections` flag to doctest plugin (`golem doctest --split-sections`) for per-section test isolation across section boundaries.
 * *Composite and Union Type Documentation:* Added composite and union type annotation support in `apidoc` formatter (lossless `Union`, `Optional`, named returns).
 * *Human-Readable Syntax Diagnostics:* Added human-readable build diagnostics in `BuildEngine.check()` using `AsciiDocSyntaxError` file/line/column info and `ASGResolver.warnings`.
-
-=== Changed
-
-* *Search Paths Typing Modernization:* `render_body` `search_paths` parameter now natively accepts `Sequence[Path | str]` (AsciiDoctype 0.1.0a6 alignment).
-* *Renderer, Template & Plugin Caching:* `GolemRenderer`, `PageCompiler` skeleton, and plugin entry-point discovery are now cached for significant build and test performance improvement.
-* *Upstream Dependency Upgrades:* Upgraded upstream dependencies: AsciiDoctrine 0.2.0a7, AsciiDocstring 0.1.0a9, AsciiDoctype 0.1.0a6, AsciiDoctest 0.2.0a5.
-
-=== Fixed
-
-* *Diagnostic Severity Preservation:* `Diagnostic` positional dict initialization no longer clobbers `"severity"` from the input mapping.
-
-== 0.1.0a3 - 2026-09-01
-
-=== Added
 
 * *ASG-Level API Doc Macro Splicing (Issue #10):*
 ** New `on_asg_created` plugin hook implementation in `golem.plugins.apidoc` that splices `golem:apidoc[pass:[...]]` block macros directly into the document Abstract Semantic Graph after full semantic resolution.
@@ -57,6 +47,12 @@ toc::[]
 
 === Changed
 
+* *Decoupled Views and Renderer:* Eliminated deferred circular imports between `golem.renderer` and `golem.views` via `views_protocol.py` defining `BodyRendererProtocol` and dependency injection.
+* *Canonical Template Context Keys:* Realigned Chameleon template context keys to canonical `title`, `body_html`, `nav_html`, `body_class`, `content_class`, and `site_title`, removing deprecated aliases.
+* *Python Runtime Compatibility:* Relaxed Python constraint to `requires-python = ">=3.12"` for Python 3.13+ forward compatibility.
+* *Search Paths Typing Modernization:* `render_body` `search_paths` parameter now natively accepts `Sequence[Path | str]` (AsciiDoctype 0.1.0a6 alignment).
+* *Renderer, Template & Plugin Caching:* `GolemRenderer`, `PageCompiler` skeleton, disk templates, and plugin entry-point discovery are now cached for significant build and test performance improvement.
+* *Upstream Dependency Upgrades:* Upgraded upstream dependencies: AsciiDoctrine 0.2.0a7, AsciiDocstring 0.1.0a9, AsciiDoctype 0.1.0a6, AsciiDoctest 0.2.0a5.
 * *`on_pre_parse` Macro Expansion Deprecated:* The `on_pre_parse` hook in `golem.plugins.apidoc` is now a deprecated fallback for `golem:apidoc[...]` macro expansion. It emits a `logger.warning` when invoked and will be removed in a future release. The `on_asg_created` hook is the preferred expansion path.
 * *Table Column Alignment Propagation:* `golem.renderer` now propagates column-level `halign`/`valign` specifications from `cols=` declarations (e.g. `cols="<,^,>"`) down to individual cell nodes in the ASG. Cell-level alignment always takes precedence over column-spec defaults.
 * *Dot-Ordered List Normalization:* `golem.renderer` now detects and repairs a parser quirk in `asciidoctrine` ≥ 0.2.0a5 where the first item of a dot-ordered list (`. First item`) is promoted to the list's `title` attribute. Affected lists are normalized in-place before rendering; consecutive fractured list blocks are merged.
@@ -72,6 +68,8 @@ toc::[]
 
 === Fixed
 
+* *Diagnostic Severity Preservation:* `Diagnostic` positional dict initialization no longer clobbers `"severity"` from the input mapping.
+* *AST Include Tracking:* Replaced fragile regex include fallback with `ast.included_files` tracking.
 * *Syntax Highlighting Callout Preservation:* Overrode `GolemRenderer.highlight_code()` to preserve AsciiDoc `<i class="conum">` callouts through Pygments and re-inject badges into highlighted lines; removed duplicate CSS counter badges on `ol.colist > li`.
 * *ApiDoc Plugin Macro Protection:* Protected delimited verbatim blocks, inline code backticks, and backslash-escaped macros (`\golem:apidoc[...]`) from unintended macro expansion in both `on_asg_created` and `on_pre_parse` paths.
 * *Listing Focus Outline Scoping:* Limited `.listingblock` focus outline highlight strictly to code content and pane interactions via `:has(.listing-content:focus-within, .listing-panes:focus-within)`.
