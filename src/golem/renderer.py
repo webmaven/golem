@@ -238,7 +238,7 @@ class GolemRenderer(asciidoctype.AsciiDoctypeRenderer):
 
 def render_body(
     asg_root: Union[Node, dict[str, Any]],
-    search_paths: Optional[Sequence[Path | str]] = None,
+    search_paths: Optional[Union[Sequence[Path | str], Path, str]] = None,
     highlighter: Optional[Callable[[str, str], Optional[str]]] = None,
 ) -> str:
     """Render an ASG dictionary or AST Node structure into static HTML5 markup.
@@ -254,7 +254,7 @@ def render_body(
 
     [parameters]
     `asg_root` (Node | dict[str, Any]):: AST Node or ASG dictionary representation of the document or fragment.
-    `search_paths` (Sequence[Path | str] | None, optional):: Optional sequence of directory paths containing custom Chameleon template overrides. Defaults to including `src/golem/templates/default`.
+    `search_paths` (Sequence[Path | str] | Path | str | None, optional):: Optional sequence or scalar directory path containing custom Chameleon template overrides. Defaults to including `src/golem/templates/default`.
     `highlighter` (Callable[[str, str], Optional[str]] | None, optional):: Optional syntax highlighter callable. Defaults to default Fired Clay Pygments highlighter.
 
     [returns]
@@ -263,6 +263,9 @@ def render_body(
     [raises]
     `TypeError`:: If `asg_root` is neither an AST `Node` nor a `dict`.
     """
+    if isinstance(search_paths, (str, Path)):
+        search_paths = [search_paths]
+
     if hasattr(asg_root, "to_dict"):
         node_dict = asg_root.to_dict()
     elif isinstance(asg_root, dict):
@@ -271,8 +274,6 @@ def render_body(
         raise TypeError(f"Expected Node or dict, got {type(asg_root).__name__}")
 
     _ensure_section_ids(node_dict)
-    _reattach_block_titles(node_dict)
-    _normalize_dot_list_items(node_dict)
     _propagate_table_alignments(node_dict)
 
     is_default_search_paths = search_paths is None or (
@@ -280,6 +281,7 @@ def render_body(
     )
     if is_default_search_paths and highlighter is None:
         renderer = _get_default_renderer()
+        renderer._listing_counter = 0
     else:
         active_highlighter = highlighter if highlighter is not None else make_highlighter()
         active_search_paths: list[Path] = []
@@ -292,6 +294,7 @@ def render_body(
             search_paths=active_search_paths,
             highlighter=active_highlighter,
         )
+        renderer._listing_counter = 0
 
     if node_dict.get("name") == "document":
         blocks = node_dict.get("blocks", [])
@@ -333,214 +336,6 @@ def _slugify(text: str) -> str:
     s = text.lower().strip()
     s = re.sub(r"[^a-z0-9]+", "-", s)
     return s.strip("-")
-
-
-def _is_block_title_paragraph(block: dict[str, Any]) -> bool:
-    """Return True if a paragraph block is an orphaned AsciiDoc block title.
-
-    Detects the asciidoctrine parser limitation where a block title line
-    (``.Title``) following another block is parsed as a standalone paragraph
-    instead of being attached as the ``title`` attribute of the following block.
-    A paragraph qualifies as an orphaned block title when it has inlines whose
-    first inline begins with a single ``.`` followed by non-whitespace content.
-
-    [parameters]
-    `block` (dict[str, Any]):: ASG node dictionary to inspect.
-
-    [returns]
-    `bool`:: ``True`` if the block is an orphaned block-title paragraph.
-    """
-    if not isinstance(block, dict) or block.get("name") != "paragraph":
-        return False
-    inlines = block.get("inlines", [])
-    if not inlines or not isinstance(inlines, list):
-        return False
-    first = inlines[0]
-    if not isinstance(first, dict):
-        return False
-    value = first.get("value", "")
-    return isinstance(value, str) and value.startswith(".") and len(value) > 1 and not value[1:2].isspace()
-
-
-def _reattach_block_titles(node: Any) -> None:
-    """Post-process an ASG dictionary to reattach orphaned block-title paragraphs.
-
-    Accounts for AsciiDoctrine 0.2.0a5 upstream block title attachment logic
-    while retaining fallback reattachment for any orphaned block-title paragraphs
-    left by parser edge cases.
-
-    NOTE: Modifies the ASG dictionary in-place.
-
-    [parameters]
-    `node` (Any):: ASG root dictionary or any sub-node to recursively process.
-    """
-    if not isinstance(node, dict):
-        return
-
-    for key in ("blocks", "children", "items"):
-        blocks = node.get(key)
-        if not isinstance(blocks, list) or not blocks:
-            continue
-
-        to_remove: set[int] = set()
-        for i, block in enumerate(blocks):
-            if i in to_remove or not isinstance(block, dict):
-                continue
-            if _is_block_title_paragraph(block) and i + 1 < len(blocks):
-                next_block = blocks[i + 1]
-                if isinstance(next_block, dict) and next_block.get("title") is None:
-                    inlines = block.get("inlines", [])
-                    if inlines:
-                        first = dict(inlines[0])
-                        raw = first.get("value", "")
-                        if raw.startswith("."):
-                            first["value"] = raw[1:]
-                        rem = [dict(il) if isinstance(il, dict) else il for il in inlines[1:]]
-                        if first.get("value") == "" and first.get("name") == "text":
-                            next_block["title"] = rem
-                        else:
-                            next_block["title"] = [first] + rem
-                        to_remove.add(i)
-
-        if to_remove:
-            node[key] = [b for j, b in enumerate(blocks) if j not in to_remove]
-
-        for block in node[key]:
-            _reattach_block_titles(block)
-
-
-def _is_dot_list_title(title: Any) -> bool:
-    """Return True if a title attribute was parsed from a dot list item.
-
-    In earlier AsciiDoctrine versions (0.2.0a5), elevated block_title grammar
-    priority caused dot-ordered list items (e.g. '. First item') to be parsed
-    as the list's title with a leading whitespace character instead of a list
-    item. While natively handled in AsciiDoctrine 0.2.0a7+, this check is
-    retained as a safe defensive fallback.
-    """
-    if not title:
-        return False
-    if isinstance(title, str):
-        return title.startswith(" ") or title.startswith("\t")
-    if isinstance(title, list) and len(title) > 0:
-        first = title[0]
-        if isinstance(first, dict):
-            val = first.get("value", "")
-            return isinstance(val, str) and (val.startswith(" ") or val.startswith("\t"))
-        if hasattr(first, "value"):
-            val = getattr(first, "value", "")
-            return isinstance(val, str) and (val.startswith(" ") or val.startswith("\t"))
-    return False
-
-
-def _title_to_list_item(title: Any, marker: str = ".") -> dict[str, Any]:
-    """Convert a dot-list title attribute into a structured listItem block node."""
-    if isinstance(title, str):
-        inlines = [{"name": "text", "type": "string", "value": title.lstrip()}]
-    elif isinstance(title, list):
-        inlines = []
-        stripped_leading_space = False
-        for inl in title:
-            if isinstance(inl, dict):
-                inl_copy = dict(inl)
-                if not stripped_leading_space:
-                    val = inl_copy.get("value")
-                    if isinstance(val, str) and (val.startswith(" ") or val.startswith("\t")):
-                        new_val = val[1:]
-                        inl_copy["value"] = new_val
-                        stripped_leading_space = True
-                        if new_val == "" and inl_copy.get("name") == "text":
-                            continue
-                inlines.append(inl_copy)
-            elif hasattr(inl, "to_dict"):
-                inl_dict = inl.to_dict()
-                if not stripped_leading_space:
-                    val = inl_dict.get("value")
-                    if isinstance(val, str) and (val.startswith(" ") or val.startswith("\t")):
-                        new_val = val[1:]
-                        inl_dict["value"] = new_val
-                        stripped_leading_space = True
-                        if new_val == "" and inl_dict.get("name") == "text":
-                            continue
-                inlines.append(inl_dict)
-            else:
-                inlines.append(inl)
-    else:
-        inlines = [{"name": "text", "type": "string", "value": str(title).lstrip()}]
-
-    return {
-        "name": "listItem",
-        "type": "block",
-        "marker": marker,
-        "principal": inlines,
-        "blocks": [],
-    }
-
-
-def _normalize_dot_list_items(node: Any) -> None:
-    """Normalize dot-ordered lists where initial items were misparsed as block titles.
-
-    Maintained as a defensive normalization pass. While AsciiDoctrine 0.2.0a7+
-    provides native dot-ordered list parsing without fracturing or misinterpreting
-    initial items as block titles, this function safely preserves backward
-    compatibility and handles any legacy or edge-case ASG structures where:
-    1. A `title` attribute originated from a dot list item (indicated
-       by leading whitespace).
-    2. Converts such titles into initial `listItem` blocks prepended to `items`.
-    3. Merges consecutive dot-ordered list blocks that were fractured by earlier parsers.
-
-    NOTE: Modifies the ASG dictionary in-place.
-    """
-    if not isinstance(node, dict):
-        return
-
-    # If the root node itself is a list with a dot-list title, normalize it
-    if node.get("name") == "list":
-        marker = node.get("marker", "")
-        if (marker == "." or node.get("variant") == "ordered") and _is_dot_list_title(node.get("title")):
-            new_item = _title_to_list_item(node.get("title"), marker=marker if marker else ".")
-            node.setdefault("items", []).insert(0, new_item)
-            node["title"] = None
-
-    for key in ("blocks", "children"):
-        blocks = node.get(key)
-        if not isinstance(blocks, list) or not blocks:
-            continue
-
-        for block in blocks:
-            if isinstance(block, dict) and block.get("name") == "list":
-                marker = block.get("marker", "")
-                if (marker == "." or block.get("variant") == "ordered") and _is_dot_list_title(block.get("title")):
-                    new_item = _title_to_list_item(block.get("title"), marker=marker if marker else ".")
-                    block.setdefault("items", []).insert(0, new_item)
-                    block["title"] = None
-
-        merged: list[Any] = []
-        for block in blocks:
-            if (
-                merged
-                and isinstance(merged[-1], dict)
-                and isinstance(block, dict)
-                and merged[-1].get("name") == "list"
-                and block.get("name") == "list"
-                and merged[-1].get("variant") == "ordered"
-                and block.get("variant") == "ordered"
-                and merged[-1].get("marker") == "."
-                and block.get("marker") == "."
-                and merged[-1].get("title") is None
-                and block.get("title") is None
-            ):
-                merged[-1].setdefault("items", []).extend(block.get("items", []))
-            else:
-                merged.append(block)
-
-        node[key] = merged
-
-        for block in node[key]:
-            _normalize_dot_list_items(block)
-
-    for item in node.get("items", []) if isinstance(node.get("items"), list) else []:
-        _normalize_dot_list_items(item)
 
 
 def _propagate_table_alignments(node: Any) -> None:

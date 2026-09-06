@@ -533,15 +533,7 @@ def test_render_dot_ordered_lists():
 
 
 def test_render_dot_ordered_list_with_title():
-    """Verify dot-ordered list with items renders correctly under AsciiDoctrine 0.2.0a5.
-
-    NOTE: AsciiDoctrine 0.2.0a5's elevated block_title.5 grammar priority causes
-    `.Shopping List` followed by `. Apples` to have Apples overwrite Shopping List
-    as the list's title (both match the same grammar rule). Shopping List is
-    irrecoverably lost at the parser level. The normalization correctly promotes
-    Apples back from the misparse title into a list item. Oranges and Bananas,
-    parsed normally as list items, are also rendered.
-    """
+    """Verify dot-ordered list with title and items renders correctly natively."""
     doc = """
 .Shopping List
 . Apples
@@ -588,7 +580,7 @@ def test_render_dot_ordered_list_single_item():
 
 
 def test_reattach_block_titles_upstream_compat():
-    """Verify block titles are preserved/reattached on example blocks, listings, and tables."""
+    """Verify block titles are preserved natively on example blocks, listings, and tables."""
     doc = """
 .Important Note
 ====
@@ -766,9 +758,6 @@ def test_render_body_reuses_cached_renderer(monkeypatch):
 
 
 def test_render_body_with_path_search_paths(tmp_path: Path):
-    from golem.renderer import render_body
-    from asciidoctrine import parse_to_ast
-
     custom_tpl_dir = tmp_path / "custom_tpls"
     custom_tpl_dir.mkdir()
     (custom_tpl_dir / "paragraph.html").write_text(
@@ -776,16 +765,49 @@ def test_render_body_with_path_search_paths(tmp_path: Path):
         encoding="utf-8",
     )
 
-    ast = parse_to_ast("Hello custom templates.")
+    ast = asciidoctrine.parse_to_ast("Hello custom templates.")
     html = render_body(ast, search_paths=[custom_tpl_dir])
     assert '<p class="custom-p">' in html
+
+    # Scalar Path and str inputs
+    path_scalar_html = render_body(ast, search_paths=custom_tpl_dir)
+    assert '<p class="custom-p">' in path_scalar_html
+
+    str_scalar_html = render_body(ast, search_paths=str(custom_tpl_dir))
+    assert '<p class="custom-p">' in str_scalar_html
 
     # Sequence of str/Path (tuple or list) and dot-list preservation
     tuple_html = render_body(ast, search_paths=(str(custom_tpl_dir),))
     assert '<p class="custom-p">' in tuple_html
 
-    dot_list_ast = parse_to_ast(". Item 1\n. Item 2")
+    dot_list_ast = asciidoctrine.parse_to_ast(". Item 1\n. Item 2")
     dot_html = render_body(dot_list_ast, search_paths=[custom_tpl_dir])
     assert '<ol class="olist">' in dot_html
     assert "<li>Item 1</li>" in dot_html
     assert "<li>Item 2</li>" in dot_html
+
+
+def test_listing_counter_resets_between_render_body_calls():
+    """Verify that _listing_counter resets to 0 across consecutive render_body calls."""
+    doc = """
+[source,python]
+----
+x = 1
+----
+
+[source,python]
+----
+y = 2
+----
+"""
+    ast1 = asciidoctrine.parse_to_ast(doc)
+    asg1 = ASGResolver(ast1).resolve(ast1)
+    html1 = render_body(asg1)
+    assert 'id="listing-1"' in html1
+    assert 'id="listing-2"' in html1
+
+    ast2 = asciidoctrine.parse_to_ast(doc)
+    asg2 = ASGResolver(ast2).resolve(ast2)
+    html2 = render_body(asg2)
+    assert 'id="listing-1"' in html2
+    assert 'id="listing-2"' in html2
