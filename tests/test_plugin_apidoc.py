@@ -104,8 +104,8 @@ def test_on_pre_parse_missing_symbol_graceful():
     assert "nonexistent_pkg_123.fake_func" in out
 
 
-def test_on_pre_parse_verbatim_and_backtick_protection():
-    """Verify on_pre_parse does not expand macros in backticks or verbatim blocks."""
+def test_on_pre_parse_verbatim_and_backtick_protection(caplog):
+    """Verify on_pre_parse does not expand macros in backticks or verbatim blocks, and does not warn."""
     from golem.plugins import apidoc
 
     raw = """= Guide
@@ -124,7 +124,8 @@ golem:apidoc[literal_block]
 
 And \\golem:apidoc[target="escaped"] is escaped.
 """
-    processed = apidoc.on_pre_parse(raw)
+    with caplog.at_level("WARNING", logger="golem.plugins.apidoc"):
+        processed = apidoc.on_pre_parse(raw)
 
     # Inline backticks preserved
     assert "`golem:apidoc[...]`" in processed
@@ -136,6 +137,9 @@ And \\golem:apidoc[target="escaped"] is escaped.
     # Escaped macro unescaped
     assert 'golem:apidoc[target="escaped"]' in processed
     assert "\\golem:apidoc" not in processed
+
+    # No deprecation warning emitted when only inert/escaped/verbatim mentions exist
+    assert "on_pre_parse macro expansion in golem.plugins.apidoc is deprecated" not in caplog.text
 
 
 def test_on_asg_created_macro_replacement(tmp_path):

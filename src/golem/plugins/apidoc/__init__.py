@@ -296,12 +296,18 @@ def on_pre_parse(raw_content: str) -> str:
     if "golem:apidoc[" not in raw_content:
         return raw_content
 
-    logger.warning(
-        "on_pre_parse macro expansion in golem.plugins.apidoc is deprecated; "
-        "use on_asg_created for AST-level ASG macro splicing."
-    )
+    chunks = _split_verbatim_blocks(raw_content)
+    warned = False
 
     def _expand_macro(args_str: str) -> str:
+        nonlocal warned
+        if not warned:
+            logger.warning(
+                "on_pre_parse macro expansion in golem.plugins.apidoc is deprecated; "
+                "use on_asg_created for AST-level ASG macro splicing."
+            )
+            warned = True
+
         kwargs = _parse_macro_args(args_str)
         target = kwargs.get("target")
         if not target:
@@ -331,7 +337,6 @@ def on_pre_parse(raw_content: str) -> str:
 
         return _MACRO_TOKEN_PATTERN.sub(_sub, text)
 
-    chunks = _split_verbatim_blocks(raw_content)
     result_parts: list[str] = []
     for is_verbatim, chunk_text in chunks:
         if is_verbatim:
