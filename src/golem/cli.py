@@ -8,6 +8,7 @@ Golem static site generator.
 - `init`:: Initialize a new Golem project.
 - `new`:: Create a new document skeleton.
 - `build`:: Run the incremental compiler.
+- `check`:: Check AsciiDoc source files for syntax errors and semantic resolver warnings.
 - `serve`:: Start the local development server.
 - `plugins`:: Inspect installed and configured plugins.
 - `themes`:: Inspect active and available themes.
@@ -24,10 +25,10 @@ from typing import Any, Iterator
 import click
 from golem.config import GolemConfig, load_config, find_default_config_path
 from golem.diagnostics import format_diagnostic
-from golem.engine import BuildEngine
+from golem.engine import BuildEngine, GolemEngine
 from golem.plugins import get_plugin_manager
 
-__all__ = ["main", "report_engine_diagnostics"]
+__all__ = ["check", "main", "report_engine_diagnostics"]
 
 BUILTIN_PLUGINS: list[str] = ["golem.plugins.doctest", "golem.plugins.apidoc"]
 
@@ -561,6 +562,72 @@ def build(config, clean, strict, verbose, quiet, directory=None):
         elapsed = time.perf_counter() - start_time
         if not quiet:
             click.echo(f"Compilation finished. Built {len(compiled)} pages in {elapsed:.2f}s.")
+
+
+@main.command("check")
+@click.option("--strict", is_flag=True, default=False, help="Fail if any syntax errors or diagnostics are found")
+@click.option(
+    "-C",
+    "--directory",
+    type=click.Path(file_okay=False, dir_okay=True),
+    help="Change working directory before executing",
+)
+@click.option("-v", "--verbose", is_flag=True, default=False, help="Display verbose diagnostic outputs")
+def check(strict: bool, directory: str | None = None, verbose: bool = False) -> None:
+    """Check AsciiDoc source files for syntax errors and semantic resolver warnings without building.
+
+    === Examples
+
+    [source,python]
+    ----
+    >>> from click.testing import CliRunner
+    >>> from golem.cli import main
+    >>> runner = CliRunner()
+    >>> with runner.isolated_filesystem():
+    ...     result = runner.invoke(main, ["check"])
+    ...     result.exit_code == 0
+    True
+
+    ----
+
+    [parameters]
+    `strict` (bool):: Fail if any syntax errors or diagnostics are found. Defaults to `False`.
+    `directory` (str | None, optional):: Change working directory before executing. Defaults to `None`.
+    `verbose` (bool):: Display verbose diagnostic outputs. Defaults to `False`.
+
+    [raises]
+    `click.ClickException`:: If syntax errors are found, or if diagnostics/warnings are found in strict mode.
+    """
+    with change_working_dir(directory):
+        if verbose:
+            import logging
+
+            logging.basicConfig(level=logging.DEBUG, force=True)
+
+        config_path = find_default_config_path()
+        try:
+            golem_config = load_config(config_path) if config_path.exists() else GolemConfig()
+        except Exception as e:
+            raise click.ClickException(f"Configuration Error: {e}")
+
+        if strict:
+            golem_config.strict = True
+
+        if not config_path.exists() and not Path(golem_config.content_dir).exists() and Path("docs").is_dir():
+            golem_config.content_dir = "docs"
+
+        engine = GolemEngine(golem_config)
+        engine.check()
+
+        report_engine_diagnostics(engine, strict=strict)
+
+        has_errors = any(d.severity == "error" for d in engine.diagnostics)
+        has_warnings = any(d.severity == "warning" for d in engine.diagnostics)
+
+        if has_errors:
+            raise click.ClickException("Syntax errors encountered during check.")
+        if strict and has_warnings:
+            raise click.ClickException("Diagnostic warnings encountered during check in strict mode.")
 
 
 @main.command()

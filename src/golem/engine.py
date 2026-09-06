@@ -66,7 +66,7 @@ from golem.renderer import (
 from golem.staleness import StalenessTracker, is_partial
 from golem.templates import PageCompiler
 
-__all__ = ["BuildEngine"]
+__all__ = ["BuildEngine", "GolemEngine"]
 
 
 def _invoke_asg_hook(impl: Any, asg: dict[str, Any] | Node, doc_path: Path) -> Any:
@@ -652,3 +652,6 @@ class BuildEngine:
 
         self.diagnostics = diagnostics
         return diagnostics
+
+
+GolemEngine = BuildEngine
