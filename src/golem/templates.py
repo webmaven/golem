@@ -111,46 +111,33 @@ class PageCompiler:
 
         generator_version = getattr(golem, "__version__", "0.1.0a2")
 
-        if template_path and template_path.exists():
-            try:
-                with open(template_path, "r", encoding="utf-8") as f:
-                    template_content = f.read()
-                template = PageTemplate(template_content)
-            except Exception:
-                template = self.default_template
+        if template_path is not None:
+            with open(template_path, "r", encoding="utf-8") as f:
+                template_content = f.read()
+            template = PageTemplate(template_content)
         else:
             # Check for user's scaffolded custom templates directory first
-            user_pt = Path(self.config.templates_dir) / "page.pt" if hasattr(self.config, "templates_dir") else None
+            user_pt = Path(self.config.templates_dir) / "page.pt" if getattr(self.config, "templates_dir", None) else None
             if user_pt and user_pt.exists():
-                try:
-                    with open(user_pt, "r", encoding="utf-8") as f:
-                        template_content = f.read()
-                    template = PageTemplate(template_content)
-                except Exception:
-                    template = self.default_template
+                with open(user_pt, "r", encoding="utf-8") as f:
+                    template_content = f.read()
+                template = PageTemplate(template_content)
             else:
                 # Fallback to configured themes folder override if exists
                 theme_dir = Path("themes") / self.config.theme
                 skeleton_pt = theme_dir / "skeleton.pt"
                 if skeleton_pt.exists():
-                    try:
-                        with open(skeleton_pt, "r", encoding="utf-8") as f:
-                            template_content = f.read()
-                        template = PageTemplate(template_content)
-                    except Exception:
-                        template = self.default_template
+                    with open(skeleton_pt, "r", encoding="utf-8") as f:
+                        template_content = f.read()
+                    template = PageTemplate(template_content)
                 else:
                     template = self.default_template
 
         return template(
             title=title,
-            page_title=title,
-            body_content=body_html,
             body_html=body_html,
-            body=body_html,
             toc_html=toc_html,
             nav_html=nav_html,
-            navigation_html=nav_html,
             nav_tree=nav_tree or [],
             current_path=current_path,
             prev_page=prev_page,
@@ -163,7 +150,6 @@ class PageCompiler:
             custom_css=custom_css or [],
             custom_js=custom_js or [],
             body_class=effective_body_class,
-            page_class=effective_body_class,
             content_class=effective_content_class,
             pygments_css=effective_pygments_css,
         )

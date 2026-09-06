@@ -14,10 +14,10 @@ def test_incremental_rebuild_logic(tmp_path):
     content_dir.mkdir()
 
     file_a = content_dir / "index.adoc"
-    file_a.write_text("= Welcome\ninclude::sidebar.adoc[]")
+    file_a.write_text("= Welcome\n\ninclude::sidebar.adoc[]\n")
 
     file_b = content_dir / "sidebar.adoc"
-    file_b.write_text("Sidebar content")
+    file_b.write_text("Sidebar content\n")
 
     config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config)
@@ -35,7 +35,7 @@ def test_incremental_rebuild_logic(tmp_path):
     assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Edit file_b (the included sidebar)
-    file_b.write_text("Modified Sidebar content")
+    file_b.write_text("Modified Sidebar content\n")
 
     # Verify that file_a is flagged for recompilation because file_b is in its include-chain
     new_rebuild_set = engine.staleness_tracker.get_outdated_files()
@@ -131,7 +131,7 @@ def test_cache_global_template_edit_propagation(tmp_path, monkeypatch):
     theme_dir = tmp_path / "themes" / "default"
     theme_dir.mkdir(parents=True)
     skeleton_pt = theme_dir / "skeleton.pt"
-    skeleton_pt.write_text("<html><body>${body_content}</body></html>", encoding="utf-8")
+    skeleton_pt.write_text("<html><body>${body_html}</body></html>", encoding="utf-8")
 
     config = GolemConfig(
         content_dir="content",
@@ -147,7 +147,7 @@ def test_cache_global_template_edit_propagation(tmp_path, monkeypatch):
     assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Modify the template skeleton
-    skeleton_pt.write_text("<html><body>NEW ${body_content}</body></html>", encoding="utf-8")
+    skeleton_pt.write_text("<html><body>NEW ${body_html}</body></html>", encoding="utf-8")
 
     # The engine must detect the global template edit and invalidate index.adoc
     outdated = engine.staleness_tracker.get_outdated_files()

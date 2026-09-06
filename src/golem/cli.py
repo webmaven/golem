@@ -316,7 +316,7 @@ body {
         <main class="content-pane">
             <article class="page-body">
                 <h1>${title}</h1>
-                <div tal:content="structure body">
+                <div tal:content="structure body_html">
                     AsciiDoc content renders here.
                 </div>
             </article>

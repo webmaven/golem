@@ -35,7 +35,7 @@ def test_custom_disk_template_compilation(tmp_path):
     <html>
     <body>
         <h1>Custom Template Header</h1>
-        <div id="custom-body" tal:content="structure body_content">Body goes here</div>
+        <div id="custom-body" tal:content="structure body_html">Body goes here</div>
     </body>
     </html>
     """,
@@ -57,15 +57,25 @@ def test_custom_disk_template_fallback_on_invalid_file(tmp_path):
     config = GolemConfig(output_dir=str(tmp_path / "dist"))
     compiler = PageCompiler(config)
 
-    # Missing file path
-    html = compiler.compile_page(
-        title="Fallback Page",
-        body_html="<p>Standard Body</p>",
-        toc_html="",
-        template_path=tmp_path / "non_existent.pt",
-    )
-    assert "Standard Body" in html
-    assert "Fallback Page" in html
+    # Missing template file path raises FileNotFoundError
+    with pytest.raises(FileNotFoundError):
+        compiler.compile_page(
+            title="Fallback Page",
+            body_html="<p>Standard Body</p>",
+            toc_html="",
+            template_path=tmp_path / "non_existent.pt",
+        )
+
+    # Corrupt custom template syntax raises template compilation error
+    corrupt_tpl = tmp_path / "corrupt_skeleton.pt"
+    corrupt_tpl.write_text('<div tal:content="a b c"></div>', encoding="utf-8")
+    with pytest.raises(Exception):
+        compiler.compile_page(
+            title="Corrupt Page",
+            body_html="<p>Standard Body</p>",
+            toc_html="",
+            template_path=corrupt_tpl,
+        )
 
 
 def test_custom_user_defined_page_pt_layout(tmp_path):
@@ -77,7 +87,7 @@ def test_custom_user_defined_page_pt_layout(tmp_path):
 <html>
 <body>
     <h1>Custom Template: ${title}</h1>
-    <div tal:content="structure body_content" />
+    <div tal:content="structure body_html" />
 </body>
 </html>
 """,
@@ -101,7 +111,7 @@ def test_rich_structured_context_passed_to_template(tmp_path):
 <!DOCTYPE html>
 <html>
 <head>
-    <title>${page_title} - ${site_title}</title>
+    <title>${title} - ${site_title}</title>
     <meta name="generator" content="${generator_version}" />
 </head>
 <body>
@@ -227,7 +237,7 @@ def test_workspace_theme_skeleton_override(tmp_path, monkeypatch):
 <html>
 <head><title>Theme Skeleton: ${title}</title></head>
 <body>
-    <div id="theme-content" tal:content="structure body_content" />
+    <div id="theme-content" tal:content="structure body_html" />
 </body>
 </html>
 """,
@@ -307,7 +317,7 @@ def test_compile_page_body_class_and_content_class_default_skeleton(tmp_path):
 
 
 def test_rich_structured_context_body_class_and_content_class(tmp_path):
-    """Test that body_class, page_class, and content_class are passed to custom templates."""
+    """Test that body_class and content_class are passed to custom templates."""
     custom_tpl = tmp_path / "custom_layout.pt"
     custom_tpl.write_text(
         """\
@@ -315,8 +325,8 @@ def test_rich_structured_context_body_class_and_content_class(tmp_path):
 <html>
 <head><title>${title}</title></head>
 <body class="${body_class}">
-    <main class="${content_class}" data-page="${page_class}">
-        <div tal:content="structure body_content" />
+    <main class="${content_class}">
+        <div tal:content="structure body_html" />
     </main>
 </body>
 </html>
@@ -335,7 +345,7 @@ def test_rich_structured_context_body_class_and_content_class(tmp_path):
         template_path=custom_tpl,
     )
     assert '<body class="custom-body">' in html
-    assert '<main class="custom-main" data-page="custom-body">' in html
+    assert '<main class="custom-main">' in html
 
 
 def test_compile_page_injects_pygments_css(tmp_path):
@@ -454,3 +464,42 @@ def test_legacy_argument_aliases_removed(tmp_path):
 
     with pytest.raises(TypeError, match="unexpected keyword argument 'page_class'"):
         compiler.compile_page(title="Test", body_html="<p>Test</p>", page_class="my-class")
+
+
+def test_removed_template_context_aliases_not_present(tmp_path):
+    """Verify removed context aliases (page_title, body_content, body, navigation_html, page_class) are not available in template."""
+    config = GolemConfig(output_dir=str(tmp_path / "dist"))
+    compiler = PageCompiler(config)
+
+    for alias in ("page_title", "body_content", "body", "navigation_html", "page_class"):
+        tpl = tmp_path / f"test_{alias}.pt"
+        tpl.write_text(f"<div>${{{alias}}}</div>", encoding="utf-8")
+        with pytest.raises(Exception):
+            compiler.compile_page(title="Test Title", body_html="<p>Content</p>", template_path=tpl)
+
+
+def test_corrupt_custom_user_pt_raises(tmp_path):
+    """Verify corrupt page.pt in templates_dir raises template error rather than falling back."""
+    custom_tpl_dir = tmp_path / "custom_templates"
+    custom_tpl_dir.mkdir()
+    (custom_tpl_dir / "page.pt").write_text('<div tal:content="a b c"></div>', encoding="utf-8")
+
+    config = GolemConfig(templates_dir=str(custom_tpl_dir))
+    compiler = PageCompiler(config)
+
+    with pytest.raises(Exception):
+        compiler.compile_page(title="Test Title", body_html="<p>Main Body</p>", toc_html="")
+
+
+def test_corrupt_theme_skeleton_pt_raises(tmp_path, monkeypatch):
+    """Verify corrupt skeleton.pt in themes/<theme> raises template error rather than falling back."""
+    monkeypatch.chdir(tmp_path)
+    theme_dir = tmp_path / "themes" / "broken"
+    theme_dir.mkdir(parents=True)
+    (theme_dir / "skeleton.pt").write_text('<div tal:content="a b c"></div>', encoding="utf-8")
+
+    config = GolemConfig(theme="broken")
+    compiler = PageCompiler(config)
+
+    with pytest.raises(Exception):
+        compiler.compile_page(title="Test Title", body_html="<p>Main Body</p>", toc_html="")

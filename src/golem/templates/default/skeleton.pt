@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${page_title} - ${site_title}</title>
+    <title>${title} - ${site_title}</title>
     <meta name="generator" content="${generator_version}" />
     <meta tal:condition="site_author" name="author" content="${site_author}" />
     <link rel="canonical" tal:condition="site_url" href="${site_url}" />
@@ -1100,7 +1100,7 @@
             </details>
         </aside>
         <main id="golem-content" class="golem-content" tal:attributes="class ('golem-content ' + content_class).strip() if content_class else 'golem-content'">
-            <h1 tal:condition="page_title">${page_title}</h1>
+            <h1 tal:condition="title">${title}</h1>
             <div tal:content="structure body_html" />
             <nav tal:condition="prev_page or next_page" class="golem-pagination" aria-label="Chapter Navigation">
                 <a tal:condition="prev_page" href="${prev_page.url}" tal:attributes="href prev_page.url" class="golem-pagination-card golem-pagination-prev" rel="prev">
