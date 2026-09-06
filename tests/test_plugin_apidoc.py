@@ -804,21 +804,26 @@ golem:apidoc[target="asg_typed_pkg.process_data"]
 
 def test_format_docstring_defensive_fallback():
     from unittest.mock import patch
+    import pytest
     from golem.plugins.apidoc.core.formatter import format_docstring
 
     doc = "Some plain text docstring."
-    # If griffe.parse raises an exception
+    # If griffe.parse raises an exception, it propagates directly
     with patch("griffe.parse", side_effect=RuntimeError("Parsing error")):
-        res = format_docstring(doc)
-        assert res == "Some plain text docstring."
+        with pytest.raises(RuntimeError, match="Parsing error"):
+            format_docstring(doc)
 
-    # If asciidocstring.griffe_bridge.to_asciidoc raises an exception
+    # If asciidocstring.griffe_bridge.to_asciidoc raises an exception, it propagates directly
     with patch("asciidocstring.griffe_bridge.to_asciidoc", side_effect=RuntimeError("Bridge error")):
+        with pytest.raises(RuntimeError, match="Bridge error"):
+            format_docstring(doc)
+
+    # If to_asciidoc returns empty string or whitespace for non-empty docstring, fall back to raw
+    with patch("asciidocstring.griffe_bridge.to_asciidoc", return_value=""):
         res = format_docstring(doc)
         assert res == "Some plain text docstring."
 
-    # If to_asciidoc returns empty string for non-empty docstring
-    with patch("asciidocstring.griffe_bridge.to_asciidoc", return_value=""):
+    with patch("asciidocstring.griffe_bridge.to_asciidoc", return_value="   \n\t  "):
         res = format_docstring(doc)
         assert res == "Some plain text docstring."
 
