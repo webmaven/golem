@@ -38,6 +38,7 @@ The compilation pipeline proceeds through sequential phases:
 
 from __future__ import annotations
 
+import inspect
 import logging
 from pathlib import Path
 import sys
@@ -66,6 +67,29 @@ from golem.staleness import StalenessTracker, is_partial
 from golem.templates import PageCompiler
 
 __all__ = ["BuildEngine"]
+
+
+def _invoke_asg_hook(impl: Any, asg: dict[str, Any] | Node, doc_path: Path) -> Any:
+    """Invoke on_asg_created hook implementation with Pluggy argument filtering."""
+    hook_kwargs: dict[str, Any] = {"asg": asg}
+    has_doc_path = "doc_path" in getattr(impl, "argnames", ()) or "doc_path" in getattr(impl, "kwargnames", ())
+    if not has_doc_path:
+        fn = getattr(impl, "function", None)
+        code = getattr(fn, "__code__", None)
+        if code and (code.co_flags & inspect.CO_VARKEYWORDS):
+            has_doc_path = True
+        elif fn is not None and not code:
+            try:
+                sig = inspect.signature(fn)
+                has_doc_path = "doc_path" in sig.parameters or any(
+                    p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+                )
+            except (ValueError, TypeError):
+                pass
+
+    if has_doc_path:
+        hook_kwargs["doc_path"] = doc_path
+    return impl.function(**hook_kwargs)
 
 
 class BuildEngine:
@@ -350,7 +374,7 @@ class BuildEngine:
                 _asg_modifiers: list[str] = []
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
                     try:
-                        result = impl.function(asg=asg)
+                        result = _invoke_asg_hook(impl, asg, doc_path)
                     except Exception as e:
                         logging.warning(
                             "[Plugin] %s raised an exception in on_asg_created for %s: %s",
@@ -615,7 +639,7 @@ class BuildEngine:
             if hasattr(self, "pm") and self.pm:
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
                     try:
-                        result = impl.function(asg=asg)
+                        result = _invoke_asg_hook(impl, asg, doc_path)
                         if isinstance(result, (dict, Node)):
                             asg = result
                     except Exception as e:

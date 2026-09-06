@@ -155,7 +155,7 @@ class GolemSpecs:
         return ast
 
     @hookspec
-    def on_asg_created(self, asg: dict[str, Any]) -> dict[str, Any]:
+    def on_asg_created(self, asg: dict[str, Any], doc_path: Path | None = None) -> dict[str, Any]:
         """Intercept and transform the Abstract Semantic Graph (ASG) dictionary after resolution.
 
         Executed after the semantic resolver converts the AST into a structured ASG dictionary.
@@ -164,6 +164,7 @@ class GolemSpecs:
 
         [parameters]
         `asg` (dict[str, Any]):: Semantic graph representation of the document containing resolved blocks, metadata, and attributes.
+        `doc_path` (Path | None, optional):: Optional Path to the document being compiled.
 
         [returns]
         `dict[str, Any]`:: Enriched or modified ASG dictionary passed to the body renderer.
