@@ -707,11 +707,11 @@ def serve(port, host, strict, directory=None, test_only=False):
         else:
             click.echo(f"Compilation finished. Built 0 pages (site is up to date) in {elapsed:.2f}s.")
 
-        click.echo(
-            f"Ready! Serving '{golem_config.output_dir}' at http://{host}:{port} "
-            f"(watching '{golem_config.content_dir}' for changes)"
-        )
-        click.echo("Press Ctrl+C to stop.")
+        watch_directories = [
+            Path(golem_config.content_dir),
+            Path(golem_config.templates_dir),
+            Path("themes"),
+        ]
 
         def on_rebuild():
             t0 = time.perf_counter()
@@ -733,11 +733,21 @@ def serve(port, host, strict, directory=None, test_only=False):
         server = LiveReloadServer(
             public_dir=Path(golem_config.output_dir),
             watch_dir=Path(golem_config.content_dir),
+            watch_directories=watch_directories,
             change_detected_func=lambda: bool(engine.staleness_tracker.get_outdated_files(commit=False)),
             rebuild_func=on_rebuild,
             port=port,
+            host=host,
             errors_func=lambda: engine.diagnostics,
         )
+
+        bound_port = server.bind() if hasattr(server, "bind") else port
+        click.echo(
+            f"Ready! Serving '{golem_config.output_dir}' at http://{host}:{bound_port} "
+            f"(watching '{golem_config.content_dir}' for changes)"
+        )
+        click.echo("Press Ctrl+C to stop.")
+
         server.run()
 
 
