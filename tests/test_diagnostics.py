@@ -160,7 +160,7 @@ def test_cli_build_strict_flag_fails_on_error(tmp_path, monkeypatch):
 
         res = runner.invoke(main, ["build", "--strict"])
         assert res.exit_code != 0
-        assert "Compilation Error" in res.output
+        assert "Compilation failed due to build diagnostics in strict mode" in res.output
         assert "broken.adoc" in res.output
 
 
@@ -283,7 +283,7 @@ def test_cli_serve_strict_fails_on_compilation_error(tmp_path, monkeypatch):
 
         res = runner.invoke(main, ["serve", "--strict"])
         assert res.exit_code != 0
-        assert "Compilation Error" in res.output
+        assert "Compilation failed due to build diagnostics in strict mode" in res.output
 
 
 def test_cli_serve_permissive_emits_diagnostics_and_runs(tmp_path, monkeypatch):

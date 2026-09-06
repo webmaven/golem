@@ -27,7 +27,7 @@ from golem.diagnostics import format_diagnostic
 from golem.engine import BuildEngine
 from golem.plugins import get_plugin_manager
 
-__all__ = ["main"]
+__all__ = ["main", "report_engine_diagnostics"]
 
 BUILTIN_PLUGINS: list[str] = ["golem.plugins.doctest", "golem.plugins.apidoc"]
 
@@ -430,6 +430,36 @@ Welcome to your newly scaffolded {doc_type}: "{name}".
         click.echo(f"Created new {doc_type}: '{target_file}'")
 
 
+def report_engine_diagnostics(engine: BuildEngine, strict: bool = False) -> None:
+    """Print compiler diagnostics for the build engine and fail if strict mode is enabled.
+
+    === Examples
+
+    [source,python]
+    ----
+    >>> from golem.config import GolemConfig
+    >>> from golem.engine import BuildEngine
+    >>> from golem.cli import report_engine_diagnostics
+    >>> engine = BuildEngine(GolemConfig())
+    >>> report_engine_diagnostics(engine, strict=False)
+
+    ----
+
+    [parameters]
+    `engine` (BuildEngine):: The build engine containing accumulated diagnostics.
+    `strict` (bool, optional):: Whether to raise an exception on error diagnostics. Defaults to `False`.
+
+    [raises]
+    `click.ClickException`:: If `strict` is `True` and one or more diagnostics have error severity.
+    """
+    if not hasattr(engine, "diagnostics") or not engine.diagnostics:
+        return
+    for diag in engine.diagnostics:
+        click.echo(format_diagnostic(diag), err=True)
+    if strict and any(d.severity == "error" for d in engine.diagnostics):
+        raise click.ClickException("Compilation failed due to build diagnostics in strict mode.")
+
+
 @main.command()
 @click.option(
     "--config",
@@ -523,14 +553,10 @@ def build(config, clean, strict, verbose, quiet, directory=None):
             engine = BuildEngine(golem_config)
             compiled = engine.build_site()
         except Exception as e:
-            if hasattr(engine, "diagnostics") and engine.diagnostics:
-                for err in engine.diagnostics:
-                    click.echo(format_diagnostic(err), err=True)
+            report_engine_diagnostics(engine, strict=strict)
             raise click.ClickException(f"Compilation Error: {e}")
 
-        if engine.diagnostics:
-            for err in engine.diagnostics:
-                click.echo(format_diagnostic(err))
+        report_engine_diagnostics(engine, strict=strict)
 
         elapsed = time.perf_counter() - start_time
         if not quiet:
@@ -602,14 +628,10 @@ def serve(port, host, strict, directory=None, test_only=False):
             engine = BuildEngine(golem_config)
             compiled = engine.build_site()
         except Exception as e:
-            if hasattr(engine, "diagnostics") and engine.diagnostics:
-                for err in engine.diagnostics:
-                    click.echo(format_diagnostic(err), err=True)
+            report_engine_diagnostics(engine, strict=strict)
             raise click.ClickException(f"Compilation Error: {e}")
 
-        if engine.diagnostics:
-            for err in engine.diagnostics:
-                click.echo(format_diagnostic(err))
+        report_engine_diagnostics(engine, strict=strict)
 
         elapsed = time.perf_counter() - start_time
         if compiled:
@@ -630,13 +652,9 @@ def serve(port, host, strict, directory=None, test_only=False):
             try:
                 recompiled = engine.build_site()
             except Exception:
-                if hasattr(engine, "diagnostics") and engine.diagnostics:
-                    for err in engine.diagnostics:
-                        click.echo(format_diagnostic(err), err=True)
+                report_engine_diagnostics(engine, strict=strict)
                 raise
-            if engine.diagnostics:
-                for err in engine.diagnostics:
-                    click.echo(format_diagnostic(err))
+            report_engine_diagnostics(engine, strict=strict)
             dt = time.perf_counter() - t0
             if recompiled:
                 p_word = "page" if len(recompiled) == 1 else "pages"

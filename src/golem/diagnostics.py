@@ -13,13 +13,9 @@ from pathlib import Path
 import re
 from typing import Any
 
-try:
-    from asciidoctrine.exceptions import AsciiDocSyntaxError  # type: ignore[import-not-found,import-untyped]
-except ImportError:
-    try:
-        from asciidoctrine import AsciiDocSyntaxError  # type: ignore[assignment]
-    except ImportError:
-        AsciiDocSyntaxError = None  # type: ignore[assignment,misc]
+from asciidoctrine import AsciiDocSyntaxError
+
+__all__ = ["AsciiDocSyntaxError", "Diagnostic", "format_diagnostic"]
 
 
 def format_diagnostic(error: Diagnostic | Exception, content_dir: Path | str | None = None) -> str:
