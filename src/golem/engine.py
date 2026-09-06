@@ -44,6 +44,7 @@ import sys
 from typing import Any
 
 import asciidoctrine
+from asciidoctrine.nodes import Document, Node
 from asciidoctrine.resolver import ASGResolver
 import click
 from golem.assets import sync_static_assets
@@ -296,9 +297,9 @@ class BuildEngine:
                             e,
                         )
                         continue
-                    if result is not None and result != content:
+                    if isinstance(result, str) and result != content:
                         _pre_parse_modifiers.append(impl.plugin_name or str(impl.function))
-                        content = result  # type: ignore[assignment]
+                        content = result
                 if len(_pre_parse_modifiers) > 1:
                     logging.warning(
                         "[Plugin] Multiple plugins modified raw_content in on_pre_parse for %s: %s. "
@@ -309,7 +310,7 @@ class BuildEngine:
                     )
 
                 # 1. Parse using asciidoctrine
-                ast = asciidoctrine.parse_to_ast(content, base_dir=str(doc_path.parent))
+                ast: Document = asciidoctrine.parse_to_ast(content, base_dir=str(doc_path.parent))
 
                 # Trigger AST hooks sequentially (chain modifications)
                 _ast_modifiers: list[str] = []
@@ -324,9 +325,9 @@ class BuildEngine:
                             e,
                         )
                         continue
-                    if result is not None and result is not ast:
+                    if isinstance(result, Document) and result is not ast:
                         _ast_modifiers.append(impl.plugin_name or str(impl.function))
-                        ast = result  # type: ignore[assignment]
+                        ast = result
                 if len(_ast_modifiers) > 1:
                     logging.warning(
                         "[Plugin] Multiple plugins modified ast in on_ast_created for %s: %s. "
@@ -338,7 +339,7 @@ class BuildEngine:
 
                 # 2. Resolve AST to ASG
                 resolver = ASGResolver(ast)
-                asg = resolver.resolve(ast)
+                asg: dict[str, Any] | Node = resolver.resolve(ast)
 
                 if hasattr(resolver, "warnings") and resolver.warnings:
                     for warn in resolver.warnings:
@@ -358,9 +359,9 @@ class BuildEngine:
                             e,
                         )
                         continue
-                    if result is not None and result is not asg:
+                    if isinstance(result, (dict, Node)) and result is not asg:
                         _asg_modifiers.append(impl.plugin_name or str(impl.function))
-                        asg = result  # type: ignore[assignment]
+                        asg = result
                 if len(_asg_modifiers) > 1:
                     logging.warning(
                         "[Plugin] Multiple plugins modified asg in on_asg_created for %s: %s. "
@@ -373,7 +374,7 @@ class BuildEngine:
                 page_node_types = collect_node_types(asg)
 
                 # 3. Render body using Golem's ASG visitor
-                body_content = render_body(asg, search_paths=search_paths)  # type: ignore[arg-type]
+                body_content = render_body(asg, search_paths=search_paths)
 
                 # Extract title for layout framing
                 title_str = ""
@@ -396,7 +397,7 @@ class BuildEngine:
                     title_str = "Golem Doc"
 
                 # 4. Compile layout via Chameleon templates
-                toc_html = generate_toc_html(asg)  # type: ignore[arg-type]
+                toc_html = generate_toc_html(asg)
 
                 # Generate dynamic navigation HTML and chapter pagination for this page
                 rel_path = doc_path.relative_to(self.content_dir)
@@ -463,9 +464,9 @@ class BuildEngine:
                             e,
                         )
                         continue
-                    if result is not None and result != final_html:
+                    if isinstance(result, str) and result != final_html:
                         _post_render_modifiers.append(impl.plugin_name or str(impl.function))
-                        final_html = result  # type: ignore[assignment]
+                        final_html = result
                 if len(_post_render_modifiers) > 1:
                     logging.warning(
                         "[Plugin] Multiple plugins modified html_content in on_post_render for %s: %s. "
@@ -564,8 +565,8 @@ class BuildEngine:
                 for impl in self.pm.hook.on_pre_parse.get_hookimpls():
                     try:
                         result = impl.function(raw_content=content)
-                        if result is not None:
-                            content = result  # type: ignore[assignment]
+                        if isinstance(result, str):
+                            content = result
                     except Exception as e:
                         logging.warning(
                             "[Plugin] %s raised an exception in on_pre_parse for %s: %s",
@@ -576,7 +577,7 @@ class BuildEngine:
 
             # 1. Parse using asciidoctrine
             try:
-                ast = asciidoctrine.parse_to_ast(content, base_dir=str(doc_path.parent))
+                ast: Document = asciidoctrine.parse_to_ast(content, base_dir=str(doc_path.parent))
             except Exception as e:
                 diag = Diagnostic.from_exception(e, file=str(doc_path))
                 diagnostics.append(diag)
@@ -587,8 +588,8 @@ class BuildEngine:
                 for impl in self.pm.hook.on_ast_created.get_hookimpls():
                     try:
                         result = impl.function(ast=ast)
-                        if result is not None:
-                            ast = result  # type: ignore[assignment]
+                        if isinstance(result, Document):
+                            ast = result
                     except Exception as e:
                         logging.warning(
                             "[Plugin] %s raised an exception in on_ast_created for %s: %s",
@@ -600,7 +601,7 @@ class BuildEngine:
             # 2. Resolve AST to ASG
             try:
                 resolver = ASGResolver(ast)
-                asg = resolver.resolve(ast)
+                asg: dict[str, Any] | Node = resolver.resolve(ast)
                 if hasattr(resolver, "warnings") and resolver.warnings:
                     for warn in resolver.warnings:
                         warn_diag = Diagnostic.from_resolver_warning(warn, file=str(doc_path), content=content)
@@ -615,8 +616,8 @@ class BuildEngine:
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
                     try:
                         result = impl.function(asg=asg)
-                        if result is not None:
-                            asg = result  # type: ignore[assignment]
+                        if isinstance(result, (dict, Node)):
+                            asg = result
                     except Exception as e:
                         logging.warning(
                             "[Plugin] %s raised an exception in on_asg_created for %s: %s",
