@@ -438,12 +438,11 @@ class BuildEngine:
                         )
 
                 resolved_body_class = (body_class or page_class or "").strip()
-                resolved_page_class = (page_class or body_class or "").strip()
                 resolved_content_class = (content_class or "").strip()
 
                 final_html = self.compiler.compile_page(
                     title=title_str,
-                    body_content=body_content,
+                    body_html=body_content,
                     toc_html=toc_html,
                     nav_html=nav_html,
                     nav_tree=_nav_tree,
@@ -451,7 +450,6 @@ class BuildEngine:
                     prev_page=prev_page,
                     next_page=next_page,
                     body_class=resolved_body_class,
-                    page_class=resolved_page_class,
                     content_class=resolved_content_class,
                 )
 
