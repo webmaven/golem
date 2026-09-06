@@ -20,7 +20,15 @@ Task 4: complete (commits 8d34c19..6c98f6f, review clean)
   Minor: format_attribute/format_function/format_class/format_module still annotate docstring_style as str not str|griffe.DocstringStyle|griffe.Parser
   Minor: format_docstring fallback guard should use `not result.strip()` vs `not result` to catch whitespace-only output
 Task 5: complete (commits 6c98f6f..61a28bb, review clean after fix)
-  Fix: Diagnostic.__init__ severity clobber on positional dict init (fixed in 61a28bb)
-  Minor: redundant partial check in BuildEngine.check() loop
-  Minor: asciidoctrine.exceptions module not bound as attribute on sys.modules["asciidoctrine"]
-  Minor: from_resolver_warning assumes warning is dict; getattr fallback would be more resilient
+
+---
+
+## Post-Review Fixup & Alpha Simplification
+Plan: `/Users/michaelbernstein/.gemini/antigravity/brain/7f4a00ed-2539-4a6d-8e67-56bcf193e2c5/implementation_plan.md`
+
+- [x] Task 1: Doctest Plugin: Eliminate Compatibility Aliases & Fix Runner (`golem.plugins.doctest`) (commit `374dcc6`)
+- [x] Task 2: Renderer: Fix State Leakage, Guard Path Input & Remove Parser Workarounds (`golem.renderer`) (commit `22cdb6b`)
+- [x] Task 3: Templates: Eliminate Hardcoded Fallback & Argument Aliases (`golem.templates`) (commit `1219d79`)
+- [x] Task 4: Apidoc Formatter: Remove Broad Fallback & Align Type Annotations (`golem.plugins.apidoc`) (commit `edbef95`)
+- [x] Task 5: Diagnostics & Build Engine: Dataclass Refactor & Alias Removal (`golem.diagnostics`, `golem.engine`, `golem.cli`, `golem.server`) (commit `b39d534`)
+
