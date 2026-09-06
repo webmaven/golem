@@ -173,6 +173,7 @@ pages:
 Prior to triggering production deployments, execute the following local pre-flight checks:
 
 * [x] Run `golem apidoc` to regenerate `docs/api/` from source (these files are excluded from git).
-* [x] Run `golem build --strict` to ensure zero compilation warnings.
+* [x] Run `golem check --strict` to verify syntax and semantic resolver rules without writing build output.
+* [x] Run `golem build --strict` to ensure zero compilation warnings and build artifacts.
 * [x] Verify that custom stylesheets (`static_dir`) and fonts resolve properly with relative URLs.
 * [x] Confirm that `:site_url:` is configured correctly in `golem.toml` or `pyproject.toml` for canonical link generation.

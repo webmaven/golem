@@ -612,6 +612,9 @@ The `golem` command-line utility routes user actions using a standard Click-base
 *   `golem build [--config=<path>] [--clean] [--strict] [-v/--verbose] [-q/--quiet] [-C <dir>]`
     *   Runs the incremental compiler, building static pages into the configured output folder (`dist/` by default).
     *   Flags: `--clean` purges the output directory and cache; `--strict` treats warnings as fatal errors; `-v` enables debug logging; `-q` silences non-error output.
+*   `golem check [--strict] [-v/--verbose] [-C <dir>]`
+    *   Performs headless, non-writing diagnostic verification of AsciiDoc source files, evaluating syntax parsing and semantic resolver warnings without generating build output.
+    *   Flags: `--strict` fails with exit code 1 if warnings are detected; `-v` displays verbose diagnostic outputs. Ideal for CI/CD pre-flight checks and git commit hooks.
 *   `golem serve [--port=<port>] [--host=<host>] [--strict] [-C <dir>]`
     *   Invokes an initial build, launches the multi-threaded HTTP web server, activates SSE reload streaming, watches source directories, and injects real-time diagnostic error overlays if compilation errors occur.
 *   `golem plugins [--json] [-C <dir>]`
