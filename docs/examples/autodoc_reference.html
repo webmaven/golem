@@ -233,6 +233,8 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 1rem;
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     }
     .annotation-toggle-btn {
       background: var(--bg-surface);
@@ -245,9 +247,24 @@
       display: inline-flex;
       align-items: center;
       gap: 0.35rem;
+      transition: all 0.15s ease;
     }
     .annotation-toggle-btn:hover {
       background: var(--color-primary-subtle);
+    }
+    body.annotations-off .annotation-control-bar {
+      background: var(--bg-surface-muted);
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-secondary);
+    }
+    body.annotations-off .annotation-toggle-btn {
+      border-color: var(--border-subtle);
+      color: var(--text-secondary);
+      background: var(--bg-surface);
+    }
+    body.annotations-off .annotation-toggle-btn:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
     }
 
     /* Main Container Layout */
@@ -802,8 +819,7 @@
 
     /* Hidden state when Annotation Mode is toggled off */
     body.annotations-off .annotation-marker,
-    body.annotations-off .annotation-callout-box,
-    body.annotations-off .annotation-control-bar {
+    body.annotations-off .annotation-callout-box {
       display: none !important;
     }
 
@@ -824,12 +840,15 @@
 
   <!-- Annotation Mode Banner -->
   <aside class="annotation-control-bar" aria-label="Research annotations bar">
-    <div>
+    <div id="annotation-bar-text">
       <strong>Design System Research Preview:</strong> This page actively demonstrates all 7 next-generation autodoc design principles.
     </div>
-    <button id="toggle-annotations" class="annotation-toggle-btn" aria-pressed="true">
-      <span>●</span> Toggle Annotations (ON)
-    </button>
+    <div style="display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0;">
+      <span style="font-size: 0.75rem; color: var(--text-muted);">Shortcut: <kbd class="kbd-shortcut">a</kbd></span>
+      <button id="toggle-annotations" class="annotation-toggle-btn" aria-pressed="true" title="Toggle annotations (shortcut: a)">
+        <span>●</span> Toggle Annotations (ON)
+      </button>
+    </div>
   </aside>
 
   <!-- Global Header -->
@@ -846,6 +865,12 @@
       </div>
 
       <div class="header-actions">
+        <!-- Persistent Header Annotation Toggle (Available even after scrolling down) -->
+        <button id="header-toggle-annotations" class="search-button" aria-label="Toggle research annotations (Press a)" title="Toggle annotations (a)">
+          <span id="header-annotation-icon" style="color: var(--annotation-badge);">●</span>
+          <span id="header-annotation-text" style="font-size: 0.75rem; font-weight: 600;">Annotations: ON</span>
+        </button>
+
         <!-- Principle 7: Search with Keyboard Shortcut -->
         <button id="search-trigger" class="search-button" aria-label="Search API Reference (Press /)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1214,6 +1239,10 @@ Output compiled: dist/index.html (24.3 KB)</code></pre>
         <span class="kbd-shortcut">e</span>
       </div>
       <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span>Toggle design principles annotations</span>
+        <span class="kbd-shortcut">a</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
         <span>Dismiss popover or modal</span>
         <span class="kbd-shortcut">Escape</span>
       </div>
@@ -1227,18 +1256,50 @@ Output compiled: dist/index.html (24.3 KB)</code></pre>
       import("https://unpkg.com/@oddbird/popover-polyfill@latest/dist/popover.min.js");
     }
 
-    // 1. Annotation Mode Toggle
+    // 1. Annotation Mode Toggle (both banner button, header button, and 'a' shortcut)
     const toggleAnnotationsBtn = document.getElementById('toggle-annotations');
+    const headerToggleBtn = document.getElementById('header-toggle-annotations');
+    const headerIcon = document.getElementById('header-annotation-icon');
+    const headerText = document.getElementById('header-annotation-text');
+    const annotationBarText = document.getElementById('annotation-bar-text');
     let annotationsEnabled = true;
 
-    toggleAnnotationsBtn.addEventListener('click', () => {
-      annotationsEnabled = !annotationsEnabled;
+    function setAnnotationsState(enabled) {
+      annotationsEnabled = enabled;
       document.body.classList.toggle('annotations-off', !annotationsEnabled);
-      toggleAnnotationsBtn.setAttribute('aria-pressed', annotationsEnabled);
-      toggleAnnotationsBtn.innerHTML = annotationsEnabled 
-        ? '<span>●</span> Toggle Annotations (ON)' 
-        : '<span>○</span> Toggle Annotations (OFF)';
-    });
+
+      if (toggleAnnotationsBtn) {
+        toggleAnnotationsBtn.setAttribute('aria-pressed', annotationsEnabled);
+        toggleAnnotationsBtn.innerHTML = annotationsEnabled 
+          ? '<span>●</span> Toggle Annotations (ON)' 
+          : '<span>○</span> Toggle Annotations (OFF)';
+      }
+
+      if (headerToggleBtn) {
+        headerToggleBtn.setAttribute('aria-pressed', annotationsEnabled);
+        headerIcon.textContent = annotationsEnabled ? '●' : '○';
+        headerIcon.style.color = annotationsEnabled ? 'var(--annotation-badge)' : 'var(--text-muted)';
+        headerText.textContent = annotationsEnabled ? 'Annotations: ON' : 'Annotations: OFF';
+      }
+
+      if (annotationBarText) {
+        annotationBarText.innerHTML = annotationsEnabled
+          ? '<strong>Design System Research Preview:</strong> This page actively demonstrates all 7 next-generation autodoc design principles.'
+          : '<strong>Clean Production Mode:</strong> Research annotations and callouts are hidden. Press <kbd class="kbd-shortcut">a</kbd> or toggle button to restore.';
+      }
+    }
+
+    if (toggleAnnotationsBtn) {
+      toggleAnnotationsBtn.addEventListener('click', () => {
+        setAnnotationsState(!annotationsEnabled);
+      });
+    }
+
+    if (headerToggleBtn) {
+      headerToggleBtn.addEventListener('click', () => {
+        setAnnotationsState(!annotationsEnabled);
+      });
+    }
 
     // 2. Dark / Light Theme Toggle with LocalStorage
     const themeToggleBtn = document.getElementById('theme-toggle');
@@ -1278,6 +1339,9 @@ Output compiled: dist/index.html (24.3 KB)</code></pre>
       if (e.key === '/' || e.key === 's') {
         e.preventDefault();
         alert('Symbol Search triggered! (Focusing search palette)');
+      } else if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        setAnnotationsState(!annotationsEnabled);
       } else if (e.key === '?') {
         e.preventDefault();
         shortcutsModal.open ? shortcutsModal.close() : shortcutsModal.showModal();
