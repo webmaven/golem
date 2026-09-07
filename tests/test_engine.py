@@ -14,10 +14,10 @@ def test_incremental_rebuild_logic(tmp_path):
     content_dir.mkdir()
 
     file_a = content_dir / "index.adoc"
-    file_a.write_text("= Welcome\ninclude::sidebar.adoc[]")
+    file_a.write_text("= Welcome\n\ninclude::sidebar.adoc[]\n")
 
     file_b = content_dir / "sidebar.adoc"
-    file_b.write_text("Sidebar content")
+    file_b.write_text("Sidebar content\n")
 
     config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
     engine = BuildEngine(config)
@@ -35,7 +35,7 @@ def test_incremental_rebuild_logic(tmp_path):
     assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Edit file_b (the included sidebar)
-    file_b.write_text("Modified Sidebar content")
+    file_b.write_text("Modified Sidebar content\n")
 
     # Verify that file_a is flagged for recompilation because file_b is in its include-chain
     new_rebuild_set = engine.staleness_tracker.get_outdated_files()
@@ -131,7 +131,7 @@ def test_cache_global_template_edit_propagation(tmp_path, monkeypatch):
     theme_dir = tmp_path / "themes" / "default"
     theme_dir.mkdir(parents=True)
     skeleton_pt = theme_dir / "skeleton.pt"
-    skeleton_pt.write_text("<html><body>${body_content}</body></html>", encoding="utf-8")
+    skeleton_pt.write_text("<html><body>${body_html}</body></html>", encoding="utf-8")
 
     config = GolemConfig(
         content_dir="content",
@@ -147,7 +147,7 @@ def test_cache_global_template_edit_propagation(tmp_path, monkeypatch):
     assert len(engine.staleness_tracker.get_outdated_files()) == 0
 
     # Modify the template skeleton
-    skeleton_pt.write_text("<html><body>NEW ${body_content}</body></html>", encoding="utf-8")
+    skeleton_pt.write_text("<html><body>NEW ${body_html}</body></html>", encoding="utf-8")
 
     # The engine must detect the global template edit and invalidate index.adoc
     outdated = engine.staleness_tracker.get_outdated_files()
@@ -531,10 +531,10 @@ def test_engine_error_interception_permissive_mode(tmp_path, monkeypatch):
     # In permissive mode, valid page is built and broken page error is intercepted
     assert len(compiled) == 1
     assert compiled[0] == tmp_path / "dist" / "valid.html"
-    assert len(engine.errors) == 1
-    assert "broken.adoc" in engine.errors[0]["file"]
-    assert "AsciiDoc syntax parse error simulated" in engine.errors[0]["message"]
-    assert engine.errors[0]["error_type"] == "ValueError"
+    assert len(engine.diagnostics) == 1
+    assert "broken.adoc" in engine.diagnostics[0].file
+    assert "AsciiDoc syntax parse error simulated" in engine.diagnostics[0].message
+    assert engine.diagnostics[0].error_type == "ValueError"
 
 
 def test_engine_error_interception_strict_mode(tmp_path, monkeypatch):
@@ -561,8 +561,8 @@ def test_engine_error_interception_strict_mode(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="Fatal syntax error in strict mode"):
         engine.build_site()
 
-    assert len(engine.errors) >= 1
-    assert "broken.adoc" in engine.errors[0]["file"]
+    assert len(engine.diagnostics) >= 1
+    assert "broken.adoc" in engine.diagnostics[0].file
 
 
 def test_engine_passes_template_search_paths_to_render_body(tmp_path, monkeypatch):
@@ -1666,3 +1666,35 @@ def test_sync_static_assets_all_layers(tmp_path, monkeypatch):
     assert (output_dir / "img" / "photo.jpg").read_bytes() == b"jpeg-data"
     assert not (output_dir / ".hidden.png").exists()
     assert not (output_dir / "index.adoc").exists()
+
+
+def test_build_engine_check_valid_and_broken_docs(tmp_path: Path):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "valid.adoc").write_text("= Valid\n\nValid body text.", encoding="utf-8")
+    (content_dir / "broken.adoc").write_text("= Broken\n\n[source\nUnclosed block", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config)
+    diagnostics = engine.check()
+
+    assert len(diagnostics) == 1
+    assert "broken.adoc" in diagnostics[0].file
+    assert diagnostics[0].line == 3
+    assert diagnostics[0].severity == "error"
+
+
+def test_build_engine_build_site_captures_resolver_warnings(tmp_path: Path):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "page.adoc").write_text(
+        "= Page Title\n\nRefer to <<unknown_section_anchor,the docs>>.\n",
+        encoding="utf-8",
+    )
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config)
+    compiled = engine.build_site()
+
+    assert len(compiled) == 1
+    assert any(d.severity == "warning" and "unknown_section_anchor" in d.message for d in engine.diagnostics)

@@ -38,17 +38,20 @@ The compilation pipeline proceeds through sequential phases:
 
 from __future__ import annotations
 
+import inspect
 import logging
 from pathlib import Path
 import sys
 from typing import Any
 
 import asciidoctrine
+from asciidoctrine.nodes import Document, Node
 from asciidoctrine.resolver import ASGResolver
 import click
 from golem.assets import sync_static_assets
 from golem.cache import BuildCache
 from golem.config import GolemConfig
+from golem.diagnostics import Diagnostic
 from golem.metadata import (
     clean_index_url,
     extract_metadata_from_doc,
@@ -63,7 +66,30 @@ from golem.renderer import (
 from golem.staleness import StalenessTracker, is_partial
 from golem.templates import PageCompiler
 
-__all__ = ["BuildEngine"]
+__all__ = ["BuildEngine", "GolemEngine"]
+
+
+def _invoke_asg_hook(impl: Any, asg: dict[str, Any] | Node, doc_path: Path) -> Any:
+    """Invoke on_asg_created hook implementation with Pluggy argument filtering."""
+    hook_kwargs: dict[str, Any] = {"asg": asg}
+    has_doc_path = "doc_path" in getattr(impl, "argnames", ()) or "doc_path" in getattr(impl, "kwargnames", ())
+    if not has_doc_path:
+        fn = getattr(impl, "function", None)
+        code = getattr(fn, "__code__", None)
+        if code and (code.co_flags & inspect.CO_VARKEYWORDS):
+            has_doc_path = True
+        elif fn is not None and not code:
+            try:
+                sig = inspect.signature(fn)
+                has_doc_path = "doc_path" in sig.parameters or any(
+                    p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+                )
+            except (ValueError, TypeError):
+                pass
+
+    if has_doc_path:
+        hook_kwargs["doc_path"] = doc_path
+    return impl.function(**hook_kwargs)
 
 
 class BuildEngine:
@@ -82,8 +108,7 @@ class BuildEngine:
     `staleness_tracker` (StalenessTracker):: Staleness tracker and DAG dependency analyzer.
     `compiler` (PageCompiler):: Page template compiler instance.
     `nav_builder` (NavigationBuilder):: Hierarchical navigation builder and pagination generator.
-    `errors` (list[dict[str, Any]]):: Errors and diagnostics captured during compilation.
-    `diagnostics` (list[dict[str, Any]]):: Diagnostic entries (alias to `errors`).
+    `diagnostics` (list[Diagnostic]):: Diagnostic entries captured during compilation.
     `pm` (pluggy.PluginManager):: Plugin manager instance for build lifecycle hooks.
 
     === Examples
@@ -134,8 +159,7 @@ class BuildEngine:
             lambda p: is_partial(p, self.content_dir),
             self.get_file_metadata,
         )
-        self.errors: list[dict[str, Any]] = []
-        self.diagnostics: list[dict[str, Any]] = self.errors
+        self.diagnostics: list[Diagnostic] = []
         self._nav_tree_cache: list[dict[str, Any]] | None = None
 
     def get_file_metadata(self, path: Path) -> dict[str, Any]:
@@ -236,8 +260,7 @@ class BuildEngine:
         compiled_pages = engine.build_site()
         ----
         """
-        self.errors = []
-        self.diagnostics = self.errors
+        self.diagnostics = []
         self._nav_tree_cache = None
         compiled_files = []
 
@@ -298,9 +321,9 @@ class BuildEngine:
                             e,
                         )
                         continue
-                    if result is not None and result != content:
+                    if isinstance(result, str) and result != content:
                         _pre_parse_modifiers.append(impl.plugin_name or str(impl.function))
-                        content = result  # type: ignore[assignment]
+                        content = result
                 if len(_pre_parse_modifiers) > 1:
                     logging.warning(
                         "[Plugin] Multiple plugins modified raw_content in on_pre_parse for %s: %s. "
@@ -311,7 +334,7 @@ class BuildEngine:
                     )
 
                 # 1. Parse using asciidoctrine
-                ast = asciidoctrine.parse_to_ast(content, base_dir=str(doc_path.parent))
+                ast: Document = asciidoctrine.parse_to_ast(content, base_dir=str(doc_path.parent))
 
                 # Trigger AST hooks sequentially (chain modifications)
                 _ast_modifiers: list[str] = []
@@ -326,9 +349,9 @@ class BuildEngine:
                             e,
                         )
                         continue
-                    if result is not None and result is not ast:
+                    if isinstance(result, Document) and result is not ast:
                         _ast_modifiers.append(impl.plugin_name or str(impl.function))
-                        ast = result  # type: ignore[assignment]
+                        ast = result
                 if len(_ast_modifiers) > 1:
                     logging.warning(
                         "[Plugin] Multiple plugins modified ast in on_ast_created for %s: %s. "
@@ -340,13 +363,18 @@ class BuildEngine:
 
                 # 2. Resolve AST to ASG
                 resolver = ASGResolver(ast)
-                asg = resolver.resolve(ast)
+                asg: dict[str, Any] | Node = resolver.resolve(ast)
+
+                if hasattr(resolver, "warnings") and resolver.warnings:
+                    for warn in resolver.warnings:
+                        warn_diag = Diagnostic.from_resolver_warning(warn, file=str(doc_path), content=content)
+                        self.diagnostics.append(warn_diag)
 
                 # Trigger ASG hooks sequentially (chain modifications)
                 _asg_modifiers: list[str] = []
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
                     try:
-                        result = impl.function(asg=asg)
+                        result = _invoke_asg_hook(impl, asg, doc_path)
                     except Exception as e:
                         logging.warning(
                             "[Plugin] %s raised an exception in on_asg_created for %s: %s",
@@ -355,9 +383,9 @@ class BuildEngine:
                             e,
                         )
                         continue
-                    if result is not None and result is not asg:
+                    if isinstance(result, (dict, Node)) and result is not asg:
                         _asg_modifiers.append(impl.plugin_name or str(impl.function))
-                        asg = result  # type: ignore[assignment]
+                        asg = result
                 if len(_asg_modifiers) > 1:
                     logging.warning(
                         "[Plugin] Multiple plugins modified asg in on_asg_created for %s: %s. "
@@ -370,7 +398,7 @@ class BuildEngine:
                 page_node_types = collect_node_types(asg)
 
                 # 3. Render body using Golem's ASG visitor
-                body_content = render_body(asg, search_paths=search_paths)  # type: ignore[arg-type]
+                body_content = render_body(asg, search_paths=search_paths)
 
                 # Extract title for layout framing
                 title_str = ""
@@ -393,7 +421,7 @@ class BuildEngine:
                     title_str = "Golem Doc"
 
                 # 4. Compile layout via Chameleon templates
-                toc_html = generate_toc_html(asg)  # type: ignore[arg-type]
+                toc_html = generate_toc_html(asg)
 
                 # Generate dynamic navigation HTML and chapter pagination for this page
                 rel_path = doc_path.relative_to(self.content_dir)
@@ -432,12 +460,11 @@ class BuildEngine:
                         )
 
                 resolved_body_class = (body_class or page_class or "").strip()
-                resolved_page_class = (page_class or body_class or "").strip()
                 resolved_content_class = (content_class or "").strip()
 
                 final_html = self.compiler.compile_page(
                     title=title_str,
-                    body_content=body_content,
+                    body_html=body_content,
                     toc_html=toc_html,
                     nav_html=nav_html,
                     nav_tree=_nav_tree,
@@ -445,7 +472,6 @@ class BuildEngine:
                     prev_page=prev_page,
                     next_page=next_page,
                     body_class=resolved_body_class,
-                    page_class=resolved_page_class,
                     content_class=resolved_content_class,
                 )
 
@@ -462,9 +488,9 @@ class BuildEngine:
                             e,
                         )
                         continue
-                    if result is not None and result != final_html:
+                    if isinstance(result, str) and result != final_html:
                         _post_render_modifiers.append(impl.plugin_name or str(impl.function))
-                        final_html = result  # type: ignore[assignment]
+                        final_html = result
                 if len(_post_render_modifiers) > 1:
                     logging.warning(
                         "[Plugin] Multiple plugins modified html_content in on_post_render for %s: %s. "
@@ -501,22 +527,131 @@ class BuildEngine:
 
                     click.echo(f"  [COMPILE] {rel_doc} -> {rel_out}")
             except Exception as e:
-                error_info = {
-                    "file": str(doc_path),
-                    "message": str(e),
-                    "error_type": type(e).__name__,
-                    "exception": e,
-                    "line": getattr(e, "line", getattr(e, "lineno", None)),
-                    "column": getattr(
-                        e,
-                        "column",
-                        getattr(e, "offset", getattr(e, "col_offset", None)),
-                    ),
-                    "context": getattr(e, "context", None),
-                }
-                self.errors.append(error_info)
+                error_info = Diagnostic.from_exception(e, file=str(doc_path))
+                self.diagnostics.append(error_info)
                 logging.error(f"Failed to build file {doc_path}: {e}")
                 if getattr(self.config, "strict", False):
                     raise e
 
         return compiled_files
+
+    def check(self, files: list[Path] | None = None) -> list[Diagnostic]:
+        """Perform syntax parsing and semantic graph resolution diagnostics.
+
+        Parses document ASTs and resolves ASGs to capture AsciiDoc syntax errors,
+        malformed block structures, and semantic resolver warnings (such as unresolved
+        cross-references) without compiling HTML or writing output files.
+
+        [parameters]
+        `files` (list[Path] | None, optional):: Optional explicit list of document files to check.
+            If None, checks all non-partial `.adoc` documents in `content_dir`.
+
+        [returns]
+        `list[Diagnostic]`:: Collected diagnostic entries (errors and warnings).
+
+        === Examples
+
+        [source,python]
+        ----
+        >>> from golem.config import GolemConfig
+        >>> from golem.engine import BuildEngine
+        >>> from pathlib import Path
+        >>> config = GolemConfig(content_dir="content", output_dir="dist")
+        >>> engine = BuildEngine(config)
+        >>> diagnostics = engine.check()
+        >>> isinstance(diagnostics, list)
+        True
+        ----
+        """
+        self.diagnostics = []
+        diagnostics: list[Diagnostic] = []
+
+        if files is None:
+            all_docs = (
+                [f for f in sorted(self.content_dir.glob("**/*.adoc")) if not is_partial(f, self.content_dir)]
+                if self.content_dir.exists()
+                else []
+            )
+        else:
+            all_docs = files
+
+        for doc_path in all_docs:
+            try:
+                with open(doc_path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+            except Exception as e:
+                diag = Diagnostic.from_exception(e, file=str(doc_path))
+                diagnostics.append(diag)
+                continue
+
+            # Trigger pre-parse hooks sequentially
+            if hasattr(self, "pm") and self.pm:
+                for impl in self.pm.hook.on_pre_parse.get_hookimpls():
+                    try:
+                        result = impl.function(raw_content=content)
+                        if isinstance(result, str):
+                            content = result
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_pre_parse for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+
+            # 1. Parse using asciidoctrine
+            try:
+                ast: Document = asciidoctrine.parse_to_ast(content, base_dir=str(doc_path.parent))
+            except Exception as e:
+                diag = Diagnostic.from_exception(e, file=str(doc_path))
+                diagnostics.append(diag)
+                continue
+
+            # Trigger AST hooks sequentially
+            if hasattr(self, "pm") and self.pm:
+                for impl in self.pm.hook.on_ast_created.get_hookimpls():
+                    try:
+                        result = impl.function(ast=ast)
+                        if isinstance(result, Document):
+                            ast = result
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_ast_created for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+
+            # 2. Resolve AST to ASG
+            try:
+                resolver = ASGResolver(ast)
+                asg: dict[str, Any] | Node = resolver.resolve(ast)
+                if hasattr(resolver, "warnings") and resolver.warnings:
+                    for warn in resolver.warnings:
+                        warn_diag = Diagnostic.from_resolver_warning(warn, file=str(doc_path), content=content)
+                        diagnostics.append(warn_diag)
+            except Exception as e:
+                diag = Diagnostic.from_exception(e, file=str(doc_path))
+                diagnostics.append(diag)
+                continue
+
+            # Trigger ASG hooks sequentially
+            if hasattr(self, "pm") and self.pm:
+                for impl in self.pm.hook.on_asg_created.get_hookimpls():
+                    try:
+                        result = _invoke_asg_hook(impl, asg, doc_path)
+                        if isinstance(result, (dict, Node)):
+                            asg = result
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_asg_created for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+
+        self.diagnostics = diagnostics
+        return diagnostics
+
+
+GolemEngine = BuildEngine

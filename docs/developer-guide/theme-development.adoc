@@ -43,20 +43,19 @@ When rendering `skeleton.pt`, Golem passes a comprehensive set of template varia
 | Variable | Type | Description
 
 | `site_title` | `str` | Title of the website configured in `golem.toml` or `pyproject.toml` (default: `"Golem Docs"`).
-| `page_title` | `str` | Title of the current document extracted from the top-level AsciiDoc header (`= Document Title`) or front-matter. Also aliased as `title`.
+| `title` | `str` | Title of the current document extracted from the top-level AsciiDoc header (`= Document Title`) or front-matter.
 | `site_author` | `str` | Configured site author name or organization (default: `"Anonymous"`).
 | `site_url` | `str \| None` | Base URL of the website if configured (useful for `<link rel="canonical">` tags).
-| `generator_version` | `str` | Active version string of the Golem engine (e.g. `0.1.0a2`).
-| `body_html` | `str` | Pre-rendered semantic HTML5 content generated from the AsciiDoc document body. Also accessible as `body_content` and `body`.
+| `generator_version` | `str` | Active version string of the Golem engine (e.g. `0.1.0a3`).
+| `body_html` | `str` | Pre-rendered semantic HTML5 content generated from the AsciiDoc document body.
 | `nav_tree` | `list[dict]` | Hierarchical site map data structure containing `{title, url, path, children}` dictionary nodes.
-| `nav_html` | `str` | Pre-rendered semantic HTML5 navigation list (`<nav class="golem-nav">...`). Also aliased as `navigation_html`.
+| `nav_html` | `str` | Pre-rendered semantic HTML5 navigation list (`<nav class="golem-nav">...`).
 | `toc_html` | `str` | Rendered Table of Contents HTML unordered list generated from document headings (`h2`, `h3`, etc.).
 | `current_path` | `str` | Path of the source document relative to the content root directory.
 | `prev_page` | `dict[str, str] \| None` | Previous document in sequential navigation order (`{title, url}`).
 | `next_page` | `dict[str, str] \| None` | Next document in sequential navigation order (`{title, url}`).
 | `pygments_css` | `str \| None` | Server-generated Pygments syntax highlighting CSS rules for light/dark mode.
-| `body_class` | `str` | Class name string extracted from `:body_class:` / `:page_class:` header attribute.
-| `page_class` | `str` | Class name string extracted from `:page_class:` header attribute.
+| `body_class` | `str` | Class name string extracted from `:body_class:` header attribute.
 | `content_class` | `str` | Class name string extracted from `:content_class:` header attribute.
 | `custom_css` | `list[str]` | List of custom stylesheet URLs or paths injected from configuration.
 | `custom_js` | `list[str]` | List of custom script URLs or paths injected from configuration.
@@ -439,7 +438,7 @@ To create a fully customized theme or override Golem's default page structure:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${page_title} - ${site_title}</title>
+    <title>${title} - ${site_title}</title>
     <meta name="generator" content="${generator_version}" />
     <meta tal:condition="site_author" name="author" content="${site_author}" />
     <link rel="canonical" tal:condition="site_url" href="${site_url}" />
@@ -473,7 +472,7 @@ To create a fully customized theme or override Golem's default page structure:
 
         <!-- Main Document Body -->
         <main class="content-body">
-            <h1 tal:condition="page_title">${page_title}</h1>
+            <h1 tal:condition="title">${title}</h1>
             <div tal:content="structure body_html" />
         </main>
 

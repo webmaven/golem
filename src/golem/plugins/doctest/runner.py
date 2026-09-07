@@ -9,7 +9,11 @@ from asciidoctest.parser import parse_adoc_tests
 from asciidoctest.runner import run_test_blocks
 
 
-def run_adoc_file(path: Path | str, mode: str = "explicit") -> tuple[int, int, list[str]]:
+def run_adoc_file(
+    path: Path | str,
+    mode: str = "explicit",
+    split_sections: bool = False,
+) -> tuple[int, int, list[str]]:
     """Execute AsciiDoc doctest blocks extracted from a single .adoc file.
 
     Returns:
@@ -31,6 +35,33 @@ def run_adoc_file(path: Path | str, mode: str = "explicit") -> tuple[int, int, l
 
     if not blocks:
         return 0, 0, []
+
+    if split_sections:
+        sections_map: dict[Any, list[Any]] = {}
+        for block in blocks:
+            sec_id = (getattr(block, "attributes", None) or {}).get("__section_id__")
+            sections_map.setdefault(sec_id, []).append(block)
+
+        total_passed = 0
+        total_failed = 0
+        errors: list[str] = []
+
+        for sec_blocks in sections_map.values():
+            sec_globals: dict[str, Any] = {
+                "__file__": str(file_path.resolve()),
+                "__name__": "__main__",
+            }
+            try:
+                run_test_blocks(sec_blocks, sec_globals)
+                total_passed += len(sec_blocks)
+            except AsciiDocTestFailure as e:
+                total_failed += 1
+                errors.append(f"[{file_path}] {e}")
+            except Exception as e:
+                total_failed += 1
+                errors.append(f"[{file_path}] Unexpected error: {e}")
+
+        return total_passed, total_failed, errors
 
     shared_globals: dict[str, Any] = {"__file__": str(file_path.resolve()), "__name__": "__main__"}
     try:
@@ -59,7 +90,12 @@ def run_docstring_tests(source_target: Path | str, mode: str = "explicit") -> tu
         return 0, 1, [f"Error extracting docstring tests from {source_target}: {e}"]
 
 
-def run_path(path: Path | str, mode: str = "explicit", fail_fast: bool = False) -> tuple[int, int, list[str]]:
+def run_path(
+    path: Path | str,
+    mode: str = "explicit",
+    fail_fast: bool = False,
+    split_sections: bool = False,
+) -> tuple[int, int, list[str]]:
     """Execute AsciiDoc doctests for a single file or recursively for a directory.
 
     Returns:
@@ -72,7 +108,7 @@ def run_path(path: Path | str, mode: str = "explicit", fail_fast: bool = False) 
     if target.is_file():
         if target.suffix == ".py":
             return run_docstring_tests(target, mode=mode)
-        return run_adoc_file(target, mode=mode)
+        return run_adoc_file(target, mode=mode, split_sections=split_sections)
 
     if target.is_dir():
         adoc_files = sorted(set(list(target.rglob("*.adoc")) + list(target.rglob("*.asciidoc"))))
@@ -81,7 +117,7 @@ def run_path(path: Path | str, mode: str = "explicit", fail_fast: bool = False) 
         all_errors: list[str] = []
 
         for adoc_file in adoc_files:
-            passed, failed, errors = run_adoc_file(adoc_file, mode=mode)
+            passed, failed, errors = run_adoc_file(adoc_file, mode=mode, split_sections=split_sections)
             total_passed += passed
             total_failed += failed
             all_errors.extend(errors)
@@ -99,6 +135,7 @@ def run_all(
     mode: str = "explicit",
     verbose: bool = False,
     fail_fast: bool = False,
+    split_sections: bool = False,
 ) -> int:
     """Run all specified test paths and/or Python source targets.
 
@@ -132,9 +169,14 @@ def run_all(
                 if p_path.suffix == ".py":
                     passed, failed, errors = run_docstring_tests(p_path, mode=mode)
                 else:
-                    passed, failed, errors = run_adoc_file(p_path, mode=mode)
+                    passed, failed, errors = run_adoc_file(p_path, mode=mode, split_sections=split_sections)
             else:
-                passed, failed, errors = run_path(p_path, mode=mode, fail_fast=fail_fast)
+                passed, failed, errors = run_path(
+                    p_path,
+                    mode=mode,
+                    fail_fast=fail_fast,
+                    split_sections=split_sections,
+                )
 
             total_passed += passed
             total_failed += failed

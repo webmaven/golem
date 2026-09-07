@@ -12,6 +12,9 @@ Transform custom AsciiDoc roles (like `[.alert]`) into custom CSS-styled admonit
 .alert_badge_plugin.py
 [source,python]
 ----
+from pathlib import Path
+from typing import Any
+
 import pluggy
 
 hookimpl = pluggy.HookimplMarker("golem")
@@ -20,7 +23,7 @@ class AlertBadgePlugin:
     """Mutates ASG nodes tagged with role='alert'."""
 
     @hookimpl
-    def on_asg_created(self, asg: dict, file_path: str) -> dict:
+    def on_asg_created(self, asg: dict[str, Any], doc_path: Path | None = None) -> dict[str, Any]:
         for block in asg.get("blocks", []):
             if block.get("role") == "alert":
                 attrs = block.setdefault("attributes", {})

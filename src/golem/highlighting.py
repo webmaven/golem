@@ -13,6 +13,7 @@ Custom styles aligning with Golem's Fired Clay / Workbench visual palette:
 from __future__ import annotations
 
 from collections.abc import Callable
+import logging
 import pygments  # type: ignore[import-untyped]
 from pygments.formatters.html import HtmlFormatter  # type: ignore[import-untyped]
 from pygments.lexers import get_lexer_by_name  # type: ignore[import-untyped]
@@ -216,17 +217,22 @@ def make_highlighter(
             if lookup_lang != raw_lang:
                 try:
                     lexer = get_lexer_by_name(raw_lang, stripall=False)
-                except (ClassNotFound, Exception):
+                except ClassNotFound:
+                    return None
+                except Exception as e:
+                    logging.getLogger(__name__).debug("Failed to get lexer for '%s': %s", raw_lang, e)
                     return None
             else:
                 return None
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).debug("Failed to get lexer for '%s': %s", lookup_lang, e)
             return None
 
         try:
             tokens_html = pygments.highlight(code, lexer, formatter).rstrip("\n")
             return f'<pre class="highlight {raw_lang}"><code class="language-{raw_lang}">{tokens_html}</code></pre>'
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).debug("Failed to highlight code for '%s': %s", raw_lang, e)
             return None
 
     return highlighter

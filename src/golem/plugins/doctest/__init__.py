@@ -14,7 +14,6 @@ from .runner import (
 
 __all__ = [
     "golem_add_subcommands",
-    "run_asciidoc_doctests",
     "run_doctests",
     "run_adoc_file",
     "run_docstring_tests",
@@ -29,6 +28,7 @@ def run_doctests(
     mode: str = "explicit",
     verbose: bool = False,
     fail_fast: bool = False,
+    split_sections: bool = False,
 ) -> int:
     """Programmatic entry point to run AsciiDoc doctests."""
     target_paths: list[Path | str] = []
@@ -60,11 +60,8 @@ def run_doctests(
         mode=mode,
         verbose=verbose,
         fail_fast=fail_fast,
+        split_sections=split_sections,
     )
-
-
-# Alias for backward compatibility / explicit naming
-run_asciidoc_doctests = run_doctests
 
 
 @hookimpl
@@ -100,12 +97,19 @@ def golem_add_subcommands(cli: click.Group) -> None:
         default=False,
         help="Stop immediately on the first test failure",
     )
+    @click.option(
+        "--split-sections",
+        is_flag=True,
+        default=False,
+        help="Split doctest execution per section rather than per document",
+    )
     def doctest_command(
         paths: tuple[str, ...],
         mode: str = "explicit",
         source: str | None = None,
         verbose: bool = False,
         fail_fast: bool = False,
+        split_sections: bool = False,
     ) -> None:
         """Run interactive AsciiDoc doctests on documentation and source files."""
         exit_code = run_doctests(
@@ -114,6 +118,7 @@ def golem_add_subcommands(cli: click.Group) -> None:
             mode=mode,
             verbose=verbose,
             fail_fast=fail_fast,
+            split_sections=split_sections,
         )
         if exit_code != 0:
             raise click.exceptions.Exit(exit_code)

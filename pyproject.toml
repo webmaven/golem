@@ -7,7 +7,7 @@ name = "golem-docs"
 version = "0.1.0a3"
 description = "A static site generator built on AsciiDoc, designed for highly technical interactive documentation."
 readme = { file = "README.adoc", content-type = "text/plain" }
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 authors = [
     { name = "Michael Bernstein" }
@@ -77,7 +77,8 @@ output_dir = "api"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--ignore=ARCHITECTURE.adoc --ignore=docs"
+addopts = "-n auto --ignore=ARCHITECTURE.adoc --ignore=docs"
+
 
 [tool.ruff]
 line-length = 127

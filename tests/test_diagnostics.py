@@ -11,7 +11,8 @@ This module contains unit and integration tests for:
 
 from pathlib import Path
 from click.testing import CliRunner
-from golem.cli import main, format_diagnostic
+from golem.cli import main
+from golem.diagnostics import Diagnostic, format_diagnostic
 import asciidoctrine
 
 
@@ -39,12 +40,12 @@ def test_format_diagnostic_with_coordinates_and_context(tmp_path):
     ]
     doc_file.write_text("\n".join(lines), encoding="utf-8")
 
-    err = {
-        "file": str(doc_file),
-        "line": 14,
-        "column": 5,
-        "message": "Unclosed attribute list",
-    }
+    err = Diagnostic(
+        file=str(doc_file),
+        line=14,
+        column=5,
+        message="Unclosed attribute list",
+    )
 
     formatted = format_diagnostic(err)
     assert f"Error in {doc_file}:14:5" in formatted
@@ -58,12 +59,12 @@ def test_format_diagnostic_first_line_of_file(tmp_path):
     doc_file = tmp_path / "index.adoc"
     doc_file.write_text("= Broken Header", encoding="utf-8")
 
-    err = {
-        "file": str(doc_file),
-        "line": 1,
-        "column": 3,
-        "message": "Invalid header syntax",
-    }
+    err = Diagnostic(
+        file=str(doc_file),
+        line=1,
+        column=3,
+        message="Invalid header syntax",
+    )
 
     formatted = format_diagnostic(err)
     assert f"Error in {doc_file}:1:3" in formatted
@@ -72,12 +73,12 @@ def test_format_diagnostic_first_line_of_file(tmp_path):
 
 
 def test_format_diagnostic_missing_file_fallback():
-    err = {
-        "file": "missing/file.adoc",
-        "line": 5,
-        "column": 2,
-        "message": "File not found",
-    }
+    err = Diagnostic(
+        file="missing/file.adoc",
+        line=5,
+        column=2,
+        message="File not found",
+    )
     formatted = format_diagnostic(err)
     assert "Error in missing/file.adoc:5:2" in formatted
     assert "File not found" in formatted
@@ -91,11 +92,11 @@ def test_format_diagnostic_from_exception():
             self.column = column
 
     exc = SyntaxException("Unexpected token", line=10, column=4)
-    err = {
-        "file": "test.adoc",
-        "exception": exc,
-        "message": str(exc),
-    }
+    err = Diagnostic(
+        file="test.adoc",
+        exception=exc,
+        message=str(exc),
+    )
     formatted = format_diagnostic(err)
     assert "Error in test.adoc:10:4" in formatted
     assert "Unexpected token" in formatted
@@ -159,7 +160,7 @@ def test_cli_build_strict_flag_fails_on_error(tmp_path, monkeypatch):
 
         res = runner.invoke(main, ["build", "--strict"])
         assert res.exit_code != 0
-        assert "Compilation Error" in res.output
+        assert "Compilation failed due to build diagnostics in strict mode" in res.output
         assert "broken.adoc" in res.output
 
 
@@ -282,7 +283,7 @@ def test_cli_serve_strict_fails_on_compilation_error(tmp_path, monkeypatch):
 
         res = runner.invoke(main, ["serve", "--strict"])
         assert res.exit_code != 0
-        assert "Compilation Error" in res.output
+        assert "Compilation failed due to build diagnostics in strict mode" in res.output
 
 
 def test_cli_serve_permissive_emits_diagnostics_and_runs(tmp_path, monkeypatch):
@@ -315,10 +316,10 @@ def test_cli_serve_permissive_emits_diagnostics_and_runs(tmp_path, monkeypatch):
 
 
 def test_format_diagnostic_regex_extraction_from_message():
-    err = {
-        "file": "manual.adoc",
-        "message": "Syntax issue at line 25, column 12: invalid macro",
-    }
+    err = Diagnostic(
+        file="manual.adoc",
+        message="Syntax issue at line 25, column 12: invalid macro",
+    )
     formatted = format_diagnostic(err)
     assert "Error in manual.adoc:25:12" in formatted
     assert "invalid macro" in formatted
@@ -332,15 +333,85 @@ def test_format_diagnostic_three_digit_line_numbers(tmp_path):
     lines[101] = "Invalid [token"
     doc_file.write_text("\n".join(lines), encoding="utf-8")
 
-    err = {
-        "file": str(doc_file),
-        "line": 102,
-        "column": 9,
-        "message": "Unclosed token bracket",
-    }
+    err = Diagnostic(
+        file=str(doc_file),
+        line=102,
+        column=9,
+        message="Unclosed token bracket",
+    )
     formatted = format_diagnostic(err)
     assert f"Error in {doc_file}:102:9" in formatted
     assert "100 | = Section 100" in formatted
     assert "101 |" in formatted
     assert "102 | Invalid [token" in formatted
     assert "^-- Unclosed token bracket" in formatted
+
+
+def test_build_engine_diagnostic_formatting(tmp_path: Path):
+    from golem.engine import BuildEngine
+    from golem.config import GolemConfig
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "bad.adoc").write_text("= Bad Doc\n\n[source\nUnclosed attribute list", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(docs_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config)
+    diagnostics = engine.check()
+    assert len(diagnostics) > 0
+    assert any("bad.adoc" in str(d) for d in diagnostics)
+
+
+def test_build_engine_diagnostic_resolver_warnings(tmp_path: Path):
+    from golem.engine import BuildEngine
+    from golem.config import GolemConfig
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "xref.adoc").write_text(
+        "= Warning Doc\n\nSee <<missing_target,here>> for details.\n",
+        encoding="utf-8",
+    )
+
+    config = GolemConfig(content_dir=str(docs_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config)
+    diagnostics = engine.check()
+    assert len(diagnostics) == 1
+    diag = diagnostics[0]
+    assert diag.severity == "warning"
+    assert "missing_target" in diag.message
+    assert "xref.adoc" in str(diag)
+    assert diag.line == 3
+    assert diag.column is not None
+
+
+def test_diagnostic_object_dict_and_attr_compatibility():
+    from golem.diagnostics import Diagnostic
+
+    d = Diagnostic(
+        file="doc.adoc",
+        line=10,
+        column=5,
+        message="Test error",
+        severity="error",
+        error_type="SyntaxError",
+    )
+    # Test attribute access
+    assert d.file == "doc.adoc"
+    assert d.line == 10
+    assert d.column == 5
+    assert d.message == "Test error"
+    assert d.severity == "error"
+    assert d.error_type == "SyntaxError"
+
+    # Test str formatting and repr
+    assert "Error in doc.adoc:10:5" in str(d)
+    assert repr(d) == "Diagnostic(file='doc.adoc', line=10, column=5, severity='error', message='Test error')"
+
+
+def test_diagnostic_positional_dict_preserves_severity():
+    from golem.diagnostics import Diagnostic
+
+    d = Diagnostic(severity="warning", message="test")
+    assert d.severity == "warning"
+    assert d.message == "test"

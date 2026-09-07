@@ -8,6 +8,7 @@ Golem static site generator.
 - `init`:: Initialize a new Golem project.
 - `new`:: Create a new document skeleton.
 - `build`:: Run the incremental compiler.
+- `check`:: Check AsciiDoc source files for syntax errors and semantic resolver warnings.
 - `serve`:: Start the local development server.
 - `plugins`:: Inspect installed and configured plugins.
 - `themes`:: Inspect active and available themes.
@@ -23,8 +24,11 @@ import time
 from typing import Any, Iterator
 import click
 from golem.config import GolemConfig, load_config, find_default_config_path
-from golem.engine import BuildEngine
+from golem.diagnostics import format_diagnostic
+from golem.engine import BuildEngine, GolemEngine
 from golem.plugins import get_plugin_manager
+
+__all__ = ["check", "main", "report_engine_diagnostics"]
 
 BUILTIN_PLUGINS: list[str] = ["golem.plugins.doctest", "golem.plugins.apidoc"]
 
@@ -43,123 +47,6 @@ def change_working_dir(directory: Path | str | None) -> Iterator[None]:
         yield
     finally:
         os.chdir(old_cwd)
-
-
-def format_diagnostic(error: dict[str, Any] | Exception, content_dir: Path | str | None = None) -> str:
-    """
-
-    Format clean AsciiDoc compiler diagnostics with source coordinates and context snippets.
-
-    === Examples
-
-    [source,python]
-    ----
-    >>> err = {"file": "docs/02-architecture.adoc", "line": 14, "column": 5, "message": "Unclosed attribute list"}
-    >>> "Error in docs/02-architecture.adoc:14:5" in format_diagnostic(err)
-    True
-
-    ----
-    """
-    if isinstance(error, Exception):
-        exc: Any = error
-        message = str(exc)
-        file_path_raw = getattr(exc, "filename", getattr(exc, "file", None))
-        line = getattr(exc, "lineno", getattr(exc, "line", None))
-        column = getattr(exc, "offset", getattr(exc, "column", getattr(exc, "col_offset", None)))
-    else:
-        exc = error.get("exception")
-        message = str(error.get("message", ""))
-        file_path_raw = error.get("file") or (getattr(exc, "filename", getattr(exc, "file", None)) if exc else None)
-        line = error.get("line") or (getattr(exc, "lineno", getattr(exc, "line", None)) if exc else None)
-        column = (
-            error.get("column")
-            or error.get("col")
-            or (
-                getattr(
-                    exc,
-                    "offset",
-                    getattr(exc, "column", getattr(exc, "col_offset", None)),
-                )
-                if exc
-                else None
-            )
-        )
-
-    # If line / column not found, parse coordinates from message if present
-    if (line is None or column is None) and message:
-        import re
-
-        m_coord = re.search(r"(?:line\s*|:)(\d+)(?:,\s*col(?:umn)?\s*|:)(\d+)", message, re.IGNORECASE)
-        if m_coord:
-            if line is None:
-                line = int(m_coord.group(1))
-            if column is None:
-                column = int(m_coord.group(2))
-        else:
-            m_line = re.search(r"(?:line\s*|:)(\d+)", message, re.IGNORECASE)
-            if m_line and line is None:
-                line = int(m_line.group(1))
-
-    file_display = str(file_path_raw) if file_path_raw else "unknown"
-    if file_path_raw:
-        try:
-            p = Path(file_path_raw)
-            if p.is_absolute():
-                try:
-                    file_display = str(p.relative_to(Path.cwd()))
-                except ValueError:
-                    file_display = str(p)
-            else:
-                file_display = str(p)
-        except Exception:
-            file_display = str(file_path_raw)
-
-    if line is not None and line > 0:
-        if column is not None and column > 0:
-            header = f"Error in {file_display}:{line}:{column}"
-        else:
-            header = f"Error in {file_display}:{line}"
-    else:
-        header = f"Error in {file_display}: {message}"
-
-    lines: list[str] = []
-    if file_path_raw:
-        target_path = Path(file_path_raw)
-        if not target_path.exists() and content_dir:
-            alt_path = Path(content_dir) / target_path
-            if alt_path.exists():
-                target_path = alt_path
-
-        if target_path.exists() and target_path.is_file():
-            try:
-                with open(target_path, "r", encoding="utf-8", errors="replace") as f:
-                    lines = f.read().splitlines()
-            except Exception:
-                lines = []
-
-    if lines and line is not None and 1 <= line <= len(lines):
-        start_line = max(1, line - 2)
-        end_line = line
-        margin_width = len(str(end_line))
-
-        out_lines = [header]
-        for ln in range(start_line, end_line + 1):
-            line_text = lines[ln - 1]
-            ln_str = str(ln).rjust(margin_width)
-            if line_text:
-                out_lines.append(f"{ln_str} | {line_text}")
-            else:
-                out_lines.append(f"{ln_str} |")
-
-        col = column if (column is not None and column > 0) else 1
-        col_idx = max(0, col - 1)
-        pointer_margin = " " * margin_width
-        out_lines.append(f"{pointer_margin} | {' ' * col_idx}^-- {message}")
-        return "\n".join(out_lines)
-
-    if line is not None and line > 0:
-        return f"{header}\n  ^-- {message}"
-    return header
 
 
 class GolemGroup(click.Group):
@@ -430,7 +317,7 @@ body {
         <main class="content-pane">
             <article class="page-body">
                 <h1>${title}</h1>
-                <div tal:content="structure body">
+                <div tal:content="structure body_html">
                     AsciiDoc content renders here.
                 </div>
             </article>
@@ -544,6 +431,36 @@ Welcome to your newly scaffolded {doc_type}: "{name}".
         click.echo(f"Created new {doc_type}: '{target_file}'")
 
 
+def report_engine_diagnostics(engine: BuildEngine, strict: bool = False) -> None:
+    """Print compiler diagnostics for the build engine and fail if strict mode is enabled.
+
+    === Examples
+
+    [source,python]
+    ----
+    >>> from golem.config import GolemConfig
+    >>> from golem.engine import BuildEngine
+    >>> from golem.cli import report_engine_diagnostics
+    >>> engine = BuildEngine(GolemConfig())
+    >>> report_engine_diagnostics(engine, strict=False)
+
+    ----
+
+    [parameters]
+    `engine` (BuildEngine):: The build engine containing accumulated diagnostics.
+    `strict` (bool, optional):: Whether to raise an exception on error diagnostics. Defaults to `False`.
+
+    [raises]
+    `click.ClickException`:: If `strict` is `True` and one or more diagnostics have error severity.
+    """
+    if not hasattr(engine, "diagnostics") or not engine.diagnostics:
+        return
+    for diag in engine.diagnostics:
+        click.echo(format_diagnostic(diag), err=True)
+    if strict and any(d.severity == "error" for d in engine.diagnostics):
+        raise click.ClickException("Compilation failed due to build diagnostics in strict mode.")
+
+
 @main.command()
 @click.option(
     "--config",
@@ -637,18 +554,80 @@ def build(config, clean, strict, verbose, quiet, directory=None):
             engine = BuildEngine(golem_config)
             compiled = engine.build_site()
         except Exception as e:
-            if hasattr(engine, "errors") and engine.errors:
-                for err in engine.errors:
-                    click.echo(format_diagnostic(err), err=True)
+            report_engine_diagnostics(engine, strict=strict)
             raise click.ClickException(f"Compilation Error: {e}")
 
-        if engine.errors:
-            for err in engine.errors:
-                click.echo(format_diagnostic(err))
+        report_engine_diagnostics(engine, strict=strict)
 
         elapsed = time.perf_counter() - start_time
         if not quiet:
             click.echo(f"Compilation finished. Built {len(compiled)} pages in {elapsed:.2f}s.")
+
+
+@main.command("check")
+@click.option("--strict", is_flag=True, default=False, help="Fail if any syntax errors or diagnostics are found")
+@click.option(
+    "-C",
+    "--directory",
+    type=click.Path(file_okay=False, dir_okay=True),
+    help="Change working directory before executing",
+)
+@click.option("-v", "--verbose", is_flag=True, default=False, help="Display verbose diagnostic outputs")
+def check(strict: bool, directory: str | None = None, verbose: bool = False) -> None:
+    """Check AsciiDoc source files for syntax errors and semantic resolver warnings without building.
+
+    === Examples
+
+    [source,python]
+    ----
+    >>> from click.testing import CliRunner
+    >>> from golem.cli import main
+    >>> runner = CliRunner()
+    >>> with runner.isolated_filesystem():
+    ...     result = runner.invoke(main, ["check"])
+    ...     result.exit_code == 0
+    True
+
+    ----
+
+    [parameters]
+    `strict` (bool):: Fail if any syntax errors or diagnostics are found. Defaults to `False`.
+    `directory` (str | None, optional):: Change working directory before executing. Defaults to `None`.
+    `verbose` (bool):: Display verbose diagnostic outputs. Defaults to `False`.
+
+    [raises]
+    `click.ClickException`:: If syntax errors are found, or if diagnostics/warnings are found in strict mode.
+    """
+    with change_working_dir(directory):
+        if verbose:
+            import logging
+
+            logging.basicConfig(level=logging.DEBUG, force=True)
+
+        config_path = find_default_config_path()
+        try:
+            golem_config = load_config(config_path) if config_path.exists() else GolemConfig()
+        except Exception as e:
+            raise click.ClickException(f"Configuration Error: {e}")
+
+        if strict:
+            golem_config.strict = True
+
+        if not config_path.exists() and not Path(golem_config.content_dir).exists() and Path("docs").is_dir():
+            golem_config.content_dir = "docs"
+
+        engine = GolemEngine(golem_config)
+        engine.check()
+
+        report_engine_diagnostics(engine, strict=strict)
+
+        has_errors = any(d.severity == "error" for d in engine.diagnostics)
+        has_warnings = any(d.severity == "warning" for d in engine.diagnostics)
+
+        if has_errors:
+            raise click.ClickException("Syntax errors encountered during check.")
+        if strict and has_warnings:
+            raise click.ClickException("Diagnostic warnings encountered during check in strict mode.")
 
 
 @main.command()
@@ -716,14 +695,10 @@ def serve(port, host, strict, directory=None, test_only=False):
             engine = BuildEngine(golem_config)
             compiled = engine.build_site()
         except Exception as e:
-            if hasattr(engine, "errors") and engine.errors:
-                for err in engine.errors:
-                    click.echo(format_diagnostic(err), err=True)
+            report_engine_diagnostics(engine, strict=strict)
             raise click.ClickException(f"Compilation Error: {e}")
 
-        if engine.errors:
-            for err in engine.errors:
-                click.echo(format_diagnostic(err))
+        report_engine_diagnostics(engine, strict=strict)
 
         elapsed = time.perf_counter() - start_time
         if compiled:
@@ -732,11 +707,11 @@ def serve(port, host, strict, directory=None, test_only=False):
         else:
             click.echo(f"Compilation finished. Built 0 pages (site is up to date) in {elapsed:.2f}s.")
 
-        click.echo(
-            f"Ready! Serving '{golem_config.output_dir}' at http://{host}:{port} "
-            f"(watching '{golem_config.content_dir}' for changes)"
-        )
-        click.echo("Press Ctrl+C to stop.")
+        watch_directories = [
+            Path(golem_config.content_dir),
+            Path(golem_config.templates_dir),
+            Path("themes"),
+        ]
 
         def on_rebuild():
             t0 = time.perf_counter()
@@ -744,13 +719,9 @@ def serve(port, host, strict, directory=None, test_only=False):
             try:
                 recompiled = engine.build_site()
             except Exception:
-                if hasattr(engine, "errors") and engine.errors:
-                    for err in engine.errors:
-                        click.echo(format_diagnostic(err), err=True)
+                report_engine_diagnostics(engine, strict=strict)
                 raise
-            if engine.errors:
-                for err in engine.errors:
-                    click.echo(format_diagnostic(err))
+            report_engine_diagnostics(engine, strict=strict)
             dt = time.perf_counter() - t0
             if recompiled:
                 p_word = "page" if len(recompiled) == 1 else "pages"
@@ -762,11 +733,21 @@ def serve(port, host, strict, directory=None, test_only=False):
         server = LiveReloadServer(
             public_dir=Path(golem_config.output_dir),
             watch_dir=Path(golem_config.content_dir),
+            watch_directories=watch_directories,
             change_detected_func=lambda: bool(engine.staleness_tracker.get_outdated_files(commit=False)),
             rebuild_func=on_rebuild,
             port=port,
-            errors_func=lambda: engine.errors,
+            host=host,
+            errors_func=lambda: engine.diagnostics,
         )
+
+        bound_port = server.bind() if hasattr(server, "bind") else port
+        click.echo(
+            f"Ready! Serving '{golem_config.output_dir}' at http://{host}:{bound_port} "
+            f"(watching '{golem_config.content_dir}' for changes)"
+        )
+        click.echo("Press Ctrl+C to stop.")
+
         server.run()
 
 

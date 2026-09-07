@@ -38,8 +38,8 @@ def test_staleness_tracker_dependency_graph(tmp_path):
     content.mkdir()
     doc_a = content / "index.adoc"
     doc_b = content / "_sidebar.adoc"
-    doc_a.write_text("= Index\ninclude::_sidebar.adoc[]", encoding="utf-8")
-    doc_b.write_text("Sidebar content", encoding="utf-8")
+    doc_a.write_text("= Index\ninclude::_sidebar.adoc[]\n", encoding="utf-8")
+    doc_b.write_text("Sidebar content\n", encoding="utf-8")
 
     cache = BuildCache(tmp_path / "cache.json")
     config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))

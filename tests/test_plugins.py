@@ -338,3 +338,32 @@ def on_pre_parse(raw_content: str) -> str:
     pm_ba = get_plugin_manager(config=config_ba, plugins_dir=tmp_path)
     res_ba = pm_ba.hook.on_pre_parse(raw_content="start")
     assert res_ba == ["start -> [A]", "start -> [B]"]
+
+
+def test_get_plugin_manager_caches_entry_points(monkeypatch):
+    """Verify get_plugin_manager caches entry point discovery across multiple calls."""
+    import importlib.metadata
+    from golem.plugins import get_plugin_manager
+
+    # First call warms or uses the cache
+    pm1 = get_plugin_manager()
+    assert pm1 is not None
+
+    # Spy on entry_points to ensure subsequent calls do not scan disk
+    ep_call_count = 0
+    orig_ep = importlib.metadata.entry_points
+
+    def spy_ep(*args, **kwargs):
+        nonlocal ep_call_count
+        ep_call_count += 1
+        return orig_ep(*args, **kwargs)
+
+    monkeypatch.setattr(importlib.metadata, "entry_points", spy_ep)
+
+    pm2 = get_plugin_manager()
+    pm3 = get_plugin_manager()
+
+    assert pm2 is not None
+    assert pm3 is not None
+    # Entry points should not have been scanned again
+    assert ep_call_count == 0

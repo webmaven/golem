@@ -140,10 +140,13 @@ def format_attribute_signature(attr: griffe.Attribute) -> str:
 
 def format_docstring(
     docstring: griffe.Docstring | str | None,
-    style: str = "auto",
+    style: str | griffe.DocstringStyle | griffe.Parser = "auto",
     heading_offset: int = 0,
 ) -> str:
     """Convert a docstring into clean AsciiDoc markup using asciidocstring and Griffe.
+
+    Handles composite and union type annotations (e.g. `Union[dict[str, int], list[str]]`,
+    `Optional[float]`) and named return structures cleanly via asciidocstring.
 
     Args:
         docstring: The docstring to convert.
@@ -163,12 +166,17 @@ def format_docstring(
     else:
         doc_obj = griffe.Docstring(str(docstring))
 
-    try:
-        style_lit: Any = style if style in ("google", "numpy", "sphinx", "auto") else "auto"
-        sections = griffe.parse(doc_obj, style_lit)
-        result = asciidocstring.griffe_bridge.to_asciidoc(sections)
-    except Exception:
-        result = str(doc_obj.value).strip()
+    raw_val = str(doc_obj.value).strip() if doc_obj.value is not None else ""
+    if not raw_val:
+        return ""
+
+    norm_style = getattr(style, "value", style)
+    style_str = str(norm_style).lower() if norm_style is not None else "auto"
+    style_lit: Any = style_str if style_str in ("google", "numpy", "sphinx", "auto") else "auto"
+    sections = griffe.parse(doc_obj, style_lit)
+    result = asciidocstring.griffe_bridge.to_asciidoc(sections)
+    if not result.strip() and raw_val:
+        result = raw_val
 
     return _offset_headings(result, heading_offset)
 
@@ -176,7 +184,7 @@ def format_docstring(
 def format_attribute(
     attr: griffe.Attribute,
     heading_level: int = 2,
-    docstring_style: str = "auto",
+    docstring_style: str | griffe.DocstringStyle | griffe.Parser = "auto",
 ) -> str:
     """Render an Attribute object to AsciiDoc."""
     heading = "=" * max(1, heading_level)
@@ -200,7 +208,7 @@ def format_attribute(
 def format_function(
     func: griffe.Function,
     heading_level: int = 2,
-    docstring_style: str = "auto",
+    docstring_style: str | griffe.DocstringStyle | griffe.Parser = "auto",
 ) -> str:
     """Render a Function (or method) object to AsciiDoc."""
     heading = "=" * max(1, heading_level)
@@ -225,7 +233,7 @@ def format_class(
     cls: griffe.Class,
     depth: str = "all",
     heading_level: int = 2,
-    docstring_style: str = "auto",
+    docstring_style: str | griffe.DocstringStyle | griffe.Parser = "auto",
     include_private: bool = False,
     include_special: bool = False,
 ) -> str:
@@ -295,7 +303,7 @@ def format_module(
     module: griffe.Module,
     depth: str = "all",
     heading_level: int = 1,
-    docstring_style: str = "auto",
+    docstring_style: str | griffe.DocstringStyle | griffe.Parser = "auto",
     include_private: bool = False,
     include_special: bool = False,
 ) -> str:

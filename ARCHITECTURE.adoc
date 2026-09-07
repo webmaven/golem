@@ -453,7 +453,7 @@ The standard skeleton template (`golem/templates/default/skeleton.pt`) exposes t
 <body>
   <div id="golem-container">
     <header id="golem-header">
-      <div class="header-logo" tal:content="site_name">Golem</div>
+      <div class="header-logo" tal:content="site_title">Golem</div>
       <metal:define-slot name="header" />
     </header>
     <div id="golem-body">
@@ -490,21 +490,19 @@ The following variables are passed to `skeleton.pt` during rendering:
 | Variable | Type | Description
 
 | `site_title` | `str` | Title of the website (`[site] name` in config).
-| `site_name` | `str` | Alias for `site_title`.
-| `page_title` | `str` | Title of the current document (from the top-level AsciiDoc header). Also aliased as `title`.
+| `title` | `str` | Title of the current document (from the top-level AsciiDoc header).
 | `site_author` | `str` | Configured site author name or organization.
 | `site_url` | `str \| None` | Base URL of the website if configured.
 | `generator_version` | `str` | Active version string of the Golem engine.
-| `body_html` | `str` | Pre-rendered HTML5 content from the AsciiDoc document body. Also aliased as `body_content` and `body`.
+| `body_html` | `str` | Pre-rendered HTML5 content from the AsciiDoc document body.
 | `nav_tree` | `list[dict]` | Hierarchical site map (`{title, url, path, children}` nodes).
-| `nav_html` | `str` | Pre-rendered `<nav class="golem-nav">` HTML. Also aliased as `navigation_html`.
+| `nav_html` | `str` | Pre-rendered `<nav class="golem-nav">` HTML.
 | `toc_html` | `str` | Rendered Table of Contents HTML generated from document headings.
 | `current_path` | `str` | Path of the source document relative to the content root.
 | `prev_page` | `dict[str, str] \| None` | Previous document in sequential navigation (`{title, url}`).
 | `next_page` | `dict[str, str] \| None` | Next document in sequential navigation (`{title, url}`).
 | `pygments_css` | `str \| None` | Pygments syntax-highlighting CSS (light + dark media queries).
 | `body_class` | `str` | Class string from `:body_class:` header attribute.
-| `page_class` | `str` | Class string from `:page_class:` header attribute.
 | `content_class` | `str` | Class string from `:content_class:` header attribute.
 | `custom_css` | `list[str]` | Custom stylesheet URLs injected from configuration.
 | `custom_js` | `list[str]` | Custom script URLs injected from configuration.
@@ -614,6 +612,9 @@ The `golem` command-line utility routes user actions using a standard Click-base
 *   `golem build [--config=<path>] [--clean] [--strict] [-v/--verbose] [-q/--quiet] [-C <dir>]`
     *   Runs the incremental compiler, building static pages into the configured output folder (`dist/` by default).
     *   Flags: `--clean` purges the output directory and cache; `--strict` treats warnings as fatal errors; `-v` enables debug logging; `-q` silences non-error output.
+*   `golem check [--strict] [-v/--verbose] [-C <dir>]`
+    *   Performs headless, non-writing diagnostic verification of AsciiDoc source files, evaluating syntax parsing and semantic resolver warnings without generating build output.
+    *   Flags: `--strict` fails with exit code 1 if warnings are detected; `-v` displays verbose diagnostic outputs. Ideal for CI/CD pre-flight checks and git commit hooks.
 *   `golem serve [--port=<port>] [--host=<host>] [--strict] [-C <dir>]`
     *   Invokes an initial build, launches the multi-threaded HTTP web server, activates SSE reload streaming, watches source directories, and injects real-time diagnostic error overlays if compilation errors occur.
 *   `golem plugins [--json] [-C <dir>]`

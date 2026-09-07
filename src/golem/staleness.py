@@ -514,7 +514,7 @@ class StalenessTracker:
         Computes the SHA-256 digest of the specified document and updates `cache.data["files"]`
         and `cache.data["metadata"]`. Associates ASG structural node types (such as `["admonition", "listing"]`)
         for granular template invalidation. Resolves included partials and child files (`include::...[]`)
-        from the supplied `included_files` list or falls back to regex/AST parsing, caching digests
+        from the supplied `included_files` list or parses the document AST via `asciidoctrine`, caching digests
         for all resolved dependencies, and persists the cache to disk.
 
         [parameters]
@@ -559,39 +559,16 @@ class StalenessTracker:
             unique_deps = list(dict.fromkeys(str(Path(f).resolve()) for f in included_files))
             self.cache.data.setdefault("dependencies", {})[p_abs] = unique_deps
         else:
-            deps = []
+            deps: list[str] = []
             try:
                 with open(path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
+                if content and not content.endswith("\n"):
+                    content += "\n"
                 ast = asciidoctrine.parse_to_ast(content, base_dir=str(path.parent))
-                deps = ast.included_files
-            except Exception:
-                # Fallback to regex-based robust include parser
-                import re
-
-                include_regex = re.compile(r"^include::([^\[]+)\[(.*)\]\s*$")
-                seen = set()
-
-                def find_includes(f_path: Path):
-                    f_abs = str(f_path.resolve())
-                    if f_abs in seen:
-                        return
-                    seen.add(f_abs)
-                    if not f_path.exists():
-                        return
-                    try:
-                        with open(f_path, "r", encoding="utf-8", errors="replace") as f_in:
-                            for line in f_in:
-                                m = include_regex.match(line.strip())
-                                if m:
-                                    inc_name = m.group(1).strip()
-                                    inc_path = (f_path.parent / inc_name).resolve()
-                                    deps.append(str(inc_path))
-                                    find_includes(inc_path)
-                    except Exception:
-                        pass
-
-                find_includes(path)
+                deps = getattr(ast, "included_files", []) or []
+            except Exception as e:
+                logging.warning("Failed to parse %s for dependencies: %s", path, e)
 
             # De-duplicate and make sure all are absolute paths as strings
             unique_deps = list(dict.fromkeys(str(Path(d).resolve()) for d in deps))

@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Any
 import pytest
 from golem.config import GolemConfig
 from golem.engine import BuildEngine
@@ -355,3 +356,47 @@ def test_anonymous_plugin_modifier_labels(tmp_path: Path, caplog: pytest.LogCapt
         if "Multiple plugins modified raw_content in on_pre_parse for index.adoc" in r.message
     ]
     assert len(conflict_warnings) == 1
+
+
+def test_on_asg_created_doc_path_support_and_arg_filtering(tmp_path: Path) -> None:
+    engine, doc = _setup_test_engine(tmp_path)
+
+    received_paths: list[Path | None] = []
+    without_doc_path_executed: list[bool] = []
+
+    class PluginWithDocPath:
+        @hookimpl
+        def on_asg_created(self, asg: dict[str, Any], doc_path: Path | None = None) -> dict[str, Any]:
+            received_paths.append(doc_path)
+            return asg
+
+    class PluginWithoutDocPath:
+        @hookimpl
+        def on_asg_created(self, asg: dict[str, Any]) -> dict[str, Any]:
+            without_doc_path_executed.append(True)
+            return asg
+
+    engine.pm.register(PluginWithDocPath(), name="plugin_with_doc_path")
+    engine.pm.register(PluginWithoutDocPath(), name="plugin_without_doc_path")
+
+    compiled = engine.build_site()
+
+    assert len(compiled) == 1
+    # 1. Plugin declaring def on_asg_created(self, asg, doc_path=None) receives the actual Path
+    assert len(received_paths) == 1
+    assert received_paths[0] == doc
+    assert isinstance(received_paths[0], Path)
+
+    # 2. Plugin declaring only def on_asg_created(self, asg) executed cleanly without errors
+    assert len(without_doc_path_executed) == 1
+    assert without_doc_path_executed[0] is True
+
+    # Verify check() handles both plugins with argument filtering as well
+    received_paths.clear()
+    without_doc_path_executed.clear()
+    diagnostics = engine.check()
+    assert len(diagnostics) == 0
+    assert len(received_paths) == 1
+    assert received_paths[0] == doc
+    assert len(without_doc_path_executed) == 1
+    assert without_doc_path_executed[0] is True
