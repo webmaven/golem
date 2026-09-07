@@ -1115,7 +1115,15 @@
     html_output = <span class="code-keyword">await</span> self.renderer.render_async(view, context)
     <span class="code-keyword">return</span> self.commit_artifact(dag_node, html_output)</code></pre>
           </details>
-          <div class="annotation-marker" style="margin-top: 0.5rem;" title="Principle 5: In-Situ Source Drawer">P5</div>
+
+          <div class="annotation-callout-box" style="margin-top: 0.75rem;">
+            <strong>Principle 5: In-Situ Inspection Over Disorienting Navigation <span class="annotation-marker">P5</span></strong>
+            Keep the developer anchored in their reading context. Traditional generators force external page hops or GitHub link jumps for auxiliary types and implementation code. Here, two native mechanisms eliminate context switching:
+            <ul style="margin: 0.5rem 0 0 1.25rem; line-height: 1.5;">
+              <li><strong>Type Definition Popover:</strong> Clicking the <button class="ast-token" popovertarget="popover-engine-config" style="background: none; border: none; font-size: inherit; font-family: inherit; font-weight: inherit; cursor: pointer; text-decoration: underline;"><code>EngineConfig</code></button> token immediately renders its full dataclass fields in a native top-layer popover without navigating away.</li>
+              <li><strong>Collapsible Source Drawer:</strong> Expanding <code>[View Source Code]</code> above exposes the exact syntax-highlighted implementation in-place.</li>
+            </ul>
+          </div>
         </section>
 
         <!-- Method 2: invalidate_staleness -->
@@ -1145,6 +1153,17 @@
             </div>
           </div>
         </section>
+
+        <!-- Principle 7: Universal Accessibility Callout -->
+        <div class="annotation-callout-box" style="margin-top: 1.5rem;">
+          <strong>Principle 7: Universal Accessibility as an Architectural Invariant <span class="annotation-marker">P7</span></strong>
+          Accessibility is baked directly into the semantic markup rather than retrofitted via CSS:
+          <ul style="margin: 0.5rem 0 0 1.25rem; line-height: 1.5;">
+            <li><strong>Semantic Landmarks:</strong> Proper HTML5 landmark structure with <code>&lt;header role="banner"&gt;</code>, <code>&lt;nav&gt;</code>, <code>&lt;main role="main"&gt;</code>, and <code>&lt;aside&gt;</code>.</li>
+            <li><strong>Keyboard Navigation &amp; Shortcuts:</strong> Accessible skip link (<kbd class="kbd-shortcut">Tab</kbd>), power-user shortcuts (<kbd class="kbd-shortcut">/</kbd> search, <kbd class="kbd-shortcut">?</kbd> shortcuts modal, <kbd class="kbd-shortcut">a</kbd> annotations toggle, <kbd class="kbd-shortcut">t</kbd> theme, <kbd class="kbd-shortcut">e</kbd> expand drawers).</li>
+            <li><strong>Contrast &amp; Motion:</strong> WCAG 2.1 AA compliant palette and strict <code>prefers-reduced-motion</code> compliance.</li>
+          </ul>
+        </div>
 
       </article>
 
