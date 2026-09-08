@@ -16,10 +16,12 @@ Golem static site generator.
 
 from pathlib import Path
 from contextlib import contextmanager
+import datetime
 import importlib.metadata
 import json
 import os
 import shutil
+import sys
 import time
 from typing import Any, Iterator
 import click
@@ -28,9 +30,10 @@ from golem.diagnostics import format_diagnostic
 from golem.engine import BuildEngine, GolemEngine
 from golem.plugins import get_plugin_manager
 
-__all__ = ["check", "main", "report_engine_diagnostics"]
+__all__ = ["check", "main", "report_engine_diagnostics", "PROFILE_NAMES"]
 
 BUILTIN_PLUGINS: list[str] = ["golem.plugins.doctest", "golem.plugins.apidoc"]
+PROFILE_NAMES: frozenset[str] = frozenset({"library", "cli", "paper", "blog"})
 
 
 @contextmanager
@@ -135,8 +138,38 @@ def _get_git_author() -> str:
         return "Your Name"
 
 
+def _scaffold_profile(profile: str, target_dir: Path, variables: dict[str, str]) -> None:
+    """Copy a profile's template files into target_dir with {{var}} substitution."""
+    profiles_dir = Path(__file__).parent / "templates" / "profiles" / profile
+    if not profiles_dir.exists():
+        raise click.ClickException(f"Profile template not found: {profile!r}")
+
+    def _render(text: str) -> str:
+        for key, val in variables.items():
+            text = text.replace("{{" + key + "}}", val)
+        return text
+
+    for src in sorted(profiles_dir.rglob("*")):
+        if src.is_dir():
+            continue
+        rel = src.relative_to(profiles_dir)
+        parts = list(rel.parts)
+        # Substitute variables in all path parts (including filename)
+        rendered_parts = [_render(p) for p in parts]
+        # Strip .tmpl from the last path component
+        if rendered_parts[-1].endswith(".tmpl"):
+            rendered_parts[-1] = rendered_parts[-1][: -len(".tmpl")]
+        dest = target_dir / Path(*rendered_parts)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(_render(src.read_text(encoding="utf-8")), encoding="utf-8")
+
+
 @main.command()
-@click.option("--template", default="package", help="Project template type")
+@click.option(
+    "--profile",
+    default="package",
+    help="Project profile (library, cli, paper, blog, package, site, simple)",
+)
 @click.option("--output-dir", help="Override build output directory")
 @click.option(
     "-C",
@@ -144,7 +177,7 @@ def _get_git_author() -> str:
     type=click.Path(file_okay=False, dir_okay=True),
     help="Change working directory before executing",
 )
-def init(template, output_dir, directory=None):
+def init(profile, output_dir, directory=None):
     """
 
     Create a standard directory structure and basic `golem.toml` configuration.
@@ -153,8 +186,8 @@ def init(template, output_dir, directory=None):
     |===
     | Option | Description
 
-    | `--template`
-    | Project layout profile (e.g. `package` or `simple`).
+    | `--profile`
+    | Project profile (library, cli, paper, blog, package, site, simple).
 
     | `--output-dir`
     | Optional build override path.
@@ -179,11 +212,52 @@ def init(template, output_dir, directory=None):
     ----
     """
     with change_working_dir(directory):
-        author = _get_git_author()
-        click.echo(f"Initializing golem project using template '{template}'...")
+        # Determine project_name and author
+        _pyproject = Path("pyproject.toml")
+        if _pyproject.exists():
+            if sys.version_info >= (3, 11):
+                import tomllib
+
+                with open(_pyproject, "rb") as _f:
+                    _pp = tomllib.load(_f)
+            else:
+                import tomli
+
+                with open(_pyproject, "rb") as _f:
+                    _pp = tomli.load(_f)
+            project_name = _pp.get("project", {}).get("name", "")
+            _authors = _pp.get("project", {}).get("authors", [])
+            author_from_pp = _authors[0].get("name", "") if (_authors and isinstance(_authors[0], dict)) else ""
+        else:
+            project_name = ""
+            author_from_pp = ""
+
+        if not project_name:
+            try:
+                project_name = click.prompt("Project name", default=Path.cwd().name)
+            except (click.Abort, EOFError):
+                project_name = Path.cwd().name
+        if not author_from_pp:
+            try:
+                author = click.prompt("Author", default=_get_git_author())
+            except (click.Abort, EOFError):
+                author = _get_git_author()
+        else:
+            author = author_from_pp
+
+        year = str(datetime.date.today().year)
+
+        variables = {"project_name": project_name, "author": author, "year": year}
+
+        click.echo(f"Initializing golem project using profile '{profile}'...")
+
+        if profile in PROFILE_NAMES:
+            _scaffold_profile(profile, Path("."), variables)
+            click.echo("Initialization complete! Project structure is ready.")
+            return
 
         pyproject_toml = Path("pyproject.toml")
-        is_site_layout = template in ("site", "book", "simple") or not pyproject_toml.exists()
+        is_site_layout = profile in ("site", "book", "simple") or not pyproject_toml.exists()
 
         if pyproject_toml.exists():
             click.echo("Found pyproject.toml! Configuring Golem under [tool.golem]...")
