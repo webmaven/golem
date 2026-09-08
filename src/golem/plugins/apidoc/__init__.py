@@ -4,17 +4,21 @@ import logging
 from pathlib import Path
 import re
 import sys
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import click
 
-from golem.plugins import hookimpl
+from golem.plugins import GolemBuildAbortError, hookimpl
 from .core import ApiGenOptions, AsciiDocApi
+
+if TYPE_CHECKING:
+    from golem.config import GolemConfig
 
 __all__ = [
     "AsciiDocApi",
     "ApiGenOptions",
     "on_asg_created",
+    "on_build_start",
     "on_pre_parse",
     "golem_add_subcommands",
     "generate_api_docs",
@@ -370,6 +374,26 @@ def generate_api_docs(
             all_generated[str(dest)] = content
 
     return all_generated
+
+
+@hookimpl
+def on_build_start(config: GolemConfig) -> None:
+    """Generate API documentation if api_packages is configured."""
+    if getattr(config, "api_packages", None):
+        try:
+            dest_dir = Path(config.content_dir) / getattr(config, "api_output_dir", "api")
+            generate_api_docs(
+                packages=config.api_packages,
+                output_dir=dest_dir,
+                search_paths=[Path.cwd(), Path("src")] + [Path(p) for p in sys.path if p],
+                docstring_style=getattr(config, "api_docstring_style", "auto"),
+            )
+        except Exception as e:
+            logger.warning("Failed to generate API documentation during build: %s", e)
+            if getattr(config, "strict", False):
+                if isinstance(e, GolemBuildAbortError):
+                    raise
+                raise GolemBuildAbortError(f"Failed to generate API documentation during build: {e}") from e
 
 
 @hookimpl

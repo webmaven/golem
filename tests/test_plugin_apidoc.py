@@ -850,3 +850,160 @@ Args:
     res2 = format_docstring(doc, style="GOOGLE")
     assert "[parameters]" in res2
     assert "`x`:: (int) Value." in res2
+
+
+def test_on_build_start_is_registered_hookimpl():
+    """Verify on_build_start is defined and registered as a hookimpl in the apidoc plugin."""
+    from golem.plugins import apidoc, get_plugin_manager
+
+    assert hasattr(apidoc, "on_build_start")
+    pm = get_plugin_manager()
+    pm.register(apidoc)
+    hookimpls = pm.hook.on_build_start.get_hookimpls()
+    apidoc_impls = [h for h in hookimpls if h.plugin is apidoc]
+    assert len(apidoc_impls) == 1
+    assert apidoc_impls[0].function == apidoc.on_build_start
+
+
+def test_on_build_start_invokes_generate_api_docs_when_configured(tmp_path, monkeypatch):
+    """Verify calling on_build_start with api_packages invokes generate_api_docs with expected args."""
+    from pathlib import Path
+    from golem.plugins import apidoc
+
+    calls = []
+
+    def mock_generate_api_docs(**kwargs):
+        calls.append(kwargs)
+        return {}
+
+    monkeypatch.setattr(apidoc, "generate_api_docs", mock_generate_api_docs)
+
+    config = GolemConfig(
+        content_dir=str(tmp_path / "docs"),
+        api_packages=["mypackage", "otherpackage"],
+        api_output_dir="reference",
+        api_docstring_style="sphinx",
+    )
+
+    apidoc.on_build_start(config)
+
+    assert len(calls) == 1
+    assert calls[0]["packages"] == ["mypackage", "otherpackage"]
+    assert calls[0]["output_dir"] == tmp_path / "docs" / "reference"
+    assert calls[0]["docstring_style"] == "sphinx"
+    assert any(str(p) == str(Path.cwd()) for p in calls[0]["search_paths"])
+
+
+def test_on_build_start_noop_when_api_packages_unset_or_empty(tmp_path, monkeypatch):
+    """Verify calling on_build_start does nothing if api_packages is None or empty."""
+    from golem.plugins import apidoc
+
+    calls = []
+
+    def mock_generate_api_docs(**kwargs):
+        calls.append(kwargs)
+        return {}
+
+    monkeypatch.setattr(apidoc, "generate_api_docs", mock_generate_api_docs)
+
+    # When empty list
+    config_empty = GolemConfig(content_dir=str(tmp_path / "docs"), api_packages=[])
+    apidoc.on_build_start(config_empty)
+    assert len(calls) == 0
+
+    # When None
+    class ConfigNone:
+        content_dir = str(tmp_path / "docs")
+        api_packages = None
+
+    apidoc.on_build_start(ConfigNone())
+    assert len(calls) == 0
+
+
+def test_on_build_start_error_handling(tmp_path, monkeypatch, caplog):
+    """Verify on_build_start error handling in non-strict and strict modes."""
+    import logging
+    import pytest
+    from golem.plugins import apidoc, GolemBuildAbortError
+
+    def failing_generate_api_docs(**kwargs):
+        raise RuntimeError("Generation failed boom")
+
+    monkeypatch.setattr(apidoc, "generate_api_docs", failing_generate_api_docs)
+
+    # Non-strict mode: logs warning, does not raise
+    config_lenient = GolemConfig(
+        content_dir=str(tmp_path / "docs"),
+        api_packages=["some_pkg"],
+        strict=False,
+    )
+    with caplog.at_level(logging.WARNING, logger="golem.plugins.apidoc"):
+        apidoc.on_build_start(config_lenient)
+    assert "Failed to generate API documentation during build: Generation failed boom" in caplog.text
+
+    # Strict mode: raises GolemBuildAbortError
+    config_strict = GolemConfig(
+        content_dir=str(tmp_path / "docs"),
+        api_packages=["some_pkg"],
+        strict=True,
+    )
+    with pytest.raises((GolemBuildAbortError, RuntimeError)):
+        apidoc.on_build_start(config_strict)
+
+
+def test_build_engine_integration_api_packages(tmp_path):
+    """End-to-end integration: BuildEngine generates and compiles API docs when api_packages is configured."""
+    import sys
+
+    pkg_dir = tmp_path / "e2e_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""E2E Package docstring."""
+def calculate(a: int, b: int) -> int:
+    """Add two numbers.
+
+    Args:
+        a: First number.
+        b: Second number.
+
+    Returns:
+        Sum of a and b.
+    """
+    return a + b
+''',
+        encoding="utf-8",
+    )
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Home\n\nWelcome home.", encoding="utf-8")
+
+    output_dir = tmp_path / "dist"
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(output_dir),
+        plugins=["golem.plugins.apidoc"],
+        api_packages=["e2e_pkg"],
+        api_output_dir="api",
+    )
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        engine = BuildEngine(config)
+        compiled = engine.build_site()
+
+        # Check .adoc was generated in content_dir / api
+        generated_adoc = content_dir / "api" / "e2e_pkg.adoc"
+        assert generated_adoc.exists()
+
+        # Check HTML was generated in output_dir / api
+        generated_html = output_dir / "api" / "e2e_pkg.html"
+        assert generated_html.exists()
+        assert generated_html in compiled
+
+        html_text = generated_html.read_text(encoding="utf-8")
+        assert "E2E Package" in html_text or "e2e_pkg" in html_text
+        assert "calculate" in html_text
+    finally:
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
