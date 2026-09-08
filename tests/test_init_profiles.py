@@ -130,6 +130,30 @@ def test_library_profile_has_api_section():
         golem_toml = Path("golem.toml").read_text()
         assert "[api]" in golem_toml
         assert "packages" in golem_toml
+        assert 'output_dir = "api"' in golem_toml
+        assert 'output_dir = "docs/api"' not in golem_toml
+
+
+def test_profile_handles_malformed_pyproject_toml():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("pyproject.toml").write_text("invalid toml [[]", encoding="utf-8")
+        result = runner.invoke(main, ["init", "--profile", "library"], input="fallback_pkg\nfallback_author\n")
+        assert result.exit_code == 0, result.output
+        golem_toml = Path("golem.toml").read_text()
+        assert "fallback_pkg" in golem_toml
+        assert "fallback_author" in golem_toml
+
+
+def test_profile_handles_non_dict_project_in_pyproject_toml():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        Path("pyproject.toml").write_text('project = "not a table"\n', encoding="utf-8")
+        result = runner.invoke(main, ["init", "--profile", "library"], input="fallback_pkg\nfallback_author\n")
+        assert result.exit_code == 0, result.output
+        golem_toml = Path("golem.toml").read_text()
+        assert "fallback_pkg" in golem_toml
+        assert "fallback_author" in golem_toml
 
 
 def test_blog_profile_has_rss():

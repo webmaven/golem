@@ -213,24 +213,29 @@ def init(profile, output_dir, directory=None):
     """
     with change_working_dir(directory):
         # Determine project_name and author
+        project_name = ""
+        author_from_pp = ""
         _pyproject = Path("pyproject.toml")
         if _pyproject.exists():
-            if sys.version_info >= (3, 11):
-                import tomllib
+            try:
+                if sys.version_info >= (3, 11):
+                    import tomllib
 
-                with open(_pyproject, "rb") as _f:
-                    _pp = tomllib.load(_f)
-            else:
-                import tomli
+                    with open(_pyproject, "rb") as _f:
+                        _pp = tomllib.load(_f)
+                else:
+                    import tomli as tomllib  # noqa: PLC0415
 
-                with open(_pyproject, "rb") as _f:
-                    _pp = tomli.load(_f)
-            project_name = _pp.get("project", {}).get("name", "")
-            _authors = _pp.get("project", {}).get("authors", [])
-            author_from_pp = _authors[0].get("name", "") if (_authors and isinstance(_authors[0], dict)) else ""
-        else:
-            project_name = ""
-            author_from_pp = ""
+                    with open(_pyproject, "rb") as _f:
+                        _pp = tomllib.load(_f)
+                _proj = _pp.get("project", {})
+                if isinstance(_proj, dict):
+                    project_name = _proj.get("name", "")
+                    _authors = _proj.get("authors", [])
+                    if _authors and isinstance(_authors[0], dict):
+                        author_from_pp = _authors[0].get("name", "")
+            except Exception:
+                pass
 
         if not project_name:
             try:
