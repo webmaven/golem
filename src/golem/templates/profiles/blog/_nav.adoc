@@ -1,0 +1,6 @@
+= Blog Index
+{{author}}
+
+== Posts
+
+* link:posts/{{year}}-01-01-hello-world.html[Hello, World! ({{year}}-01-01)]

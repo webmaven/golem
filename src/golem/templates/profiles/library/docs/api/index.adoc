@@ -1,0 +1,7 @@
+= API Reference
+{{author}}
+:toc: left
+
+== Overview
+
+This section contains the auto-generated API reference for `{{project_name}}`.
