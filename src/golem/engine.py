@@ -269,7 +269,9 @@ class BuildEngine:
         `list[Path]`:: List of output `Path` objects for all compiled HTML documents.
 
         [raises]
-        `Exception`:: If compilation fails for any document while `config.strict` is `True`.
+        `GolemBuildAbortError`:: If any `on_build_start` hookimpl raises `GolemBuildAbortError`.
+            All pre-flight hooks run before the build halts; individual messages are aggregated.
+        `Exception`:: Any document compilation error when `config.strict` is `True`.
 
         === Examples
 

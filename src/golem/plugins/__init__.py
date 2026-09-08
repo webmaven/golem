@@ -82,14 +82,15 @@ class GolemBuildAbortError(Exception):
     all on_build_start implementations before halting, so every check runs
     before the build is aborted.
 
-    Example::
+    [source,python]
+    ----
+    from golem.plugins import hookimpl, GolemBuildAbortError
 
-        from golem.plugins import hookimpl, GolemBuildAbortError
-
-        @hookimpl
-        def on_build_start(config) -> None:
-            if not config.content_dir:
-                raise GolemBuildAbortError("content_dir must be set")
+    @hookimpl
+    def on_build_start(config) -> None:
+        if not config.content_dir:
+            raise GolemBuildAbortError("content_dir must be set")
+    ----
     """
 
 
@@ -97,10 +98,11 @@ class GolemBuildAbortError(Exception):
 class BuildResult:
     """Carries build output metadata delivered to on_build_finish implementations.
 
-    compiled_files: files written to disk this run (changed/new only).
-        Use for incremental indexers that only need to update changed pages.
-    output_dir: root output directory for this build.
-        Use for full-rebuild indexers that need to scan all outputs.
+    [attributes]
+    `compiled_files` (list[Path]):: Files written to disk this run (changed/new only).
+        Use for incremental indexers that only need to re-process pages that changed.
+    `output_dir` (Path):: Root output directory for this build.
+        Use for full-rebuild indexers that need to scan all site outputs.
     """
 
     compiled_files: list[Path]

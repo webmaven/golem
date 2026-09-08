@@ -378,7 +378,23 @@ def generate_api_docs(
 
 @hookimpl
 def on_build_start(config: GolemConfig) -> None:
-    """Generate API documentation if api_packages is configured."""
+    """Generate API documentation before compilation begins.
+
+    Runs when `config.api_packages` is set.
+    Writes AsciiDoc source files into `config.content_dir / config.api_output_dir`
+    (defaults to `content_dir/api`) using the `generate_api_docs` core pipeline.
+    When `config.api_packages` is empty or `None`, this hook is a no-op.
+
+    On failure, logs a warning and continues unless `config.strict` is `True`,
+    in which case the original exception propagates and the build is halted.
+
+    [parameters]
+    `config` (GolemConfig):: The active site configuration for this build.
+
+    [raises]
+    `Exception`:: Re-raised verbatim when `config.strict` is `True` and API
+        doc generation fails. Swallowed with a warning when `config.strict` is `False`.
+    """
     if getattr(config, "api_packages", None):
         try:
             dest_dir = Path(config.content_dir) / getattr(config, "api_output_dir", "api")
