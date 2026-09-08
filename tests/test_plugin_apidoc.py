@@ -924,7 +924,7 @@ def test_on_build_start_error_handling(tmp_path, monkeypatch, caplog):
     """Verify on_build_start error handling in non-strict and strict modes."""
     import logging
     import pytest
-    from golem.plugins import apidoc, GolemBuildAbortError
+    from golem.plugins import apidoc
 
     def failing_generate_api_docs(**kwargs):
         raise RuntimeError("Generation failed boom")
@@ -941,13 +941,13 @@ def test_on_build_start_error_handling(tmp_path, monkeypatch, caplog):
         apidoc.on_build_start(config_lenient)
     assert "Failed to generate API documentation during build: Generation failed boom" in caplog.text
 
-    # Strict mode: raises GolemBuildAbortError
+    # Strict mode: re-raises original exception
     config_strict = GolemConfig(
         content_dir=str(tmp_path / "docs"),
         api_packages=["some_pkg"],
         strict=True,
     )
-    with pytest.raises((GolemBuildAbortError, RuntimeError)):
+    with pytest.raises(RuntimeError, match="Generation failed boom"):
         apidoc.on_build_start(config_strict)
 
 

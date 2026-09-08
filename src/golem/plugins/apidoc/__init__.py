@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Sequence
 
 import click
 
-from golem.plugins import GolemBuildAbortError, hookimpl
+from golem.plugins import hookimpl
 from .core import ApiGenOptions, AsciiDocApi
 
 if TYPE_CHECKING:
@@ -391,9 +391,7 @@ def on_build_start(config: GolemConfig) -> None:
         except Exception as e:
             logger.warning("Failed to generate API documentation during build: %s", e)
             if getattr(config, "strict", False):
-                if isinstance(e, GolemBuildAbortError):
-                    raise
-                raise GolemBuildAbortError(f"Failed to generate API documentation during build: {e}") from e
+                raise
 
 
 @hookimpl
