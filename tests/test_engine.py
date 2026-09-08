@@ -5,6 +5,7 @@ This module contains unit tests for verifying the Golem incremental build orches
 """
 
 from pathlib import Path
+import pytest
 from golem.engine import BuildEngine
 from golem.config import GolemConfig
 
@@ -1698,3 +1699,122 @@ def test_build_engine_build_site_captures_resolver_warnings(tmp_path: Path):
 
     assert len(compiled) == 1
     assert any(d.severity == "warning" and "unknown_section_anchor" in d.message for d in engine.diagnostics)
+
+
+# ---------------------------------------------------------------------------
+# Build Lifecycle Hooks (on_build_start, on_build_finish) and Decoupling Tests
+# ---------------------------------------------------------------------------
+
+
+def test_on_build_start_collect_all_errors(tmp_path: Path, caplog: "pytest.LogCaptureFixture") -> None:
+    """Verify on_build_start runs all hooks and collects all GolemBuildAbortErrors before aborting."""
+    import logging
+    import pytest
+    from golem.plugins import GolemBuildAbortError, hookimpl
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Home\n\nContent", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    class PluginA:
+        @hookimpl
+        def on_build_start(self, config):
+            raise GolemBuildAbortError("Check A failed: missing requirement A")
+
+    class PluginB:
+        @hookimpl
+        def on_build_start(self, config):
+            raise GolemBuildAbortError("Check B failed: missing requirement B")
+
+    engine.pm.register(PluginA(), name="plugin_a")
+    engine.pm.register(PluginB(), name="plugin_b")
+
+    with caplog.at_level(logging.ERROR):
+        with pytest.raises(GolemBuildAbortError) as excinfo:
+            engine.build_site()
+
+    err_msg = str(excinfo.value)
+    assert "2 pre-flight check(s) failed" in err_msg
+    assert "Check A failed: missing requirement A" in err_msg
+    assert "Check B failed: missing requirement B" in err_msg
+
+    # Verify both errors were logged
+    assert any("Build pre-flight check failed: Check A failed" in r.message for r in caplog.records)
+    assert any("Build pre-flight check failed: Check B failed" in r.message for r in caplog.records)
+
+    # Verify build was halted before any compilation
+    assert not (tmp_path / "dist").exists() or not list((tmp_path / "dist").glob("*.html"))
+
+
+def test_on_build_start_single_abort(tmp_path: Path) -> None:
+    """Verify a single on_build_start GolemBuildAbortError halts build before staleness/compilation."""
+    import pytest
+    from golem.plugins import GolemBuildAbortError, hookimpl
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Home\n\nContent", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    class AbortingPlugin:
+        @hookimpl
+        def on_build_start(self, config):
+            raise GolemBuildAbortError("Pre-flight requirement unmet")
+
+    engine.pm.register(AbortingPlugin(), name="aborting_plugin")
+
+    with pytest.raises(GolemBuildAbortError) as excinfo:
+        engine.build_site()
+
+    assert "1 pre-flight check(s) failed: Pre-flight requirement unmet" in str(excinfo.value)
+    assert not (tmp_path / "dist" / "index.html").exists()
+
+
+def test_on_build_finish_called_with_build_result(tmp_path: Path) -> None:
+    """Verify on_build_finish hook is called with config and BuildResult containing compiled files."""
+    from typing import Any
+    from golem.plugins import BuildResult, hookimpl
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "page1.adoc").write_text("= Page 1\n\nBody 1", encoding="utf-8")
+    (content_dir / "page2.adoc").write_text("= Page 2\n\nBody 2", encoding="utf-8")
+
+    output_dir = tmp_path / "dist"
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(output_dir))
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    captured: dict[str, Any] = {}
+
+    class FinishPlugin:
+        @hookimpl
+        def on_build_finish(self, config, result):
+            captured["config"] = config
+            captured["result"] = result
+
+    engine.pm.register(FinishPlugin(), name="finish_plugin")
+
+    compiled = engine.build_site()
+
+    assert "result" in captured, "on_build_finish was not called"
+    assert captured["config"] is engine.config
+    result: BuildResult = captured["result"]
+    assert isinstance(result, BuildResult)
+    assert result.output_dir == output_dir
+    assert set(result.compiled_files) == set(compiled)
+    assert len(result.compiled_files) == 2
+
+
+def test_engine_does_not_import_apidoc():
+    """Verify golem.engine does not import golem.plugins.apidoc."""
+    import inspect
+    import golem.engine
+
+    src = inspect.getsource(golem.engine)
+    assert "from golem.plugins.apidoc" not in src
+    assert "import golem.plugins.apidoc" not in src
