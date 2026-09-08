@@ -12,6 +12,8 @@ Golem leverages `pluggy` to provide a modular extension ecosystem:
 
 During site compilation and CLI initialization, hooks execute across discrete pipeline stages:
 
+0. Build Pre-flight (`on_build_start`)::
+   Executed once before stale detection. All implementations run; any GolemBuildAbortError raised causes the build to halt after all checks complete.
 1. CLI Initialization (`golem_add_subcommands`)::
    Executed during Click CLI bootstrap. Registered plugins attach custom subcommands to the root CLI group before command parsing.
 2. Incremental Cache Resolution (`golem_mark_stale`)::
@@ -24,6 +26,8 @@ During site compilation and CLI initialization, hooks execute across discrete pi
    Executed after the semantic resolver transforms the AST into an Abstract Semantic Graph (ASG) dictionary. Plugins mutate semantic nodes, table metadata, or document attributes.
 6. Layout Compilation & Post-Render (`on_post_render`)::
    Executed after Chameleon template layout rendering. Plugins receive the compiled HTML page string and return modified HTML before it is written to disk.
+7. Build Finish (`on_build_finish`)::
+   Executed once after all documents have been written to disk. Receives a BuildResult with compiled_files and output_dir.
 
 == Plugin Discovery Order
 
@@ -39,6 +43,7 @@ When initializing via `get_plugin_manager()`, plugins are discovered and registe
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import importlib
 import importlib.metadata
 import importlib.util
@@ -57,6 +62,39 @@ HOOK_NAMESPACE = "golem"
 
 hookspec = pluggy.HookspecMarker(HOOK_NAMESPACE)
 hookimpl = pluggy.HookimplMarker(HOOK_NAMESPACE)
+
+
+class GolemBuildAbortError(Exception):
+    """Raised by on_build_start implementations to abort the build.
+
+    Raise this from an on_build_start hookimpl to signal a pre-flight check
+    failure. The engine collects ALL GolemBuildAbortError instances raised by
+    all on_build_start implementations before halting, so every check runs
+    before the build is aborted.
+
+    Example::
+
+        from golem.plugins import hookimpl, GolemBuildAbortError
+
+        @hookimpl
+        def on_build_start(config) -> None:
+            if not config.content_dir:
+                raise GolemBuildAbortError("content_dir must be set")
+    """
+
+
+@dataclass
+class BuildResult:
+    """Carries build output metadata delivered to on_build_finish implementations.
+
+    compiled_files: files written to disk this run (changed/new only).
+        Use for incremental indexers that only need to update changed pages.
+    output_dir: root output directory for this build.
+        Use for full-rebuild indexers that need to scan all outputs.
+    """
+
+    compiled_files: list[Path]
+    output_dir: Path
 
 
 class GolemSpecs:
@@ -275,6 +313,53 @@ class GolemSpecs:
         ----
         """
         return []
+
+    @hookspec
+    def on_build_start(self, config: "GolemConfig") -> None:
+        """Called once before any documents are compiled.
+
+        Plugins can raise GolemBuildAbortError to halt the build.
+        The engine runs ALL on_build_start implementations before halting,
+        collecting every raised GolemBuildAbortError into a single summary error.
+        Executed after plugin registration but before stale detection.
+
+        [parameters]
+        `config` (GolemConfig):: The active site configuration for this build.
+
+        [source,python]
+        ----
+        from golem.plugins import hookimpl, GolemBuildAbortError
+
+        @hookimpl
+        def on_build_start(config) -> None:
+            if not some_precondition(config):
+                raise GolemBuildAbortError("Pre-flight check failed: reason")
+        ----
+        """
+        pass
+
+    @hookspec
+    def on_build_finish(self, config: "GolemConfig", result: "BuildResult") -> None:
+        """Called once after all documents have been written to output_dir.
+
+        result.compiled_files — only files written this run (use for incremental indexers).
+        result.output_dir     — scan this for all site outputs (use for full-rebuild indexers).
+
+        [parameters]
+        `config` (GolemConfig):: The active site configuration for this build.
+        `result` (BuildResult):: Build output metadata.
+
+        [source,python]
+        ----
+        from golem.plugins import hookimpl
+
+        @hookimpl
+        def on_build_finish(config, result) -> None:
+            all_pages = list(result.output_dir.rglob("*.html"))
+            print(f"Build complete: {len(result.compiled_files)} compiled, {len(all_pages)} total")
+        ----
+        """
+        pass
 
 
 _CACHED_ENTRY_POINTS: dict[str, tuple[str, Any]] | None = None
