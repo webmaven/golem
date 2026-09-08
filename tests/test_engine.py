@@ -1775,6 +1775,79 @@ def test_on_build_start_single_abort(tmp_path: Path) -> None:
     assert not (tmp_path / "dist" / "index.html").exists()
 
 
+def test_on_build_start_unexpected_exception_strict_mode(tmp_path: Path) -> None:
+    """Verify unexpected exceptions in on_build_start are re-raised when strict=True."""
+    import pytest
+    from golem.plugins import hookimpl
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Home\n\nContent", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"), strict=True)
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    class CrashingPlugin:
+        @hookimpl
+        def on_build_start(self, config):
+            raise RuntimeError("Unexpected failure in plugin")
+
+    engine.pm.register(CrashingPlugin(), name="crashing_plugin")
+
+    with pytest.raises(RuntimeError, match="Unexpected failure in plugin"):
+        engine.build_site()
+
+
+def test_on_build_start_unexpected_exception_lenient_mode(tmp_path: Path, caplog: "pytest.LogCaptureFixture") -> None:
+    """Verify unexpected exceptions in on_build_start are logged as warnings and build proceeds when strict=False."""
+    import logging
+    from golem.plugins import hookimpl
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Home\n\nContent", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content_dir), output_dir=str(tmp_path / "dist"), strict=False)
+    engine = BuildEngine(config, cache_file=tmp_path / "cache.json")
+
+    class CrashingPlugin:
+        @hookimpl
+        def on_build_start(self, config):
+            raise RuntimeError("Non-fatal failure in plugin")
+
+    engine.pm.register(CrashingPlugin(), name="crashing_plugin")
+
+    with caplog.at_level(logging.WARNING):
+        engine.build_site()
+
+    assert any(
+        "raised an unexpected exception in on_build_start: Non-fatal failure in plugin" in r.message for r in caplog.records
+    )
+    assert (tmp_path / "dist" / "index.html").exists()
+
+
+def test_invoke_build_start_hook_no_duplicate_execution_on_error() -> None:
+    """Verify _invoke_build_start_hook executes hook exactly once even if hook raises ValueError or TypeError."""
+    import pytest
+    from golem.engine import _invoke_build_start_hook
+
+    call_count = 0
+
+    class MockImpl:
+        def function(self, config=None):
+            nonlocal call_count
+            call_count += 1
+            raise ValueError("Invalid argument value within hook")
+
+    config = GolemConfig()
+    impl = MockImpl()
+
+    with pytest.raises(ValueError, match="Invalid argument value within hook"):
+        _invoke_build_start_hook(impl, config)
+
+    assert call_count == 1
+
+
 def test_on_build_finish_called_with_build_result(tmp_path: Path) -> None:
     """Verify on_build_finish hook is called with config and BuildResult containing compiled files."""
     from typing import Any

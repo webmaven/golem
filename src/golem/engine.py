@@ -77,18 +77,18 @@ __all__ = ["BuildEngine", "GolemEngine"]
 def _invoke_build_start_hook(impl: Any, config: GolemConfig) -> None:
     """Invoke an on_build_start hook implementation with argument filtering."""
     fn = getattr(impl, "function", None)
+    accepts_config = True
     if fn is not None:
         try:
             sig = inspect.signature(fn)
             params = sig.parameters
-            if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()) or "config" in params:
-                impl.function(config=config)
-            else:
-                impl.function()
-            return
+            accepts_config = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()) or "config" in params
         except (ValueError, TypeError):
             pass
-    impl.function(config=config)
+    if accepts_config:
+        impl.function(config=config)
+    else:
+        impl.function()
 
 
 def _invoke_asg_hook(impl: Any, asg: dict[str, Any] | Node, doc_path: Path) -> Any:
@@ -301,6 +301,8 @@ class BuildEngine:
                         getattr(impl, "plugin_name", None) or str(impl.function),
                         exc,
                     )
+                    if getattr(self.config, "strict", False):
+                        raise
 
         if abort_errors:
             for err in abort_errors:
