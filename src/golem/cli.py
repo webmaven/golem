@@ -212,51 +212,52 @@ def init(profile, output_dir, directory=None):
     ----
     """
     with change_working_dir(directory):
-        # Determine project_name and author
-        project_name = ""
-        author_from_pp = ""
-        _pyproject = Path("pyproject.toml")
-        if _pyproject.exists():
-            try:
-                if sys.version_info >= (3, 11):
-                    import tomllib
-
-                    with open(_pyproject, "rb") as _f:
-                        _pp = tomllib.load(_f)
-                else:
-                    import tomli as tomllib  # noqa: PLC0415
-
-                    with open(_pyproject, "rb") as _f:
-                        _pp = tomllib.load(_f)
-                _proj = _pp.get("project", {})
-                if isinstance(_proj, dict):
-                    project_name = _proj.get("name", "")
-                    _authors = _proj.get("authors", [])
-                    if _authors and isinstance(_authors[0], dict):
-                        author_from_pp = _authors[0].get("name", "")
-            except Exception:
-                pass
-
-        if not project_name:
-            try:
-                project_name = click.prompt("Project name", default=Path.cwd().name)
-            except (click.Abort, EOFError):
-                project_name = Path.cwd().name
-        if not author_from_pp:
-            try:
-                author = click.prompt("Author", default=_get_git_author())
-            except (click.Abort, EOFError):
-                author = _get_git_author()
-        else:
-            author = author_from_pp
-
-        year = str(datetime.date.today().year)
-
-        variables = {"project_name": project_name, "author": author, "year": year}
-
+        # Default author for legacy profiles (package, site, simple, book).
+        # Profile-specific init overrides this via pyproject.toml extraction or click.prompt().
+        author = _get_git_author()
         click.echo(f"Initializing golem project using profile '{profile}'...")
 
         if profile in PROFILE_NAMES:
+            # Determine project_name and author from pyproject.toml or interactive prompts
+            project_name = ""
+            author_from_pp = ""
+            _pyproject = Path("pyproject.toml")
+            if _pyproject.exists():
+                try:
+                    if sys.version_info >= (3, 11):
+                        import tomllib
+
+                        with open(_pyproject, "rb") as _f:
+                            _pp = tomllib.load(_f)
+                    else:
+                        import tomli as tomllib  # noqa: PLC0415
+
+                        with open(_pyproject, "rb") as _f:
+                            _pp = tomllib.load(_f)
+                    _proj = _pp.get("project", {})
+                    if isinstance(_proj, dict):
+                        project_name = _proj.get("name", "")
+                        _authors = _proj.get("authors", [])
+                        if _authors and isinstance(_authors[0], dict):
+                            author_from_pp = _authors[0].get("name", "")
+                except Exception:
+                    pass
+
+            if not project_name:
+                try:
+                    project_name = click.prompt("Project name", default=Path.cwd().name)
+                except (click.Abort, EOFError):
+                    project_name = Path.cwd().name
+            if not author_from_pp:
+                try:
+                    author = click.prompt("Author", default=_get_git_author())
+                except (click.Abort, EOFError):
+                    author = _get_git_author()
+            else:
+                author = author_from_pp
+
+            year = str(datetime.date.today().year)
+            variables = {"project_name": project_name, "author": author, "year": year}
             _scaffold_profile(profile, Path("."), variables)
             click.echo("Initialization complete! Project structure is ready.")
             return
