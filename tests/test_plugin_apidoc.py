@@ -1007,3 +1007,32 @@ def calculate(a: int, b: int) -> int:
     finally:
         if str(tmp_path) in sys.path:
             sys.path.remove(str(tmp_path))
+
+
+def test_build_engine_strict_mode_raises_when_apidoc_fails(tmp_path, monkeypatch) -> None:
+    """Verify BuildEngine(strict=True) re-raises when apidoc generation fails."""
+    import pytest
+    from golem.engine import BuildEngine
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Test\n\nBody", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(tmp_path / "dist"),
+        plugins=["golem.plugins.apidoc"],
+        api_packages=["nonexistent_pkg_that_will_fail"],
+        strict=True,
+    )
+
+    def _mock_generate_fail(*args, **kwargs):
+        raise RuntimeError("Simulated apidoc failure during build")
+
+    from golem.plugins import apidoc
+
+    monkeypatch.setattr(apidoc, "generate_api_docs", _mock_generate_fail)
+
+    engine = BuildEngine(config)
+    with pytest.raises(RuntimeError, match="Simulated apidoc failure during build"):
+        engine.build_site()

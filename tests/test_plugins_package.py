@@ -20,6 +20,10 @@ def test_plugins_exports():
     assert hookimpl is not None
     assert GolemSpecs is not None
     assert callable(get_plugin_manager)
+    assert hasattr(golem.plugins, "GolemBuildAbortError")
+    assert hasattr(golem.plugins, "BuildResult")
+    assert "GolemBuildAbortError" in golem.plugins.__all__
+    assert "BuildResult" in golem.plugins.__all__
 
 
 def test_golem_build_abort_error_is_importable():

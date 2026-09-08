@@ -58,6 +58,16 @@ import pluggy
 if TYPE_CHECKING:
     from golem.config import GolemConfig
 
+__all__ = [
+    "HOOK_NAMESPACE",
+    "hookspec",
+    "hookimpl",
+    "GolemSpecs",
+    "GolemBuildAbortError",
+    "BuildResult",
+    "get_plugin_manager",
+]
+
 HOOK_NAMESPACE = "golem"
 
 hookspec = pluggy.HookspecMarker(HOOK_NAMESPACE)

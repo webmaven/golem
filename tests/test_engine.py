@@ -1882,6 +1882,15 @@ def test_on_build_finish_called_with_build_result(tmp_path: Path) -> None:
     assert set(result.compiled_files) == set(compiled)
     assert len(result.compiled_files) == 2
 
+    # Second build with no changes: on_build_finish receives empty compiled_files
+    captured.clear()
+    compiled_incremental = engine.build_site()
+    assert compiled_incremental == []
+    assert "result" in captured, "on_build_finish was not called on incremental build"
+    result_incremental: BuildResult = captured["result"]
+    assert result_incremental.compiled_files == []
+    assert result_incremental.output_dir == output_dir
+
 
 def test_engine_does_not_import_apidoc():
     """Verify golem.engine does not import golem.plugins.apidoc."""
