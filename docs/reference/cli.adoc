@@ -19,10 +19,10 @@ Initialize a new Golem documentation project scaffold.
 .Terminal
 [source,bash]
 ----
-golem init [--template=<package|site|book|simple>] [--output-dir=<dir>] [-C <dir>]
+golem init [--profile=<package|site|book|simple>] [--output-dir=<dir>] [-C <dir>]
 ----
 
-* `--template`: Scaffolding template preset (default: `package`; uses `site` if no `pyproject.toml` is found).
+* `--profile`: Scaffolding profile preset (default: `package`; uses `site` if no `pyproject.toml` is found).
 * `--output-dir`: Override output build directory in generated config.
 * `-C, --directory`: Working directory context.
 

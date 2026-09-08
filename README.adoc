@@ -120,7 +120,7 @@ nav = [
 |===
 | Command | Options | Description
 
-| `golem init` | `[--template=<type>] [-C <dir>]` | Initialize documentation scaffold (`site`, `package`, `book`).
+| `golem init` | `[--profile=<type>] [-C <dir>]` | Initialize documentation scaffold (`site`, `package`, `book`).
 | `golem new` | `<type> <name> [-C <dir>]` | Generate a new `.adoc` document skeleton.
 | `golem build` | `[--clean] [--strict] [-v] [-C <dir>]` | Run DAG compiler to render HTML pages into output directory.
 | `golem serve` | `[--port=<port>] [--host=<host>] [--strict] [-C <dir>]` | Run live-reload HTTP server watching source directories.

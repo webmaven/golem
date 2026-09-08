@@ -163,3 +163,25 @@ def test_blog_profile_has_rss():
         assert result.exit_code == 0, result.output
         golem_toml = Path("golem.toml").read_text()
         assert "rss = true" in golem_toml
+
+
+def test_cli_profile_adoc_content():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        result = runner.invoke(main, ["init", "--profile", "cli"], input="\n\n")
+        assert result.exit_code == 0, result.output
+        content = Path("docs/reference/cli.adoc").read_text()
+        assert "== NAME" in content
+        assert "== SYNOPSIS" in content
+        assert "== OPTIONS" in content
+
+
+def test_paper_profile_adoc_content():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        result = runner.invoke(main, ["init", "--profile", "paper"], input="\n\n")
+        assert result.exit_code == 0, result.output
+        content = Path("paper.adoc").read_text()
+        assert "[abstract]" in content
+        assert "== Introduction" in content
+        assert "bibliography::refs.bib[]" in content
