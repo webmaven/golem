@@ -1,0 +1,1062 @@
+:root {
+    /* Light Mode Default (Fired Clay / Workbench) */
+    --golem-bg: #faf9f5;
+    --golem-surface: #f3f0e8;
+    --golem-code-bg: #ede8df;
+    --golem-text: #1e1a16;
+    --golem-text-muted: #6b5d52;
+    --golem-primary: #8b3a12;
+    --golem-primary-hover: #6b2a08;
+    --golem-border: #dfdbd2;
+    --golem-link: #8b3a12;
+    --golem-link-visited: #3e2518;
+    --golem-link-hover: #6b2a08;
+
+    /* Admonitions */
+    --golem-note: #2d6a5a;
+    --golem-tip: #6e7818;
+    --golem-important: #8b3a12;
+    --golem-warning: #b58a00;
+    --golem-caution: #a31818;
+
+    /* Typography */
+    --golem-font-display: 'Source Serif 4', Georgia, serif;
+    --golem-font-body: 'Source Serif 4', Georgia, serif;
+    --golem-font-ui: 'Source Sans 3', system-ui, -apple-system, sans-serif;
+    --golem-font-mono: 'Source Code Pro', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+    /* Sub-perceptible paper grain texture */
+    --golem-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --golem-bg: #170f0b;
+        --golem-surface: #1e1410;
+        --golem-code-bg: #2a1e17;
+        --golem-text: #f0e4d8;
+        --golem-text-muted: #9a7a68;
+        --golem-primary: #d4692a;
+        --golem-primary-hover: #e07a3a;
+        --golem-border: #3d2a20;
+        --golem-link: #d4692a;
+        --golem-link-visited: #8a4c32;
+        --golem-link-hover: #e07a3a;
+
+        --golem-note: #4a9a8a;
+        --golem-tip: #7aaa3a;
+        --golem-important: #d4692a;
+        --golem-warning: #d4a020;
+        --golem-caution: #c04040;
+
+        --golem-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+    }
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--golem-bg);
+    background-image: var(--golem-texture);
+    color: var(--golem-text);
+    font-family: var(--golem-font-body);
+    font-optical-sizing: auto;
+    font-variation-settings: "opsz" 12;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    line-height: 1.75;
+}
+
+/* ── Header ────────────────────────────────────────── */
+#golem-header {
+    background: var(--golem-surface);
+    padding: 1rem 1.75rem;
+    border-bottom: 1px solid var(--golem-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--golem-font-ui);
+}
+#golem-header h1 {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-family: var(--golem-font-display);
+    font-variation-settings: "opsz" 36;
+    letter-spacing: -0.01em;
+}
+#golem-header a {
+    color: var(--golem-text);
+    text-decoration: none;
+}
+#golem-header a:hover {
+    color: var(--golem-primary);
+}
+.golem-author {
+    color: var(--golem-text-muted);
+    font-size: 0.875rem;
+}
+
+/* ── Layout Grid / Columns ─────────────────────────── */
+#golem-wrapper {
+    display: flex;
+    flex: 1;
+}
+
+/* ── Skip Link (Accessibility) ─────────────────────── */
+.golem-skip-link {
+    position: absolute;
+    top: -999px;
+    left: 1rem;
+    z-index: 1000;
+    padding: 0.5rem 1rem;
+    background: var(--golem-primary);
+    color: #ffffff;
+    font-family: var(--golem-font-ui);
+    font-size: 0.875rem;
+    font-weight: 600;
+    border-radius: 0 0 4px 4px;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.golem-skip-link:focus {
+    top: 0;
+}
+
+/* ── Left Sidebar (Navigation) ─────────────────────── */
+#golem-sidebar-left {
+    width: 270px;
+    background: var(--golem-surface);
+    padding: 1.5rem 1.25rem;
+    border-right: 1px solid var(--golem-border);
+    font-family: var(--golem-font-ui);
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+#golem-sidebar-left h3 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    color: var(--golem-text-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+#golem-sidebar-left ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+#golem-sidebar-left li {
+    margin-bottom: 0.25rem;
+}
+.golem-nav-section {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+}
+.golem-nav-section-title {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--golem-text-muted);
+    margin-bottom: 0.35rem;
+    padding: 0.15rem 0.5rem;
+}
+.golem-nav-section-title a {
+    color: var(--golem-text-muted) !important;
+    font-weight: 700 !important;
+    font-size: 0.8rem !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.15rem 0.5rem !important;
+    border-radius: 4px;
+}
+.golem-nav-section-title a:hover {
+    color: var(--golem-primary) !important;
+    background-color: var(--golem-surface-alt, rgba(0, 0, 0, 0.04));
+}
+.golem-nav-section-title a.active,
+.golem-nav-section-title a[aria-current="page"] {
+    color: var(--golem-primary) !important;
+    background-color: var(--golem-surface-alt, rgba(0, 0, 0, 0.05));
+    border-left: 3px solid var(--golem-primary);
+}
+.golem-nav-sublist {
+    list-style: none;
+    padding-left: 0.5rem !important;
+    margin: 0.25rem 0 0.5rem 0 !important;
+    border-left: 1px solid var(--golem-border);
+}
+#golem-sidebar-left a {
+    color: var(--golem-text);
+    text-decoration: none;
+    font-size: 0.875rem;
+    display: block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: color 0.15s ease, background-color 0.15s ease, padding-left 0.15s ease;
+}
+#golem-sidebar-left a:hover {
+    color: var(--golem-primary);
+    background-color: var(--golem-surface-alt, rgba(0, 0, 0, 0.04));
+    padding-left: 0.75rem;
+}
+#golem-sidebar-left a.active,
+#golem-sidebar-left a[aria-current="page"] {
+    color: var(--golem-primary);
+    font-weight: 600;
+    background-color: var(--golem-surface-alt, rgba(0, 0, 0, 0.05));
+    border-left: 3px solid var(--golem-primary);
+    padding-left: 0.5rem;
+}
+
+/* ── Main Content Area ─────────────────────────────── */
+#golem-content {
+    flex: 1;
+    --golem-content-pad-x: 3.5rem;
+    padding: 2.5rem var(--golem-content-pad-x);
+    max-width: calc(72ch + (2 * var(--golem-content-pad-x)));
+}
+#golem-content h1 {
+    font-family: var(--golem-font-display);
+    font-size: 2.1rem;
+    font-weight: 700;
+    font-variation-settings: "opsz" 36;
+    line-height: 1.2;
+    margin-top: 0;
+    margin-bottom: 1.25rem;
+    color: var(--golem-text);
+    letter-spacing: -0.01em;
+}
+#golem-content h2 {
+    font-family: var(--golem-font-display);
+    font-size: 1.55rem;
+    font-weight: 600;
+    font-variation-settings: "opsz" 24;
+    line-height: 1.3;
+    margin-top: 2rem;
+    margin-bottom: 0.85rem;
+    color: var(--golem-text);
+    border-bottom: 1px solid var(--golem-border);
+    padding-bottom: 0.35rem;
+}
+#golem-content h3 {
+    font-family: var(--golem-font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    font-variation-settings: "opsz" 18;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--golem-text);
+}
+#golem-content h4 {
+    font-family: var(--golem-font-ui);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--golem-text);
+    margin-top: 1.25rem;
+    margin-bottom: 0.35rem;
+}
+#golem-content h5 {
+    font-family: var(--golem-font-ui);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--golem-text-muted);
+    margin-top: 1rem;
+    margin-bottom: 0.25rem;
+}
+#golem-content h6 {
+    font-family: var(--golem-font-ui);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--golem-text-muted);
+    margin-top: 0.75rem;
+    margin-bottom: 0.2rem;
+}
+#golem-content p {
+    margin-top: 0;
+    margin-bottom: 1.25rem;
+}
+#golem-content a {
+    color: var(--golem-link);
+    text-decoration-color: color-mix(in srgb, var(--golem-link) 45%, transparent);
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    transition: color 0.15s ease;
+}
+#golem-content a:hover {
+    color: var(--golem-link-hover);
+    text-decoration-color: var(--golem-link-hover);
+}
+#golem-content a:visited {
+    color: var(--golem-link-visited);
+}
+
+/* ── Code & Inline Elements ────────────────────────── */
+code, samp {
+    font-family: var(--golem-font-mono);
+    font-size: 0.875em;
+}
+p code, li code, td code {
+    background: var(--golem-code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 2px;
+    border: 1px solid var(--golem-border);
+}
+h1 code, h2 code, h3 code, h4 code, h5 code, h6 code {
+    background: var(--golem-code-bg);
+    padding: 0.1em 0.3em;
+    border-radius: 2px;
+    border: 1px solid var(--golem-border);
+    font-size: 0.85em;
+}
+
+/* ── UI Macros (kbd, btn, menu) ────────────────────── */
+kbd {
+    display: inline-block;
+    font-family: var(--golem-font-mono);
+    font-size: 0.8em;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--golem-text);
+    background-color: var(--golem-surface);
+    border: 1px solid var(--golem-border);
+    border-bottom: 2px solid var(--golem-border);
+    border-radius: 4px;
+    padding: 0.15em 0.45em;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
+    vertical-align: middle;
+    white-space: nowrap;
+}
+b.button, .button {
+    display: inline-block;
+    font-family: var(--golem-font-ui);
+    font-size: 0.85em;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--golem-text);
+    background-color: var(--golem-surface);
+    border: 1px solid var(--golem-border);
+    border-radius: 5px;
+    padding: 0.15em 0.55em;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    vertical-align: baseline;
+    white-space: nowrap;
+}
+span.menuseq {
+    font-family: var(--golem-font-ui);
+    font-size: 0.92em;
+    color: var(--golem-text);
+}
+span.menuseq b.menu,
+span.menuseq b.submenu,
+span.menuseq b.menuitem {
+    font-family: var(--golem-font-ui);
+    font-weight: 600;
+    color: var(--golem-text);
+}
+/* ── Code Blocks & Listings ────────────────────────── */
+.listingblock {
+    position: relative;
+    margin: 1.25rem 0;
+    border: 1px solid var(--golem-border);
+    border-left: 3px solid var(--golem-primary);
+    border-radius: 4px;
+    background: var(--golem-code-bg);
+    overflow: hidden;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.listingblock:has(.listing-content:focus-within, .listing-panes:focus-within) {
+    border-color: var(--golem-primary);
+    box-shadow: 0 0 0 1px var(--golem-primary);
+}
+pre {
+    position: relative;
+    background: var(--golem-code-bg);
+    border: 1px solid var(--golem-border);
+    border-left: 3px solid var(--golem-primary);
+    border-radius: 4px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    line-height: 1.55;
+    margin: 1.25rem 0;
+    cursor: text;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+pre:focus-within {
+    user-select: all;
+    -webkit-user-select: all;
+    border-color: var(--golem-primary);
+    box-shadow: 0 0 0 1px var(--golem-primary);
+}
+.listingblock pre {
+    margin: 0;
+    border: none;
+    border-left: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 1rem 1.25rem;
+    box-shadow: none;
+}
+.listingblock:has(.listing-content:focus-within, .listing-panes:focus-within) pre {
+    box-shadow: none;
+    border-color: transparent;
+}
+pre code {
+    background: transparent;
+    padding: 0;
+    border: none;
+    font-size: 0.875rem;
+}
+
+/* ── Listing Header & Actions ──────────────────────── */
+.listing-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.45rem 0.75rem;
+    background: var(--golem-surface);
+    border-bottom: 1px solid var(--golem-border);
+    font-family: var(--golem-font-ui);
+    font-size: 0.8rem;
+}
+.listing-title {
+    font-weight: 600;
+    color: var(--golem-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: auto;
+}
+.listing-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: auto;
+}
+.badge {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--golem-font-ui);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.15em 0.55em;
+    border-radius: 3px;
+    background: var(--golem-surface);
+    color: var(--golem-text-muted);
+    border: 1px solid var(--golem-border);
+    line-height: 1.2;
+}
+.badge-lang {
+    color: var(--golem-text-muted);
+    border-color: var(--golem-border);
+    background: var(--golem-bg);
+}
+.badge-test {
+    color: var(--golem-note);
+    border-color: color-mix(in srgb, var(--golem-note) 40%, var(--golem-border));
+    background: color-mix(in srgb, var(--golem-note) 10%, transparent);
+}
+.badge-shared {
+    color: var(--golem-tip);
+    border-color: color-mix(in srgb, var(--golem-tip) 40%, var(--golem-border));
+    background: color-mix(in srgb, var(--golem-tip) 10%, transparent);
+}
+.badge-reset {
+    color: var(--golem-warning);
+    border-color: color-mix(in srgb, var(--golem-warning) 40%, var(--golem-border));
+    background: color-mix(in srgb, var(--golem-warning) 10%, transparent);
+}
+.listing-copy-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--golem-font-ui);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15em 0.55em;
+    border-radius: 3px;
+    background: var(--golem-surface);
+    color: var(--golem-text-muted);
+    border: 1px solid var(--golem-border);
+    cursor: pointer;
+    line-height: 1.2;
+    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.listing-copy-btn:hover {
+    color: var(--golem-text);
+    border-color: var(--golem-primary);
+    background: var(--golem-bg);
+}
+.listing-copy-btn:focus-visible {
+    outline: 2px solid var(--golem-primary);
+    outline-offset: 1px;
+}
+.listing-copy-btn.copied {
+    color: var(--golem-tip);
+    border-color: var(--golem-tip);
+}
+.listing-copy-btn svg {
+    display: block;
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ── Multi-View Listing Tabs (Zero-JS Radio-Controlled Physical Tabs) ── */
+.tab-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+    pointer-events: none;
+}
+.listingblock.multi-view .listing-header {
+    padding: 0.45rem 0.75rem 0;
+    align-items: flex-end;
+}
+.listingblock.multi-view .listing-title {
+    padding-bottom: 0.35rem;
+}
+.listingblock.multi-view .listing-actions {
+    padding-bottom: 0.35rem;
+}
+.listing-tabs {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 3px;
+    margin-right: auto;
+    margin-bottom: -1px;
+    position: relative;
+    z-index: 10;
+    align-self: flex-end;
+}
+.tab-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--golem-font-ui);
+    font-size: 0.73rem;
+    font-weight: 600;
+    padding: 0.35rem 0.75rem calc(0.35rem + 1px);
+    border-radius: 5px 5px 0 0;
+    border: 1px solid transparent;
+    border-bottom: none;
+    background: transparent;
+    color: var(--golem-text-muted);
+    cursor: pointer;
+    line-height: 1.2;
+    position: relative;
+    user-select: none;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+.tab-btn:hover {
+    color: var(--golem-text);
+    background: color-mix(in srgb, var(--golem-text) 5%, transparent);
+    border-color: color-mix(in srgb, var(--golem-border) 60%, transparent) color-mix(in srgb, var(--golem-border) 60%, transparent) transparent;
+}
+.tab-btn:focus-visible {
+    outline: 2px solid var(--golem-primary);
+    outline-offset: 1px;
+}
+
+/* Declarative Zero-JS Active Tab State via :has() */
+.listingblock:has(.tab-input[value="source"]:checked) .tab-btn[data-tab="source"],
+.listingblock:has(.tab-input[value="asg"]:checked) .tab-btn[data-tab="asg"],
+.listingblock:has(.tab-input[value="html"]:checked) .tab-btn[data-tab="html"],
+.listingblock:has(.tab-input[value="preview"]:checked) .tab-btn[data-tab="preview"] {
+    color: var(--golem-primary);
+    font-weight: 700;
+    background: var(--golem-code-bg);
+    border: 1px solid var(--golem-border);
+    border-bottom: 1px solid var(--golem-code-bg);
+    margin-bottom: -1px;
+    z-index: 20;
+}
+.listingblock:has(.tab-input[value="preview"]:checked) .tab-btn[data-tab="preview"] {
+    background: var(--golem-bg);
+    border-bottom: 1px solid var(--golem-bg);
+}
+
+.listing-panes {
+    position: relative;
+    background: var(--golem-code-bg);
+}
+.listing-panes .tab-pane {
+    display: none;
+}
+
+/* Declarative Zero-JS Active Pane Visibility via :has() */
+.listingblock:has(.tab-input[value="source"]:checked) .tab-pane[data-tab="source"],
+.listingblock:has(.tab-input[value="asg"]:checked) .tab-pane[data-tab="asg"],
+.listingblock:has(.tab-input[value="html"]:checked) .tab-pane[data-tab="html"],
+.listingblock:has(.tab-input[value="preview"]:checked) .tab-pane[data-tab="preview"] {
+    display: block;
+}
+.tab-pane pre {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+}
+.tab-pane pre code {
+    border: none;
+    background: transparent;
+    padding: 0;
+}
+.rendered-preview {
+    padding: 1.25rem;
+    background: var(--golem-bg);
+    border-radius: 0 0 4px 4px;
+    color: var(--golem-text);
+    font-family: var(--golem-font-body);
+}
+.rendered-preview > :first-child {
+    margin-top: 0;
+}
+.rendered-preview > :last-child {
+    margin-bottom: 0;
+}
+
+/* ── Callout Badges (.conum) ───────────────────────── */
+i.conum {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25em;
+    height: 1.25em;
+    border-radius: 50%;
+    background: var(--golem-primary);
+    color: #ffffff;
+    font-family: var(--golem-font-mono);
+    font-style: normal;
+    font-size: 0.75em;
+    font-weight: bold;
+    line-height: 1;
+    text-align: center;
+    vertical-align: middle;
+    margin: 0 0.2em;
+    user-select: none;
+}
+i.conum[data-value]::after {
+    content: attr(data-value);
+    display: inline-block;
+}
+i.conum b {
+    display: none;
+    font-size: 0;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+.colist, ol.colist {
+    margin: 1rem 0;
+    font-size: 0.95rem;
+}
+ol.colist {
+    list-style: none;
+    padding-left: 0;
+}
+ol.colist > li {
+    /* Callout badges are rendered by <i class="conum"> from the template;
+       no ::before counter is needed — flex aligns badge + text naturally. */
+    display: flex;
+    align-items: baseline;
+    gap: 0.5em;
+    margin-bottom: 0.5rem;
+}
+.colist ol {
+    padding-left: 1.25rem;
+}
+.colist ol > li {
+    margin-bottom: 0.5rem;
+}
+.colist table {
+    border: none;
+    margin: 0.5rem 0;
+    width: 100%;
+}
+.colist table td {
+    border: none;
+    padding: 0.25rem 0.5rem;
+    vertical-align: top;
+}
+.colist table td:first-child {
+    width: 2rem;
+    padding-left: 0;
+}
+
+/* ── Admonitions ───────────────────────────────────── */
+.admonitionblock, aside.golem-admonition, .admonition {
+    margin: 1.5rem 0;
+    padding: 0.85rem 1.15rem;
+    background: var(--golem-surface);
+    border-left: 4px solid var(--golem-note);
+    border-top: 1px solid var(--golem-border);
+    border-right: 1px solid var(--golem-border);
+    border-bottom: 1px solid var(--golem-border);
+    border-radius: 0 4px 4px 0;
+}
+.admonitionblock.note, aside.golem-admonition.note, .admonition.note { border-left-color: var(--golem-note); }
+.admonitionblock.tip, aside.golem-admonition.tip, .admonition.tip { border-left-color: var(--golem-tip); }
+.admonitionblock.important, aside.golem-admonition.important, .admonition.important { border-left-color: var(--golem-important); }
+.admonitionblock.warning, aside.golem-admonition.warning, .admonition.warning { border-left-color: var(--golem-warning); }
+.admonitionblock.caution, aside.golem-admonition.caution, .admonition.caution { border-left-color: var(--golem-caution); }
+
+.admonitionblock::before,
+aside.golem-admonition::before,
+.admonition::before {
+    display: inline-block;
+    font-family: var(--golem-font-ui);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.4rem;
+    padding: 0.1em 0.45em;
+    border-radius: 3px;
+    line-height: 1.3;
+}
+.admonitionblock.note::before,
+aside.golem-admonition.note::before,
+.admonition.note::before {
+    content: 'NOTE';
+    color: var(--golem-note);
+    background: color-mix(in srgb, var(--golem-note) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--golem-note) 30%, transparent);
+}
+.admonitionblock.tip::before,
+aside.golem-admonition.tip::before,
+.admonition.tip::before {
+    content: 'TIP';
+    color: var(--golem-tip);
+    background: color-mix(in srgb, var(--golem-tip) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--golem-tip) 30%, transparent);
+}
+.admonitionblock.important::before,
+aside.golem-admonition.important::before,
+.admonition.important::before {
+    content: 'IMPORTANT';
+    color: var(--golem-important);
+    background: color-mix(in srgb, var(--golem-important) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--golem-important) 30%, transparent);
+}
+.admonitionblock.warning::before,
+aside.golem-admonition.warning::before,
+.admonition.warning::before {
+    content: 'WARNING';
+    color: var(--golem-warning);
+    background: color-mix(in srgb, var(--golem-warning) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--golem-warning) 30%, transparent);
+}
+.admonitionblock.caution::before,
+aside.golem-admonition.caution::before,
+.admonition.caution::before {
+    content: 'CAUTION';
+    color: var(--golem-caution);
+    background: color-mix(in srgb, var(--golem-caution) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--golem-caution) 30%, transparent);
+}
+
+/* ── Definition Lists (API Parameters) ─────────────── */
+#golem-content dl {
+    margin: 1rem 0 1.25rem 0;
+}
+#golem-content dt {
+    font-family: var(--golem-font-mono);
+    font-weight: 600;
+    color: var(--golem-primary);
+    margin-top: 0.75rem;
+}
+#golem-content dd {
+    margin-left: 1.25rem;
+    margin-bottom: 0.5rem;
+    color: var(--golem-text);
+}
+
+/* ── Tables ────────────────────────────────────────── */
+table, table.tableblock, table.golem-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    font-size: 0.925rem;
+}
+table caption.title,
+.tableblock caption.title {
+    font-family: var(--golem-font-ui);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--golem-text-muted);
+    text-align: left;
+    padding-bottom: 0.5rem;
+    caption-side: top;
+}
+colgroup col {
+    /* Support proportional column width styles */
+}
+th {
+    font-family: var(--golem-font-ui);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-align: left;
+    padding: 0.6rem 0.85rem;
+    border-bottom: 2px solid var(--golem-border);
+    color: var(--golem-text-muted);
+    background-color: var(--golem-surface);
+}
+td {
+    padding: 0.6rem 0.85rem;
+    border-bottom: 1px solid var(--golem-border);
+    vertical-align: top;
+}
+tr:last-child td {
+    border-bottom: 1px solid var(--golem-border);
+}
+
+/* ── Table Alignment Classes (AsciiDoc / AsciiDoctype DSL) ── */
+th.halign-left, td.halign-left, .halign-left { text-align: left; }
+th.halign-center, td.halign-center, .halign-center { text-align: center; }
+th.halign-right, td.halign-right, .halign-right { text-align: right; }
+th.halign-justify, td.halign-justify, .halign-justify { text-align: justify; }
+
+th.valign-top, td.valign-top, .valign-top { vertical-align: top; }
+th.valign-middle, td.valign-middle, .valign-middle { vertical-align: middle; }
+th.valign-bottom, td.valign-bottom, .valign-bottom { vertical-align: bottom; }
+
+/* Striping & Grid options */
+table.stripes-even tbody tr:nth-child(even),
+table.stripes-odd tbody tr:nth-child(odd),
+table.stripes-hover tbody tr:hover {
+    background-color: color-mix(in srgb, var(--golem-surface) 60%, transparent);
+}
+table.frame-all { border: 1px solid var(--golem-border); }
+table.frame-sides { border-left: 1px solid var(--golem-border); border-right: 1px solid var(--golem-border); }
+table.frame-topbot { border-top: 1px solid var(--golem-border); border-bottom: 1px solid var(--golem-border); }
+table.frame-none { border: none; }
+table.grid-all th, table.grid-all td { border: 1px solid var(--golem-border); }
+table.grid-cols th, table.grid-cols td { border-left: 1px solid var(--golem-border); border-right: 1px solid var(--golem-border); }
+table.grid-rows th, table.grid-rows td { border-top: 1px solid var(--golem-border); border-bottom: 1px solid var(--golem-border); }
+table.grid-none th, table.grid-none td { border: none; }
+
+/* ── Full-Bleed Table Breakout ──────────────────────── */
+#golem-content table,
+#golem-content .tableblock {
+    margin-inline: calc(-1 * var(--golem-content-pad-x));
+    width: calc(100% + (2 * var(--golem-content-pad-x)));
+    max-width: none;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ── Images & Media ────────────────────────────────── */
+#golem-content img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 6px;
+    border: 1px solid var(--golem-border);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+#golem-content .imageblock {
+    margin: 1.5rem 0;
+}
+#golem-content .imageblock .title {
+    font-family: var(--golem-font-ui);
+    font-size: 0.85rem;
+    color: var(--golem-text-muted);
+    margin-top: 0.5rem;
+    text-align: center;
+}
+
+/* ── Focus Rings (Accessibility) ───────────────────── */
+a:focus-visible,
+button:focus-visible,
+details summary:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid var(--golem-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* ── Right Sidebar (TOC) ───────────────────────────── */
+#golem-sidebar-right {
+    width: 230px;
+    padding: 1.5rem 1rem;
+    border-left: 1px solid var(--golem-border);
+    font-family: var(--golem-font-ui);
+    flex-shrink: 0;
+}
+#golem-sidebar-right h4 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    color: var(--golem-text-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+#golem-sidebar-right ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+#golem-sidebar-right li {
+    margin-bottom: 0.35rem;
+}
+#golem-sidebar-right a {
+    color: var(--golem-text-muted);
+    text-decoration: none;
+    font-size: 0.825rem;
+    line-height: 1.4;
+    display: block;
+    transition: color 0.15s ease;
+}
+#golem-sidebar-right a:hover {
+    color: var(--golem-primary);
+}
+
+/* ── Footer ────────────────────────────────────────── */
+#golem-footer {
+    background: var(--golem-surface);
+    padding: 1.25rem 1.75rem;
+    border-top: 1px solid var(--golem-border);
+    text-align: center;
+    font-family: var(--golem-font-ui);
+    font-size: 0.825rem;
+    color: var(--golem-text-muted);
+}
+#golem-footer p {
+    margin: 0;
+}
+
+/* ── Chapter Pagination (Prev / Next) ──────────────── */
+.golem-pagination {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 1.25rem;
+    margin-top: 3.5rem;
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--golem-border);
+    font-family: var(--golem-font-ui);
+}
+.golem-pagination-spacer {
+    flex: 1;
+}
+.golem-pagination-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 0.9rem 1.15rem;
+    background: var(--golem-surface);
+    border: 1px solid var(--golem-border);
+    border-radius: 6px;
+    text-decoration: none;
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.golem-pagination-card:hover {
+    border-color: var(--golem-primary);
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+    transform: translateY(-1px);
+}
+.golem-pagination-next {
+    text-align: right;
+    align-items: flex-end;
+}
+.golem-pagination-prev {
+    text-align: left;
+    align-items: flex-start;
+}
+.golem-pagination-subtitle {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--golem-text-muted);
+    margin-bottom: 0.25rem;
+}
+.golem-pagination-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--golem-text);
+    line-height: 1.35;
+}
+.golem-pagination-card:hover .golem-pagination-title {
+    color: var(--golem-primary);
+}
+
+/* ── Reduced Motion ────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+    *, *::before, *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+    }
+}
+
+/* ── Responsive Breakdown ──────────────────────────── */
+@media (max-width: 1100px) {
+    #golem-sidebar-right { display: none; }
+    #golem-content { padding: 2rem 2.5rem; }
+}
+@media (max-width: 800px) {
+    #golem-wrapper { flex-direction: column; }
+    #golem-sidebar-left {
+        position: static;
+        width: 100%;
+        height: auto;
+        max-height: none;
+        border-right: none;
+        border-bottom: 1px solid var(--golem-border);
+        padding: 0.75rem 1.25rem;
+    }
+    .golem-nav-details summary {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.25rem 0;
+    }
+    .golem-nav-details summary::after {
+        content: "▾";
+        font-size: 0.85rem;
+        transition: transform 0.15s ease;
+    }
+    .golem-nav-details[open] summary::after {
+        transform: rotate(180deg);
+    }
+    #golem-content {
+        --golem-content-pad-x: 1.25rem;
+        padding: 1.5rem var(--golem-content-pad-x);
+        max-width: 100%;
+    }
+    .golem-pagination {
+        flex-direction: column;
+    }
+    .golem-pagination-next {
+        text-align: left;
+        align-items: flex-start;
+    }
+}

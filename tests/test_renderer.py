@@ -717,9 +717,9 @@ def test_render_table_caption_title():
 
 
 def test_skeleton_table_alignment_styles():
-    """Verify skeleton.pt contains CSS definitions for table colgroup, caption, and alignment classes."""
-    skeleton_path = Path("src/golem/templates/default/skeleton.pt")
-    content = skeleton_path.read_text(encoding="utf-8")
+    """Verify skeleton template CSS definitions for table colgroup, caption, and alignment classes."""
+    css_path = Path("src/golem/templates/default/static/css/golem.css")
+    content = css_path.read_text(encoding="utf-8")
     assert ".halign-left" in content
     assert ".halign-center" in content
     assert ".halign-right" in content

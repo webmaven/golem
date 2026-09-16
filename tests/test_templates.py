@@ -379,7 +379,7 @@ def test_compile_page_custom_pygments_css(tmp_path):
 
 
 def test_compile_page_includes_client_interaction_script(tmp_path):
-    """Test that default skeleton template includes client-side copy and tab scripts with preview fallback."""
+    """Test that default skeleton template includes client-side copy script and links theme stylesheet."""
     config = GolemConfig(output_dir=str(tmp_path / "dist"))
     compiler = PageCompiler(config)
 
@@ -389,10 +389,14 @@ def test_compile_page_includes_client_interaction_script(tmp_path):
     )
     assert ".listing-copy-btn" in html
     assert "navigator.clipboard" in html
-    assert ".tab-btn" in html
-    assert ".tab-input" in html
-    assert 'data-tab="preview"' in html or "rendered-preview" in html
-    assert 'data-tab="source"' in html
+    assert "golem.css" in html
+
+    css_path = Path(__file__).parent.parent / "src" / "golem" / "templates" / "default" / "static" / "css" / "golem.css"
+    css_content = css_path.read_text(encoding="utf-8")
+    assert ".tab-btn" in css_content
+    assert ".tab-input" in css_content
+    assert 'data-tab="preview"' in css_content or "rendered-preview" in css_content
+    assert 'data-tab="source"' in css_content
 
 
 def test_skeleton_copy_button_preview_targeting(tmp_path):
@@ -401,8 +405,11 @@ def test_skeleton_copy_button_preview_targeting(tmp_path):
     tpl_content = tpl_path.read_text(encoding="utf-8")
     assert "activePane" in tpl_content
     assert "data-tab" in tpl_content
-    assert "rendered-preview" in tpl_content
     assert '.tab-pane[data-tab="source"] pre code' in tpl_content
+
+    css_path = tpl_path.parent / "static" / "css" / "golem.css"
+    css_content = css_path.read_text(encoding="utf-8")
+    assert "rendered-preview" in css_content
 
 
 def test_page_compiler_reuses_cached_skeleton_template(tmp_path):

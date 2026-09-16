@@ -73,17 +73,17 @@ def sync_static_assets(config: Any, content_dir: Path, output_dir: Path) -> None
 
     theme_name = getattr(config, "theme", "default") or "default"
 
-    # 1. Package default theme static assets (if any)
-    pkg_theme_static = Path(__file__).parent / "templates" / theme_name / "static"
-    if pkg_theme_static.exists() and pkg_theme_static.is_dir():
-        output_static_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(pkg_theme_static, output_static_dir, dirs_exist_ok=True)
-
-    # Also check package default static if theme != default
+    # 1. Package default theme static assets (base fallback)
     pkg_default_static = Path(__file__).parent / "templates" / "default" / "static"
-    if pkg_default_static != pkg_theme_static and pkg_default_static.exists() and pkg_default_static.is_dir():
+    if pkg_default_static.exists() and pkg_default_static.is_dir():
         output_static_dir.mkdir(parents=True, exist_ok=True)
         shutil.copytree(pkg_default_static, output_static_dir, dirs_exist_ok=True)
+
+    # Package theme static assets (if theme != default, overriding package default)
+    pkg_theme_static = Path(__file__).parent / "templates" / theme_name / "static"
+    if pkg_theme_static != pkg_default_static and pkg_theme_static.exists() and pkg_theme_static.is_dir():
+        output_static_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(pkg_theme_static, output_static_dir, dirs_exist_ok=True)
 
     # 2. Configured theme directory static assets (themes/<theme>/static)
     if theme_name:

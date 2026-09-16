@@ -157,6 +157,14 @@ class PageCompiler:
                 else:
                     template = self.default_template
 
+        try:
+            default_layout = self.default_template.macros["layout"]
+        except (KeyError, AttributeError):
+            try:
+                default_layout = self._pkg_default_template.macros["layout"]
+            except (KeyError, AttributeError):
+                default_layout = None
+
         template_kwargs: dict[str, Any] = {
             "title": title,
             "body_html": body_html,
@@ -176,6 +184,7 @@ class PageCompiler:
             "body_class": effective_body_class,
             "content_class": effective_content_class,
             "pygments_css": effective_pygments_css,
+            "default_layout": default_layout,
         }
         if "extra_context" in extra_context and isinstance(extra_context["extra_context"], dict):
             template_kwargs.update(extra_context.pop("extra_context"))
