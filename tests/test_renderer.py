@@ -177,7 +177,9 @@ This is an equation: stem:[E = mc^2]
     ast = asciidoctrine.parse_to_ast(adoc_source)
     asg = ASGResolver(ast).resolve(ast)
     html = render_body(asg)
-    assert '<span class="stem">E = mc^2</span>' in html
+    assert '<span class="stem">' in html
+    assert '<math xmlns="http://www.w3.org/1998/Math/MathML">' in html
+    assert "<mrow><mi>E</mi><mo>=</mo><msup><mi>mc</mi><mn>2</mn></msup></mrow>" in html
 
 
 def test_render_footnotes():
