@@ -631,3 +631,21 @@ def test_user_templates_dir_page_pt_caching_and_mtime_invalidation(tmp_path):
     cached_mtime3, tpl_instance3 = compiler._disk_template_cache[user_pt]
     assert tpl_instance3 is not tpl_instance1
     assert cached_mtime3 == new_mtime
+
+
+def test_compile_page_preserves_dict_named_extra_context(tmp_path):
+    """Verify that passing an extra_context keyword argument preserves it in template context."""
+    config = GolemConfig(output_dir=str(tmp_path / "dist"))
+    compiler = PageCompiler(config)
+    custom_tpl = tmp_path / "extra_context.pt"
+    custom_tpl.write_text(
+        '<html><body><span id="extra">${extra_context["nested"]}</span></body></html>',
+        encoding="utf-8",
+    )
+    html = compiler.compile_page(
+        title="Extra Context Test",
+        body_html="<p>Body</p>",
+        template_path=custom_tpl,
+        extra_context={"nested": "value"},
+    )
+    assert '<span id="extra">value</span>' in html

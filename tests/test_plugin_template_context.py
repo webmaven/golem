@@ -93,8 +93,9 @@ def test_on_template_context_multiple_plugins_chain(tmp_path):
     class PluginB:
         @hookimpl
         def on_template_context(self, context: dict, doc_path: Path) -> dict:
-            # Returning updated dict or new dict
-            return {"val_b": "from_b"}
+            # PluginB should see PluginA's contribution in forward sequential order
+            prev_val = context.get("val_a", "missing")
+            return {"val_b": f"from_b_saw_{prev_val}"}
 
     templates_dir = tmp_path / "templates"
     templates_dir.mkdir()
@@ -116,7 +117,38 @@ def test_on_template_context_multiple_plugins_chain(tmp_path):
     assert len(compiled) == 1
     output_html = compiled[0].read_text(encoding="utf-8")
     assert "<span>from_a</span>" in output_html
-    assert "<span>from_b</span>" in output_html
+    assert "<span>from_b_saw_from_a</span>" in output_html
+
+
+def test_on_template_context_preserves_dict_named_extra_context(tmp_path):
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Extra Context Doc\n\nContent.\n", encoding="utf-8")
+
+    class ExtraContextPlugin:
+        @hookimpl
+        def on_template_context(self, context: dict, doc_path: Path) -> dict:
+            return {"extra_context": {"nested_key": "preserved_val"}}
+
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    (templates_dir / "page.pt").write_text(
+        '<html><body><span>${extra_context["nested_key"]}</span></body></html>',
+        encoding="utf-8",
+    )
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(tmp_path / "dist"),
+        templates_dir=str(templates_dir),
+    )
+    engine = BuildEngine(config)
+    engine.pm.register(ExtraContextPlugin())
+
+    compiled = engine.build_site()
+    assert len(compiled) == 1
+    output_html = compiled[0].read_text(encoding="utf-8")
+    assert "<span>preserved_val</span>" in output_html
 
 
 def test_on_template_context_optional_doc_path(tmp_path):
@@ -148,3 +180,72 @@ def test_on_template_context_optional_doc_path(tmp_path):
     compiled = engine.build_site()
     assert len(compiled) == 1
     assert "<span>works</span>" in compiled[0].read_text(encoding="utf-8")
+
+
+def test_on_template_context_exception_isolation(tmp_path, caplog):
+    import logging
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Title\n\nBody.\n", encoding="utf-8")
+
+    class FailingPlugin:
+        @hookimpl
+        def on_template_context(self, context: dict, doc_path: Path) -> dict:
+            raise RuntimeError("Context crash!")
+
+    class GoodPlugin:
+        @hookimpl
+        def on_template_context(self, context: dict, doc_path: Path) -> dict:
+            context["good_key"] = "recovered"
+            return context
+
+    templates_dir = tmp_path / "templates"
+    templates_dir.mkdir()
+    (templates_dir / "page.pt").write_text(
+        "<html><body><span>${good_key}</span></body></html>",
+        encoding="utf-8",
+    )
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(tmp_path / "dist"),
+        templates_dir=str(templates_dir),
+    )
+    engine = BuildEngine(config)
+    engine.pm.register(FailingPlugin(), name="failing_plugin")
+    engine.pm.register(GoodPlugin(), name="good_plugin")
+
+    with caplog.at_level(logging.WARNING):
+        compiled = engine.build_site()
+
+    assert len(compiled) == 1
+    assert "<span>recovered</span>" in compiled[0].read_text(encoding="utf-8")
+    assert any(
+        "failing_plugin raised an exception in on_template_context for index.adoc: Context crash!" in r.message
+        for r in caplog.records
+    )
+
+
+def test_on_template_context_exception_strict_raises(tmp_path):
+    import pytest
+
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text("= Title\n\nBody.\n", encoding="utf-8")
+
+    class FailingPlugin:
+        @hookimpl
+        def on_template_context(self, context: dict, doc_path: Path) -> dict:
+            raise RuntimeError("Strict crash!")
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(tmp_path / "dist"),
+        strict=True,
+    )
+    engine = BuildEngine(config)
+    engine.pm.register(FailingPlugin())
+
+    with pytest.raises(RuntimeError, match="Strict crash!"):
+        engine.build_site()

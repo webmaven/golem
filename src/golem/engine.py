@@ -92,6 +92,29 @@ def _invoke_asg_hook(impl: Any, asg: dict[str, Any] | Node, doc_path: Path) -> A
     return impl.function(**hook_kwargs)
 
 
+def _invoke_template_context_hook(impl: Any, context: dict[str, Any], doc_path: Path) -> Any:
+    """Invoke on_template_context hook implementation with Pluggy argument filtering."""
+    hook_kwargs: dict[str, Any] = {"context": context}
+    has_doc_path = "doc_path" in getattr(impl, "argnames", ()) or "doc_path" in getattr(impl, "kwargnames", ())
+    if not has_doc_path:
+        fn = getattr(impl, "function", None)
+        code = getattr(fn, "__code__", None)
+        if code and (code.co_flags & inspect.CO_VARKEYWORDS):
+            has_doc_path = True
+        elif fn is not None and not code:
+            try:
+                sig = inspect.signature(fn)
+                has_doc_path = "doc_path" in sig.parameters or any(
+                    p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+                )
+            except (ValueError, TypeError):
+                pass
+
+    if has_doc_path:
+        hook_kwargs["doc_path"] = doc_path
+    return impl.function(**hook_kwargs)
+
+
 class BuildEngine:
     """Incremental DAG compilation engine for Golem static site builds.
 
@@ -475,24 +498,22 @@ class BuildEngine:
                     "content_class": resolved_content_class,
                 }
 
-                # Trigger on_template_context hooks
-                try:
-                    context_results = self.pm.hook.on_template_context(
-                        context=context_dict,
-                        doc_path=doc_path,
-                    )
-                    if context_results:
-                        for res in reversed(context_results):
-                            if isinstance(res, dict):
-                                context_dict.update(res)
-                except Exception as e:
-                    logging.warning(
-                        "[Plugin] Exception in on_template_context for %s: %s",
-                        doc_path.name,
-                        e,
-                    )
-                    if getattr(self.config, "strict", False):
-                        raise
+                # Trigger on_template_context hooks sequentially (chain modifications)
+                for impl in self.pm.hook.on_template_context.get_hookimpls():
+                    try:
+                        result = _invoke_template_context_hook(impl, context_dict, doc_path)
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_template_context for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+                        if getattr(self.config, "strict", False):
+                            raise
+                        continue
+                    if isinstance(result, dict):
+                        context_dict.update(result)
 
                 final_html = self.compiler.compile_page(**context_dict)
 

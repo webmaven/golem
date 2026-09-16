@@ -186,8 +186,6 @@ class PageCompiler:
             "pygments_css": effective_pygments_css,
             "default_layout": default_layout,
         }
-        if "extra_context" in extra_context and isinstance(extra_context["extra_context"], dict):
-            template_kwargs.update(extra_context.pop("extra_context"))
         template_kwargs.update(extra_context)
 
         return template(**template_kwargs)
