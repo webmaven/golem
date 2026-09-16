@@ -5,6 +5,7 @@ from disk or the built-in package skeleton template.
 """
 
 from pathlib import Path
+from typing import Any
 from chameleon import PageTemplate
 from golem.config import GolemConfig
 from golem.highlighting import PYGMENTS_CSS
@@ -96,6 +97,7 @@ class PageCompiler:
         body_class: str = "",
         content_class: str = "",
         pygments_css: str | None = None,
+        **extra_context: Any,
     ) -> str:
         """
 
@@ -117,7 +119,12 @@ class PageCompiler:
         - `body_class`:: CSS classes applied to the `<body>` element.
         - `content_class`:: Additional CSS classes applied to `<main id="golem-content">`.
         - `pygments_css`:: Optional custom Pygments CSS string to inject into the template.
+        - `**extra_context`:: Additional context variables injected by plugins or custom callers.
         """
+        for forbidden in ("body_content", "page_title", "page_class"):
+            if forbidden in extra_context:
+                raise TypeError(f"compile_page() got an unexpected keyword argument '{forbidden}'")
+
         effective_body_class = (body_class or "").strip()
         effective_content_class = (content_class or "").strip()
         effective_pygments_css = pygments_css if pygments_css is not None else PYGMENTS_CSS
@@ -150,23 +157,28 @@ class PageCompiler:
                 else:
                     template = self.default_template
 
-        return template(
-            title=title,
-            body_html=body_html,
-            toc_html=toc_html,
-            nav_html=nav_html,
-            nav_tree=nav_tree or [],
-            current_path=current_path,
-            prev_page=prev_page,
-            next_page=next_page,
-            site_title=getattr(self.config, "site_title", "Golem Docs"),
-            site_author=getattr(self.config, "site_author", "Anonymous"),
-            site_url=getattr(self.config, "site_url", None),
-            root_path=root_path,
-            generator_version=generator_version,
-            custom_css=custom_css or [],
-            custom_js=custom_js or [],
-            body_class=effective_body_class,
-            content_class=effective_content_class,
-            pygments_css=effective_pygments_css,
-        )
+        template_kwargs: dict[str, Any] = {
+            "title": title,
+            "body_html": body_html,
+            "toc_html": toc_html,
+            "nav_html": nav_html,
+            "nav_tree": nav_tree or [],
+            "current_path": current_path,
+            "prev_page": prev_page,
+            "next_page": next_page,
+            "site_title": getattr(self.config, "site_title", "Golem Docs"),
+            "site_author": getattr(self.config, "site_author", "Anonymous"),
+            "site_url": getattr(self.config, "site_url", None),
+            "root_path": root_path,
+            "generator_version": generator_version,
+            "custom_css": custom_css or [],
+            "custom_js": custom_js or [],
+            "body_class": effective_body_class,
+            "content_class": effective_content_class,
+            "pygments_css": effective_pygments_css,
+        }
+        if "extra_context" in extra_context and isinstance(extra_context["extra_context"], dict):
+            template_kwargs.update(extra_context.pop("extra_context"))
+        template_kwargs.update(extra_context)
+
+        return template(**template_kwargs)

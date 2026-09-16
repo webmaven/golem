@@ -22,7 +22,9 @@ During site compilation and CLI initialization, hooks execute across discrete pi
    Executed after Lark parses AsciiDoc source into an Abstract Syntax Tree (AST). Plugins mutate or wrap syntax nodes prior to semantic resolution.
 5. ASG Transformation (`on_asg_created`)::
    Executed after the semantic resolver transforms the AST into an Abstract Semantic Graph (ASG) dictionary. Plugins mutate semantic nodes, table metadata, or document attributes.
-6. Layout Compilation & Post-Render (`on_post_render`)::
+6. Template Context Enrichment (`on_template_context`)::
+   Executed sequentially per document prior to Chameleon layout compilation. Plugins inject or mutate variables in the template context dictionary.
+7. Layout Compilation & Post-Render (`on_post_render`)::
    Executed after Chameleon template layout rendering. Plugins receive the compiled HTML page string and return modified HTML before it is written to disk.
 
 == Plugin Discovery Order
@@ -83,7 +85,7 @@ class GolemSpecs:
         not activate a plugin. This ensures reproducible builds and explicit opt-in.
 
     Hook Execution Order::
-        Transform hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_post_render`)
+        Transform hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_template_context`, `on_post_render`)
         execute in the order plugins appear in `config.plugins`. The first listed plugin runs
         first; its output becomes the input to the second, and so on. A `logging.WARNING` is
         emitted at build time when multiple plugins modify the same value in a single hook,
@@ -181,6 +183,35 @@ class GolemSpecs:
         ----
         """
         return asg
+
+    @hookspec
+    def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+        """Intercept and modify or enrich the template context dictionary before Chameleon page rendering.
+
+        Executed sequentially per document before Chameleon layout template compilation.
+        Plugins can inject new context variables (e.g. GitHub repository links, custom
+        navigation structures, timestamps, or author details) or modify existing context values.
+
+        [parameters]
+        `context` (dict[str, Any]):: Dictionary of context variables prepared for the template.
+        `doc_path` (Path):: Path to the AsciiDoc document being compiled.
+
+        [returns]
+        `dict[str, Any]`:: Updated context dictionary or new keys to merge into the template context.
+
+        [source,python]
+        ----
+        from pathlib import Path
+        from typing import Any
+        from golem.plugins import hookimpl
+
+        @hookimpl
+        def on_template_context(context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+            context["github_url"] = f"https://github.com/myorg/myrepo/edit/main/{doc_path.name}"
+            return context
+        ----
+        """
+        return context
 
     @hookspec
     def on_post_render(self, html_content: str) -> str:

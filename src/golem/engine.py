@@ -32,7 +32,7 @@ The compilation pipeline proceeds through sequential phases:
 5. ASG Resolution & Hook Execution: Resolves ASTs into Abstract Semantic Graphs (ASG) and executes `on_asg_created` hooks.
 6. Body & Table of Contents Rendering: Evaluates ASG nodes into HTML body content and generates structural table-of-contents HTML.
 7. Navigation & Pagination Assembly: Discovers site navigation trees and calculates page-specific sequential pagination links.
-8. Template Framing & Post-Render Hooks: Compiles the complete HTML page via Chameleon templates (`PageCompiler`) and executes `on_post_render` hooks.
+8. Template Context Framing & Post-Render Hooks: Executes `on_template_context` hooks, compiles the complete HTML page via Chameleon templates (`PageCompiler`), and executes `on_post_render` hooks.
 9. Disk Output & Cache Update: Writes compiled HTML files to `output_dir` and updates content hashes and include dependencies in the cache.
 """
 
@@ -239,7 +239,7 @@ class BuildEngine:
         2. Identifies stale or modified documents via `staleness_tracker.get_outdated_files()`.
         3. Synchronizes static assets into the output directory via `sync_static_assets()`.
         4. Compiles each outdated document through sequential AST parsing (`asciidoctrine`), ASG semantic resolution (`ASGResolver`), body rendering (`render_body`), navigation and TOC generation, and Chameleon template layout compilation (`PageCompiler`).
-        5. Executes plugin hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_post_render`) across each lifecycle phase.
+        5. Executes plugin hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_template_context`, `on_post_render`) across each lifecycle phase.
         6. Writes compiled HTML files to disk and updates the DAG cache via `staleness_tracker.update_cache_for_file()`.
 
         [returns]
@@ -462,18 +462,39 @@ class BuildEngine:
                 resolved_body_class = (body_class or page_class or "").strip()
                 resolved_content_class = (content_class or "").strip()
 
-                final_html = self.compiler.compile_page(
-                    title=title_str,
-                    body_html=body_content,
-                    toc_html=toc_html,
-                    nav_html=nav_html,
-                    nav_tree=_nav_tree,
-                    current_path=str(rel_path),
-                    prev_page=prev_page,
-                    next_page=next_page,
-                    body_class=resolved_body_class,
-                    content_class=resolved_content_class,
-                )
+                context_dict: dict[str, Any] = {
+                    "title": title_str,
+                    "body_html": body_content,
+                    "toc_html": toc_html,
+                    "nav_html": nav_html,
+                    "nav_tree": _nav_tree,
+                    "current_path": str(rel_path),
+                    "prev_page": prev_page,
+                    "next_page": next_page,
+                    "body_class": resolved_body_class,
+                    "content_class": resolved_content_class,
+                }
+
+                # Trigger on_template_context hooks
+                try:
+                    context_results = self.pm.hook.on_template_context(
+                        context=context_dict,
+                        doc_path=doc_path,
+                    )
+                    if context_results:
+                        for res in reversed(context_results):
+                            if isinstance(res, dict):
+                                context_dict.update(res)
+                except Exception as e:
+                    logging.warning(
+                        "[Plugin] Exception in on_template_context for %s: %s",
+                        doc_path.name,
+                        e,
+                    )
+                    if getattr(self.config, "strict", False):
+                        raise
+
+                final_html = self.compiler.compile_page(**context_dict)
 
                 # Trigger post-render hooks sequentially (chain modifications)
                 _post_render_modifiers: list[str] = []
