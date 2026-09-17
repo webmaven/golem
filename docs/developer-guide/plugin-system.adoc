@@ -68,7 +68,7 @@ class MyPlugin:
 
 [NOTE]
 ====
-*`on_pre_parse` for macro expansion is deprecated.* The `golem.plugins.apidoc` plugin previously expanded `golem:apidoc[...]` macros in the `on_pre_parse` hook (text substitution before parsing). As of 0.1.0a3, `on_asg_created` is the correct hook for block-level macro splicing — it operates on the fully resolved ASG and preserves document structure. `on_pre_parse` still fires as a fallback but emits a deprecation warning.
+*Block macro splicing uses `on_asg_created`.* The `golem.plugins.apidoc` plugin expands `golem.apidoc::` block macros in the `on_asg_created` hook via an AST `NodeTransformer` — it operates directly on typed ASG nodes and preserves document structure.
 ====
 
 

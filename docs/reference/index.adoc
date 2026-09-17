@@ -9,5 +9,5 @@ Authoritative technical reference for Golem's command-line interface and built-i
 == Topics in this Section
 
 * link:cli.html[*CLI Command Reference*] — Complete dictionary of `golem build`, `golem serve`, `golem doctest`, `golem apidoc`, and all flags and options.
-* link:apidoc.html[*API Reference Generator & Inline Macro*] — Generating Python API reference pages from source code and splicing API docs via the `golem:apidoc` macro.
+* link:apidoc.html[*API Reference Generator & Macro*] — Generating Python API reference pages from source code and splicing API docs via the `golem.apidoc::` macro.
 * link:doctest.html[*Doctest & Code Example Verification*] — Embedded executable code block testing, `pytest` integration, and verification of inline AsciiDoc source examples.

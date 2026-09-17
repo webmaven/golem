@@ -176,9 +176,9 @@ Welcome to our project documentation.
 
 
 def test_e2e_inline_apidoc_macro_in_guide(tmp_path: Path, sample_package: dict[str, Any]):
-    """Scenario 2: Inline golem:apidoc[...] Macro in a Hand-Written Guide.
+    """Scenario 2: Inline golem.apidoc::[...] Macro in a Hand-Written Guide.
 
-    Verify that golem:apidoc[...] in an AsciiDoc document is replaced during build
+    Verify that golem.apidoc::[...] in an AsciiDoc document is replaced during build
     and rendered into the output HTML.
     """
     content_dir = tmp_path / "content"
@@ -188,7 +188,7 @@ def test_e2e_inline_apidoc_macro_in_guide(tmp_path: Path, sample_package: dict[s
 
 Here is our helper function:
 
-golem:apidoc[target="sample_pkg.helper_func"]
+golem.apidoc::sample_pkg.helper_func[]
 
 End of guide.
 """,
@@ -209,7 +209,7 @@ End of guide.
     assert guide_html.exists()
     guide_content = guide_html.read_text(encoding="utf-8")
 
-    assert "golem:apidoc" not in guide_content
+    assert "golem.apidoc" not in guide_content
     assert "helper_func" in guide_content
     assert "Transform text to uppercase" in guide_content
 

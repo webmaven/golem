@@ -35,7 +35,7 @@ Golem operates as a deterministic, compiler-grade document processing pipeline b
  Full Static HTML5 Document (dist/*.html)
 ----
 
-★ `on_asg_created` is the preferred hook for block-level structural transforms such as `golem:apidoc[]` macro splicing. It receives the fully resolved ASG after all cross-references and include directives are settled.
+★ `on_asg_created` is the preferred hook for block-level structural transforms such as `golem.apidoc::` macro splicing. It receives the fully resolved ASG after all cross-references and include directives are settled.
 
 == Pipeline Stages
 

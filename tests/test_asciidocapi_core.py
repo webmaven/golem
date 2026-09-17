@@ -360,10 +360,11 @@ def add(a: int, b: int) -> int:
 
     assert isinstance(nodes, list)
     assert len(nodes) >= 1
-    assert any(isinstance(n, dict) and n.get("name") in ("section", "paragraph", "listing") for n in nodes)
+    assert any(n.name in ("section", "paragraph", "listing") for n in nodes)
 
 
 def test_get_asg_nodes_structure(tmp_path):
+    from golem.model import Node
     from golem.plugins.apidoc.core import AsciiDocApi
 
     pkg_dir = tmp_path / "asg_cls_pkg"
@@ -387,18 +388,22 @@ class Service:
     assert isinstance(all_nodes, list)
     assert len(all_nodes) >= 1
     for node in all_nodes:
-        assert isinstance(node, dict)
-        assert "name" in node
-        assert "type" in node
+        assert isinstance(node, Node)
+        assert hasattr(node, "name")
 
 
-def test_get_asg_nodes_missing_symbol_raises(tmp_path):
-    import pytest
+def test_get_asg_nodes_missing_symbol_warning(tmp_path):
+    from asciidoctrine.nodes import Admonition
+    from golem.model import Node
     from golem.plugins.apidoc.core import AsciiDocApi
 
     api = AsciiDocApi(search_paths=[str(tmp_path)])
-    with pytest.raises(Exception):
-        api.get_asg_nodes("nonexistent_pkg_xyz.missing_symbol")
+    nodes = api.get_asg_nodes("nonexistent_pkg_xyz.missing_symbol")
+    assert len(nodes) == 1
+    assert isinstance(nodes[0], Node)
+    assert isinstance(nodes[0], Admonition)
+    assert nodes[0].variant == "warning"
+    assert "Could not resolve target" in str(nodes[0].blocks[0].inlines[0].value)
 
 
 def test_get_asg_nodes_heading_level_offset(tmp_path):
@@ -421,7 +426,7 @@ def compute() -> None:
 
     assert isinstance(base_nodes, list)
     assert isinstance(offset_nodes, list)
-    base_section = next((n for n in base_nodes if n.get("name") == "section"), None)
-    offset_section = next((n for n in offset_nodes if n.get("name") == "section"), None)
+    base_section = next((n for n in base_nodes if n.name == "section"), None)
+    offset_section = next((n for n in offset_nodes if n.name == "section"), None)
     if base_section and offset_section:
-        assert offset_section.get("level", 0) == base_section.get("level", 0) + 1
+        assert getattr(offset_section, "level", 0) == getattr(base_section, "level", 0) + 1
