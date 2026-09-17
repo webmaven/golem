@@ -33,10 +33,9 @@ HTML structure that mirrors the hierarchical document outline.
 import re
 from pathlib import Path
 from typing import Any, Callable, Optional, Sequence, Union
-import asciidoctype  # type: ignore[import-untyped,import-not-found]
+import asciidoctype  # type: ignore[import-untyped]
 from asciidoctrine.nodes import Node
 from golem.highlighting import make_highlighter
-from golem.model.asg import BaseNode
 from golem.views import extract_listing_views
 from golem.views_protocol import (
     _extract_plain_text,
@@ -241,7 +240,7 @@ class GolemRenderer(asciidoctype.AsciiDoctypeRenderer):
 
 
 def render_body(
-    asg_root: Union[Node, dict[str, Any], BaseNode],
+    asg_root: Union[Node, dict[str, Any]],
     search_paths: Optional[Union[Sequence[Path | str], Path, str]] = None,
     highlighter: Optional[Callable[[str, str], Optional[str]]] = None,
 ) -> str:
@@ -496,7 +495,7 @@ def _collect_sections(node: Any, sections: list) -> None:
                 _collect_sections(child, sections)
 
 
-def generate_toc_html(asg_root: Union[Node, dict[str, Any], BaseNode]) -> str:
+def generate_toc_html(asg_root: Union[Node, dict[str, Any]]) -> str:
     """Traverse sections in ASG dictionaries or AST nodes and build a clean Table of Contents HTML navigation tree.
 
     Recursively discovers all sections within the document tree, ensures section anchor IDs
@@ -566,7 +565,7 @@ def generate_toc_html(asg_root: Union[Node, dict[str, Any], BaseNode]) -> str:
     return "".join(toc_parts)
 
 
-def collect_node_types(asg_root: Union[Node, dict[str, Any], BaseNode]) -> list[str]:
+def collect_node_types(asg_root: Union[Node, dict[str, Any]]) -> list[str]:
     """Extract all unique AST and ASG node names found in a document or node tree.
 
     Recursively walks all branches of an AST Node or ASG dictionary tree—including blocks,
