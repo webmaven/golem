@@ -69,32 +69,9 @@ from golem.templates import PageCompiler
 __all__ = ["BuildEngine", "GolemEngine"]
 
 
-def _invoke_asg_hook(impl: Any, asg: Node, doc_path: Path) -> Any:
-    """Invoke on_asg_created hook implementation with Pluggy argument filtering."""
-    hook_kwargs: dict[str, Any] = {"asg": asg}
-    has_doc_path = "doc_path" in getattr(impl, "argnames", ()) or "doc_path" in getattr(impl, "kwargnames", ())
-    if not has_doc_path:
-        fn = getattr(impl, "function", None)
-        code = getattr(fn, "__code__", None)
-        if code and (code.co_flags & inspect.CO_VARKEYWORDS):
-            has_doc_path = True
-        elif fn is not None and not code:
-            try:
-                sig = inspect.signature(fn)
-                has_doc_path = "doc_path" in sig.parameters or any(
-                    p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
-                )
-            except (ValueError, TypeError):
-                pass
-
-    if has_doc_path:
-        hook_kwargs["doc_path"] = doc_path
-    return impl.function(**hook_kwargs)
-
-
-def _invoke_template_context_hook(impl: Any, context: dict[str, Any], doc_path: Path) -> Any:
-    """Invoke on_template_context hook implementation with Pluggy argument filtering."""
-    hook_kwargs: dict[str, Any] = {"context": context}
+def _invoke_doc_hook(impl: Any, arg_name: str, arg_val: Any, doc_path: Path) -> Any:
+    """Invoke document hook implementation with Pluggy argument filtering."""
+    hook_kwargs: dict[str, Any] = {arg_name: arg_val}
     has_doc_path = "doc_path" in getattr(impl, "argnames", ()) or "doc_path" in getattr(impl, "kwargnames", ())
     if not has_doc_path:
         fn = getattr(impl, "function", None)
@@ -167,6 +144,9 @@ class BuildEngine:
         # Load Pluggy Plugin Manager
         plugins_dir = Path(getattr(config, "plugins_dir", "plugins"))
         self.pm = get_plugin_manager(config=config, plugins_dir=plugins_dir)
+        asg_spec = getattr(getattr(self.pm.hook, "on_asg_created", None), "spec", None)
+        if asg_spec and "doc_path" not in asg_spec.argnames:
+            asg_spec.argnames = (*asg_spec.argnames, "doc_path")
 
         self.staleness_tracker = StalenessTracker(
             config=self.config,
@@ -397,7 +377,7 @@ class BuildEngine:
                 _asg_modifiers: list[str] = []
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
                     try:
-                        result = _invoke_asg_hook(impl, asg, doc_path)
+                        result = _invoke_doc_hook(impl, "asg", asg, doc_path)
                     except Exception as e:
                         logging.warning(
                             "[Plugin] %s raised an exception in on_asg_created for %s: %s",
@@ -506,7 +486,7 @@ class BuildEngine:
                 # Trigger on_template_context hooks sequentially (chain modifications)
                 for impl in self.pm.hook.on_template_context.get_hookimpls():
                     try:
-                        result = _invoke_template_context_hook(impl, context_dict, doc_path)
+                        result = _invoke_doc_hook(impl, "context", context_dict, doc_path)
                     except Exception as e:
                         logging.warning(
                             "[Plugin] %s raised an exception in on_template_context for %s: %s",
@@ -686,7 +666,7 @@ class BuildEngine:
             if hasattr(self, "pm") and self.pm:
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
                     try:
-                        result = _invoke_asg_hook(impl, asg, doc_path)
+                        result = _invoke_doc_hook(impl, "asg", asg, doc_path)
                         if isinstance(result, Node):
                             asg = result
                     except Exception as e:
