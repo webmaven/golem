@@ -77,7 +77,8 @@ output_dir = "api"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-n auto --ignore=ARCHITECTURE.adoc --ignore=docs"
+addopts = "-n auto --ignore=ARCHITECTURE.adoc --ignore=docs -p no:asciidoctest"
+pythonpath = [".venv/lib/python3.14/site-packages", "src"]
 
 
 [tool.ruff]
@@ -99,5 +100,9 @@ omit = ["*/tests/*", "*/__pycache__/*"]
 show_missing = true
 skip_covered = false
 fail_under = 70
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
 
 
