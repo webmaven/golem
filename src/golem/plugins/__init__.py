@@ -49,6 +49,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from asciidoctrine.nodes import Node
 import click
 import pluggy
 
@@ -157,28 +158,28 @@ class GolemSpecs:
         return ast
 
     @hookspec
-    def on_asg_created(self, asg: dict[str, Any], doc_path: Path | None = None) -> dict[str, Any]:
-        """Intercept and transform the Abstract Semantic Graph (ASG) dictionary after resolution.
+    def on_asg_created(self, asg: Node, doc_path: Path | None = None) -> Node:
+        """Intercept and transform the Abstract Semantic Graph (ASG) Node after resolution.
 
-        Executed after the semantic resolver converts the AST into a structured ASG dictionary.
+        Executed after the semantic resolver converts the AST into a structured Document node.
         Plugins can enrich document metadata, modify section and block hierarchies, inject
         synthetic blocks, or alter resolved attributes before HTML rendering.
 
         [parameters]
-        `asg` (dict[str, Any]):: Semantic graph representation of the document containing resolved blocks, metadata, and attributes.
+        `asg` (Node):: Semantic graph Node representing the document containing resolved blocks, metadata, and attributes.
         `doc_path` (Path | None, optional):: Optional Path to the document being compiled.
 
         [returns]
-        `dict[str, Any]`:: Enriched or modified ASG dictionary passed to the body renderer.
+        `Node`:: Enriched or modified ASG Node passed to the body renderer.
 
         [source,python]
         ----
-        from typing import Any
+        from asciidoctrine.nodes import Node
         from golem.plugins import hookimpl
 
         @hookimpl
-        def on_asg_created(asg: dict[str, Any]) -> dict[str, Any]:
-            asg["injected_metadata"] = {"status": "reviewed"}
+        def on_asg_created(asg: Node) -> Node:
+            # Modify ASG node in-place or return transformed Node
             return asg
         ----
         """

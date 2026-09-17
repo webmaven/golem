@@ -69,7 +69,7 @@ from golem.templates import PageCompiler
 __all__ = ["BuildEngine", "GolemEngine"]
 
 
-def _invoke_asg_hook(impl: Any, asg: dict[str, Any] | Node, doc_path: Path) -> Any:
+def _invoke_asg_hook(impl: Any, asg: Node, doc_path: Path) -> Any:
     """Invoke on_asg_created hook implementation with Pluggy argument filtering."""
     hook_kwargs: dict[str, Any] = {"asg": asg}
     has_doc_path = "doc_path" in getattr(impl, "argnames", ()) or "doc_path" in getattr(impl, "kwargnames", ())
@@ -386,7 +386,7 @@ class BuildEngine:
 
                 # 2. Resolve AST to ASG
                 resolver = ASGResolver(ast)
-                asg: dict[str, Any] | Node = resolver.resolve(ast)
+                asg: Node = resolver.resolve_to_ast(ast)
 
                 if hasattr(resolver, "warnings") and resolver.warnings:
                     for warn in resolver.warnings:
@@ -406,7 +406,7 @@ class BuildEngine:
                             e,
                         )
                         continue
-                    if isinstance(result, (dict, Node)) and result is not asg:
+                    if isinstance(result, Node) and result is not asg:
                         _asg_modifiers.append(impl.plugin_name or str(impl.function))
                         asg = result
                 if len(_asg_modifiers) > 1:
@@ -423,23 +423,34 @@ class BuildEngine:
                 # 3. Render body using Golem's ASG visitor
                 body_content = render_body(asg, search_paths=search_paths)
 
-                # Extract title for layout framing
+                # Extract title for layout framing from typed Document node
                 title_str = ""
-                if isinstance(asg, dict):
-                    title_str = asg.get("title", "")
-                    if not title_str and asg.get("header"):
-                        header = asg["header"]
-                        if isinstance(header, dict) and header.get("title"):
-                            title_nodes = header["title"]
-                            if isinstance(title_nodes, list) and len(title_nodes) > 0:
-                                title_str = title_nodes[0].get("value", "")
-                    if not title_str and asg.get("blocks"):
-                        first_block = asg["blocks"][0]
-                        if first_block.get("name") == "title":
-                            title_str = first_block.get("value", "")
-                else:
-                    title_str = getattr(asg, "title", "")
+                header = getattr(asg, "header", None)
+                if header and getattr(header, "title", None):
+                    t = header.title
+                    if hasattr(t, "inlines") and t.inlines:
+                        title_str = "".join(getattr(n, "value", "") if hasattr(n, "value") else str(n) for n in t.inlines)
+                    elif isinstance(t, list) and t:
+                        title_str = getattr(t[0], "value", "") if hasattr(t[0], "value") else str(t[0])
+                    elif isinstance(t, str):
+                        title_str = t
+                if not title_str and hasattr(asg, "blocks"):
+                    # Fall back to first section title
+                    for block in getattr(asg, "blocks", None) or []:
+                        if getattr(block, "name", None) in ("section", "title") and getattr(block, "title", None):
+                            t = block.title
+                            if hasattr(t, "inlines"):
+                                title_str = "".join(
+                                    getattr(n, "value", "") if hasattr(n, "value") else str(n) for n in t.inlines
+                                )
+                            elif isinstance(t, list) and t:
+                                title_str = getattr(t[0], "value", "") if hasattr(t[0], "value") else str(t[0])
+                            elif isinstance(t, str):
+                                title_str = t
+                            break
 
+                if not title_str:
+                    title_str = getattr(asg, "title", "") if not isinstance(getattr(asg, "title", None), (dict, list)) else ""
                 if not title_str:
                     title_str = "Golem Doc"
 
@@ -458,29 +469,23 @@ class BuildEngine:
                 content_class = doc_meta.get("content_class", "")
 
                 asg_attrs: dict[str, Any] = {}
-                if isinstance(asg, dict):
-                    asg_attrs = asg.get("attributes") or {}
-                    if not isinstance(asg_attrs, dict) and isinstance(asg.get("header"), dict):
-                        asg_attrs = asg["header"].get("attributes") or {}
-                elif hasattr(asg, "attributes"):
-                    asg_attrs = getattr(asg, "attributes") or {}
+                attributes = getattr(asg, "attributes", None)
+                if attributes and isinstance(attributes, dict):
+                    asg_attrs = attributes
+                else:
+                    header = getattr(asg, "header", None)
+                    header_attrs = getattr(header, "attributes", None) if header else None
+                    if header_attrs and isinstance(header_attrs, dict):
+                        asg_attrs = header_attrs
 
-                if isinstance(asg_attrs, dict):
-                    if not body_class:
-                        body_class = (
-                            asg_attrs.get("body_class") or asg_attrs.get("body-class") or asg_attrs.get("bodyclass") or ""
-                        )
-                    if not page_class:
-                        page_class = (
-                            asg_attrs.get("page_class") or asg_attrs.get("page-class") or asg_attrs.get("pageclass") or ""
-                        )
-                    if not content_class:
-                        content_class = (
-                            asg_attrs.get("content_class")
-                            or asg_attrs.get("content-class")
-                            or asg_attrs.get("contentclass")
-                            or ""
-                        )
+                if not body_class:
+                    body_class = asg_attrs.get("body_class") or asg_attrs.get("body-class") or asg_attrs.get("bodyclass") or ""
+                if not page_class:
+                    page_class = asg_attrs.get("page_class") or asg_attrs.get("page-class") or asg_attrs.get("pageclass") or ""
+                if not content_class:
+                    content_class = (
+                        asg_attrs.get("content_class") or asg_attrs.get("content-class") or asg_attrs.get("contentclass") or ""
+                    )
 
                 resolved_body_class = (body_class or page_class or "").strip()
                 resolved_content_class = (content_class or "").strip()
@@ -667,7 +672,7 @@ class BuildEngine:
             # 2. Resolve AST to ASG
             try:
                 resolver = ASGResolver(ast)
-                asg: dict[str, Any] | Node = resolver.resolve(ast)
+                asg: Node = resolver.resolve_to_ast(ast)
                 if hasattr(resolver, "warnings") and resolver.warnings:
                     for warn in resolver.warnings:
                         warn_diag = Diagnostic.from_resolver_warning(warn, file=str(doc_path), content=content)
@@ -682,7 +687,7 @@ class BuildEngine:
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
                     try:
                         result = _invoke_asg_hook(impl, asg, doc_path)
-                        if isinstance(result, (dict, Node)):
+                        if isinstance(result, Node):
                             asg = result
                     except Exception as e:
                         logging.warning(
