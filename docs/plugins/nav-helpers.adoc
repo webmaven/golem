@@ -101,9 +101,9 @@ The following pattern matches Golem's default `skeleton.pt` breadcrumb implement
 <tal:block tal:define="crumbs breadcrumbs | nothing">
     <nav tal:condition="python: crumbs and len(crumbs) > 1" aria-label="Breadcrumb" class="breadcrumbs">
         <ol>
-            <li tal:repeat="crumb crumbs" tal:attributes="aria-current python:'page' if crumb.is_current else None">
-                <a tal:condition="not:crumb.is_current" href="${crumb.url}">${crumb.title}</a>
-                <span tal:condition="crumb.is_current">${crumb.title}</span>
+            <li tal:repeat="crumb crumbs" tal:attributes="aria-current python:'page' if (crumb.get('is_current') if isinstance(crumb, dict) else getattr(crumb, 'is_current', False)) else None">
+                <a tal:condition="python: not (crumb.get('is_current') if isinstance(crumb, dict) else getattr(crumb, 'is_current', False))" href="${crumb.url}">${crumb.title}</a>
+                <span tal:condition="python: (crumb.get('is_current') if isinstance(crumb, dict) else getattr(crumb, 'is_current', False))">${crumb.title}</span>
             </li>
         </ol>
     </nav>

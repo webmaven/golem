@@ -7,7 +7,7 @@
   slots for Golem documentation portals. Custom themes can inherit or override
   individual slots using METAL macro expansion:
 
-    <html metal:use-macro="default_layout['layout']">
+    <html metal:use-macro="default_layout">
       <head metal:fill-slot="head">...</head>
       <header metal:fill-slot="header">...</header>
       <aside metal:fill-slot="navigation">...</aside>
