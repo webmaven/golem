@@ -126,6 +126,42 @@
             </tal:block>
             <h1 tal:condition="title">${title}</h1>
             <div tal:content="structure body_html" />
+            <div tal:condition="site_index | nothing" class="site-index">
+                <div tal:repeat="letter site_index" class="index-section">
+                    <h2 tal:content="letter">A</h2>
+                    <ul class="index-term-list">
+                        <li tal:repeat="term python: sorted(site_index[letter].keys())">
+                            <span class="index-primary" tal:content="term">Term</span>
+                            <span class="index-locations" tal:condition="site_index[letter][term]['locations']">
+                                : <span tal:repeat="loc site_index[letter][term]['locations']">
+                                    <a href="${loc}" tal:attributes="href loc" tal:content="loc">Page</a>
+                                </span>
+                            </span>
+                            <ul tal:condition="site_index[letter][term]['secondary']" class="index-secondary-list">
+                                <li tal:repeat="sec_term python: sorted(site_index[letter][term]['secondary'].keys())">
+                                    <span class="index-secondary" tal:content="sec_term">Subterm</span>
+                                    <span class="index-locations" tal:condition="site_index[letter][term]['secondary'][sec_term]['locations']">
+                                        : <span tal:repeat="loc site_index[letter][term]['secondary'][sec_term]['locations']">
+                                            <a href="${loc}" tal:attributes="href loc" tal:content="loc">Page</a>
+                                        </span>
+                                    </span>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div tal:condition="site_glossary | nothing" class="site-glossary">
+                <div tal:repeat="letter site_glossary" class="glossary-section">
+                    <h2 tal:content="letter">A</h2>
+                    <dl class="glossary-list">
+                        <tal:block tal:repeat="entry site_glossary[letter]">
+                            <dt tal:content="entry['term']">API</dt>
+                            <dd tal:content="entry['definition']">Application Programming Interface</dd>
+                        </tal:block>
+                    </dl>
+                </div>
+            </div>
             <nav tal:condition="prev_page or next_page" class="golem-pagination" aria-label="Chapter Navigation">
                 <a tal:condition="prev_page" href="${prev_page.url}" tal:attributes="href prev_page.url" class="golem-pagination-card golem-pagination-prev" rel="prev">
                     <span class="golem-pagination-subtitle">← Previous</span>

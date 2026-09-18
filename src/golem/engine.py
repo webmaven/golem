@@ -297,6 +297,15 @@ class BuildEngine:
             else set(all_docs)
         )
 
+        def _get_build_priority(doc_p: Path) -> tuple[int, str]:
+            meta = self.get_file_metadata(doc_p)
+            role = (meta.get("page_role") or "").strip().lower()
+            # Compile aggregator pages (index, glossary) after content pages
+            is_aggregator = 1 if role in ("index", "glossary") else 0
+            return (is_aggregator, str(doc_p))
+
+        sorted_to_build = sorted(to_build, key=_get_build_priority)
+
         output_dir = Path(self.config.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -304,7 +313,7 @@ class BuildEngine:
 
         search_paths = self.staleness_tracker._get_template_search_paths()
 
-        for doc_path in to_build:
+        for doc_path in sorted_to_build:
             if is_partial(doc_path, self.content_dir):
                 continue
             try:
@@ -470,6 +479,8 @@ class BuildEngine:
                 resolved_body_class = (body_class or page_class or "").strip()
                 resolved_content_class = (content_class or "").strip()
 
+                page_role = asg_attrs.get("page-role") or asg_attrs.get("page_role") or asg_attrs.get("role")
+
                 context_dict: dict[str, Any] = {
                     "title": title_str,
                     "body_html": body_content,
@@ -481,7 +492,10 @@ class BuildEngine:
                     "next_page": next_page,
                     "body_class": resolved_body_class,
                     "content_class": resolved_content_class,
+                    "doc_attributes": asg_attrs,
                 }
+                if page_role:
+                    context_dict["page_role"] = page_role
 
                 # Trigger on_template_context hooks sequentially (chain modifications)
                 for impl in self.pm.hook.on_template_context.get_hookimpls():

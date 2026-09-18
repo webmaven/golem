@@ -915,7 +915,7 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
             if ep_module:
                 seen_names.add(ep_module)
 
-        # 3. Local plugins in plugins_dir
+        # 2. Local plugins in plugins_dir
         plugins_dir_path = Path(config.plugins_dir) if getattr(config, "plugins_dir", None) else Path("plugins")
         if plugins_dir_path.exists() and plugins_dir_path.is_dir():
             for py_file in sorted(plugins_dir_path.glob("*.py")):
@@ -941,7 +941,7 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
                 )
                 seen_names.add(stem)
 
-        # 4. Any other custom configured plugins
+        # 3. Any other custom configured plugins
         for cfg_plugin in configured_plugins:
             if cfg_plugin not in seen_names:
                 plugins_list.append(
