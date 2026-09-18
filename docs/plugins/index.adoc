@@ -1,0 +1,97 @@
+= Plugins Overview
+:nav_order: 35
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+Golem provides a modular, pluggable extension ecosystem built on link:../developer-guide/plugin-system.html[Pluggy]. In addition to creating custom plugins, Golem includes several production-ready bundled plugins for navigation enrichment, repository integrations, document indexes, API reference generation, and test verification.
+
+== Bundled Plugins Summary
+
+[cols="1,2,1"]
+|===
+| Plugin Name | Purpose | Documentation
+
+| `source_links`
+| Automatically generates canonical "Edit this page", view source, and repository links for GitHub, GitLab, and custom git hosts.
+| link:source-links.html[Source Links Guide]
+
+| `nav_helpers`
+| Injects hierarchical breadcrumb trails and flattened depth-first navigation trees into template contexts.
+| link:nav-helpers.html[Navigation Helpers Guide]
+
+| `index`
+| Compiles an alphabetized, hierarchical back-of-the-book document index from inline `indexterm` macros.
+| link:index-glossary.html[Index & Glossary Guide]
+
+| `glossary`
+| Compiles an alphabetized terms and definitions glossary from `[glossary]` description lists across your documentation.
+| link:index-glossary.html[Index & Glossary Guide]
+
+| `apidoc`
+| Extracts Python docstrings using Griffe, generating full API reference trees and providing the `golem.apidoc::` ASG macro.
+| link:../reference/apidoc.html[API Reference Manual]
+
+| `doctest`
+| Extracts and executes inline Python code examples in documentation via `pytest` and `asciidoctest`.
+| link:../reference/doctest.html[Doctest Reference Manual]
+|===
+
+== Enabling Plugins
+
+Plugins are explicitly enabled in your site configuration file (`golem.toml` or `pyproject.toml`). Listing a plugin in the `plugins` array activates it during site compilation. The order of declaration determines execution order for lifecycle transform hooks.
+
+=== In `golem.toml`
+
+.golem.toml
+[source,toml]
+----
+[plugins]
+plugins = [
+    "source_links",
+    "nav_helpers",
+    "index",
+    "glossary",
+]
+----
+
+=== In `pyproject.toml`
+
+.pyproject.toml
+[source,toml]
+----
+[tool.golem.plugins]
+plugins = [
+    "source_links",
+    "nav_helpers",
+    "index",
+    "glossary",
+]
+----
+
+== Configuring Plugins
+
+Plugin-specific options are configured in distinct tables matching the plugin name: `[plugins.<name>]` in `golem.toml` or `[tool.golem.plugins.<name>]` in `pyproject.toml`.
+
+.golem.toml
+[source,toml]
+----
+[plugins]
+plugins = ["source_links", "nav_helpers"]
+
+[plugins.source_links]
+repo_url = "https://github.com/myorg/myproject"
+branch = "main"
+docs_dir = "docs"
+
+[plugins.nav_helpers]
+home_title = "Home"
+home_url = "/"
+----
+
+Golem automatically matches the plugin's `name` attribute against the configuration table and injects the options into the plugin instance during initialization.
+
+== Developing Custom Plugins
+
+To learn how to author your own plugins using `pluggy` hooks and the `GolemPlugin` base class, consult the link:../developer-guide/plugin-system.html[Plugin System Architecture & Authoring Guide].

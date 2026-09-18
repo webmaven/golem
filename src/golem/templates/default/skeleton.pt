@@ -1,5 +1,79 @@
+<!--
+  =============================================================================
+  Golem Default Layout Template (skeleton.pt)
+  =============================================================================
+
+  This template defines the foundational HTML5 layout macro and METAL extension
+  slots for Golem documentation portals. Custom themes can inherit or override
+  individual slots using METAL macro expansion:
+
+    <html metal:use-macro="default_layout['layout']">
+      <head metal:fill-slot="head">...</head>
+      <header metal:fill-slot="header">...</header>
+      <aside metal:fill-slot="navigation">...</aside>
+      <main metal:fill-slot="content">...</main>
+      <aside metal:fill-slot="table-of-contents">...</aside>
+      <footer metal:fill-slot="footer">...</footer>
+    </html>
+
+  METAL Slots Defined:
+  ~~~~~~~~~~~~~~~~~~~~
+  * metal:define-macro="layout"
+      Top-level HTML document macro defining the page structure.
+  * metal:define-slot="head"
+      Document <head> metadata, custom CSS, Google Fonts, and syntax styling.
+  * metal:define-slot="header"
+      Site header bar displaying site title, branding, and author metadata.
+  * metal:define-slot="navigation"
+      Sidebar navigation panel supporting pre-rendered nav_html or tree iteration.
+  * metal:define-slot="content"
+      Main reading pane: breadcrumbs, page title, rendered body HTML, and pagination.
+  * metal:define-slot="table-of-contents"
+      Right-hand sidebar displaying on-page Table of Contents (toc_html).
+  * metal:define-slot="footer"
+      Page footer containing "Edit this page" source links and generator version.
+
+  Template Context Variables:
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Core Engine Variables:
+  * title (str): Active page heading extracted from document header.
+  * site_title (str): Global site title from golem.toml / pyproject.toml.
+  * site_author (str): Global author or organization name.
+  * site_url (str | None): Canonical site root URL.
+  * generator_version (str): Running Golem version string.
+  * root_path (str): Relative path prefix back to site root.
+  * current_path (str): Relative path of the source document.
+  * body_html (str): Pre-rendered semantic HTML body content.
+  * nav_tree (list[dict]): Hierarchical navigation tree items ({title, url, path, children}).
+  * nav_html (str): Pre-rendered navigation HTML markup.
+  * toc_html (str): Rendered unordered list of on-page headings.
+  * prev_page (dict | None): Previous document link ({title, url}).
+  * next_page (dict | None): Next document link ({title, url}).
+  * custom_css (list[str]): External stylesheet URLs to inject.
+  * custom_js (list[str]): External JavaScript URLs to inject.
+  * pygments_css (str | None): Code syntax highlighting CSS rules.
+  * body_class (str | None): CSS classes applied to <body>.
+  * content_class (str | None): Additional CSS classes applied to <main>.
+
+  Plugin-Injected Variables:
+  * breadcrumbs (list[dict]): Hierarchical ancestor trail from root to current page.
+      Item keys: title (str), url (str), is_current (bool).
+      (Injected by 'nav_helpers' plugin)
+  * source_edit_url (str | None): Canonical web URL to edit source file in git host.
+      (Injected by 'source_links' plugin)
+  * source_view_url (str | None): Canonical web URL to view raw source file.
+      (Injected by 'source_links' plugin)
+  * source_repo_url (str | None): Canonical web URL to the source repository.
+      (Injected by 'source_links' plugin)
+  * site_index (dict[str, dict]): Alphabetized index entries grouped by letter.
+      (Injected by 'index' plugin on pages with :page-role: index)
+  * site_glossary (dict[str, list[dict]]): Alphabetized glossary entries grouped by letter.
+      (Injected by 'glossary' plugin on pages with :page-role: glossary)
+  =============================================================================
+-->
 <!DOCTYPE html>
 <html lang="en" metal:define-macro="layout">
+<!-- METAL Slot: head - Document <head> metadata, custom CSS, and syntax styling -->
 <head metal:define-slot="head">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,11 +92,13 @@
 </head>
 <body tal:attributes="class body_class or None">
     <a href="#golem-content" class="golem-skip-link">Skip to main content</a>
+    <!-- METAL Slot: header - Branding, site title, logo, and top-level header content -->
     <header id="golem-header" class="golem-header" metal:define-slot="header">
         <h1><a href="./" tal:attributes="href site_url or root_path">${site_title}</a></h1>
         <span tal:condition="site_author" class="golem-author">${site_author}</span>
     </header>
     <div id="golem-wrapper">
+        <!-- METAL Slot: navigation - Sidebar navigation layout, tree vs. custom HTML -->
         <aside id="golem-sidebar-left" class="golem-sidebar-left" aria-label="Site Navigation" metal:define-slot="navigation">
             <details class="golem-nav-details" open="open">
                 <summary class="golem-nav-summary"><h3>Navigation</h3></summary>
@@ -36,6 +112,7 @@
                 </div>
             </details>
         </aside>
+        <!-- METAL Slot: content - Main article body, breadcrumbs, title, and sequential pagination -->
         <main id="golem-content" class="golem-content" metal:define-slot="content" tal:attributes="class ('golem-content ' + content_class).strip() if content_class else 'golem-content'">
             <tal:block tal:define="crumbs breadcrumbs | nothing">
                 <nav tal:condition="python: crumbs and len(crumbs) > 1" aria-label="Breadcrumb" class="golem-breadcrumbs">
@@ -61,11 +138,13 @@
                 </a>
             </nav>
         </main>
+        <!-- METAL Slot: table-of-contents - On-page TOC sidebar -->
         <aside id="golem-sidebar-right" class="golem-sidebar-right golem-toc" metal:define-slot="table-of-contents">
             <h4>On This Page</h4>
             <div tal:content="structure toc_html" />
         </aside>
     </div>
+    <!-- METAL Slot: footer - Footer links, copyright notice, and edit page link -->
     <footer id="golem-footer" class="golem-footer" metal:define-slot="footer">
         <div tal:condition="source_edit_url | nothing" class="golem-source-links">
             <a href="${source_edit_url}" tal:attributes="href source_edit_url" class="golem-edit-link" target="_blank" rel="noopener noreferrer">

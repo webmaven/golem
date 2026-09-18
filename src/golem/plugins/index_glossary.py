@@ -376,7 +376,7 @@ class IndexPlugin(GolemPlugin):
         [returns]
         `IndexPlugin`:: Configured index plugin instance.
         """
-        return cls()
+        return super().from_config(config)
 
     @hookimpl
     def on_asg_created(self, asg: Node, doc_path: Path | None = None) -> Node:
@@ -480,7 +480,7 @@ class GlossaryPlugin(GolemPlugin):
         [returns]
         `GlossaryPlugin`:: Configured glossary plugin instance.
         """
-        return cls()
+        return super().from_config(config)
 
     @hookimpl
     def on_asg_created(self, asg: Node, doc_path: Path | None = None) -> Node:

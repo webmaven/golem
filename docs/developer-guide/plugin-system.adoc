@@ -41,6 +41,12 @@ class MyPlugin:
         return asg
 
     @hookimpl
+    def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+        """Called per document prior to Chameleon template rendering. Enriches context."""
+        context["custom_greeting"] = "Hello from MyPlugin!"
+        return context
+
+    @hookimpl
     def on_post_render(self, html_content: str) -> str:
         """Called after Chameleon layout rendering before writing the HTML page to disk."""
         return html_content
@@ -66,11 +72,84 @@ class MyPlugin:
         return []
 ----
 
+=== Template Context Enrichment (`on_template_context`)
+
+The `on_template_context` hook enables plugins to inject dynamic variables into the Chameleon template rendering scope immediately prior to HTML generation:
+
+[source,python]
+----
+@hookimpl
+def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+    context.update({
+        "last_updated": datetime.now().isoformat(),
+        "custom_badge": "Beta",
+    })
+    return context
+----
+
+==== Best Practices for Context Enrichment
+
+* *Additive Enrichment*: Use `context.update(...)` or set unique, prefixed keys to avoid accidental collisions with core engine variables (`title`, `body_html`, `nav_tree`, `toc_html`, `site_title`, `current_path`).
+* *Execution Order*: Hooks execute sequentially in the exact order plugins are declared in `plugins` within `golem.toml`. The context returned by each plugin is passed to subsequent plugins.
+* *Document-Specific Context*: Inspect `doc_path` or document attributes (`context.get("doc_attributes")`) to conditionally inject data (e.g. only adding index structures when `:page-role: index` is present).
+
 [NOTE]
 ====
 *Block macro splicing uses `on_asg_created`.* The `golem.plugins.apidoc` plugin expands `golem.apidoc::` block macros in the `on_asg_created` hook via an AST `NodeTransformer` — it operates directly on typed ASG nodes and preserves document structure.
 ====
 
+== Stateful Plugin Authoring with `GolemPlugin`
+
+Plugins requiring configuration or persistent state across the build pipeline should inherit from `golem.plugins.GolemPlugin`.
+
+=== Defining a Configurable Plugin
+
+When you inherit from `GolemPlugin`, Golem provides automatic configuration discovery and factory instantiation:
+
+.my_plugin.py
+[source,python]
+----
+from pathlib import Path
+from typing import Any
+from golem.plugins import GolemPlugin, hookimpl
+
+class AnalyticsPlugin(GolemPlugin):
+    """Inject analytics scripts into page template context."""
+
+    name = "analytics"
+
+    def __init__(self, tracking_id: str = "", provider: str = "custom", **extra: Any) -> None:
+        super().__init__(tracking_id=tracking_id, provider=provider, **extra)
+        self.tracking_id = tracking_id
+        self.provider = provider
+
+    @hookimpl
+    def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+        if self.tracking_id:
+            context["analytics_tracking_id"] = self.tracking_id
+            context["analytics_provider"] = self.provider
+        return context
+----
+
+=== Configuration Injection
+
+Golem automatically routes plugin-specific configuration sections from `golem.toml` (or `pyproject.toml`) directly into your plugin instance:
+
+.golem.toml
+[source,toml]
+----
+[plugins]
+plugins = ["analytics"]
+
+[plugins.analytics]
+tracking_id = "UA-XXXXX-Y"
+provider = "google"
+----
+
+When Golem discovers and activates `AnalyticsPlugin`:
+1. It matches `name = "analytics"` against the `[plugins.analytics]` configuration table.
+2. The default `GolemPlugin.from_config(config)` class method extracts the options table and unpacks it as keyword arguments into `__init__(**cfg)`.
+3. The unpacked options are accessible on `self.config` as well as any instance attributes assigned in your `__init__`.
 
 == Registering Plugins via Entry Points
 
@@ -81,4 +160,18 @@ In your plugin package's `pyproject.toml`:
 ----
 [project.entry-points."golem.plugins"]
 my_plugin = "my_package.plugin:MyPlugin"
+analytics = "my_package.analytics:AnalyticsPlugin"
 ----
+
+When installed, users can enable and configure the plugin by referencing its registered entry-point name in `golem.toml`:
+
+.golem.toml
+[source,toml]
+----
+[plugins]
+plugins = ["analytics"]
+
+[plugins.analytics]
+tracking_id = "UA-12345678-1"
+----
+

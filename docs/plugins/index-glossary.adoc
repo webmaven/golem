@@ -1,0 +1,207 @@
+= Index & Glossary Plugins
+:nav_order: 30
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+The `index` and `glossary` plugins provide automated compilation of site-wide, alphabetized back-of-the-book indexes and terminological glossaries from standard AsciiDoc syntax.
+
+== Overview
+
+* *`index` Plugin*: Scans all documentation pages during the ASG build stage, collecting inline `indexterm:[...]`, `((term))`, and `(((primary, secondary, tertiary)))` macros. It compiles an alphabetized, three-tier hierarchical index mapping terms to source document paths.
+* *`glossary` Plugin*: Scans description lists marked with the `[glossary]` attribute across all pages, extracting defined terms and explanations into a unified alphabetized glossary.
+* *Role-Based Context Injection*: To maintain lean template scopes, the compiled data structures (`site_index` and `site_glossary`) are injected into the Chameleon template context only on pages declaring `:page-role: index` or `:page-role: glossary`.
+
+== Enabling the Plugins
+
+Add `"index"` and/or `"glossary"` to the `plugins` list in `golem.toml`:
+
+.golem.toml
+[source,toml]
+----
+[plugins]
+plugins = [
+    "index",
+    "glossary",
+]
+----
+
+Or in `pyproject.toml`:
+
+.pyproject.toml
+[source,toml]
+----
+[tool.golem.plugins]
+plugins = [
+    "index",
+    "glossary",
+]
+----
+
+== Authoring Syntax
+
+=== Document Index Terms
+
+Golem recognizes standard AsciiDoc index syntax anywhere within document prose:
+
+* *Primary Index Terms*:
++
+[source,asciidoc]
+----
+The compiler uses an indexterm:[Abstract Semantic Graph] to resolve nodes.
+
+You can also use double parentheses ((ASG)) for inline primary terms.
+----
+
+* *Hierarchical Multi-Level Terms (Primary, Secondary, Tertiary)*:
++
+Triple parentheses or `indexterm2:[...]` declare multi-level index relationships:
++
+[source,asciidoc]
+----
+We configure caching policies (((caching, disk cache, TTL))) in the server layer.
+----
++
+This registers the term under `C` -> `caching` -> `disk cache` -> `TTL`.
+
+=== Glossary Definition Lists
+
+To register glossary terms, create standard AsciiDoc description lists annotated with the `[glossary]` attribute:
+
+.docs/concepts/architecture.adoc
+[source,asciidoc]
+----
+[glossary]
+Abstract Syntax Tree (AST)::
+  The initial parse tree produced by Lark before semantic resolution.
+
+Abstract Semantic Graph (ASG)::
+  The resolved graph of typed document nodes produced by AsciiDoctrine.
+
+TAL::
+  Template Attribute Language; declarative XML attributes used by Chameleon.
+----
+
+Terms defined in `[glossary]` lists across all documentation files are aggregated into the global glossary dictionary.
+
+== Dedicated Index & Glossary Pages
+
+To render the compiled index or glossary on a page, create an AsciiDoc file with the corresponding `:page-role:` attribute in its header:
+
+=== Index Page (`docs/index-terms.adoc`)
+
+.docs/index-terms.adoc
+[source,asciidoc]
+----
+= Document Index
+:page-role: index
+
+Index terms compiled across this publication.
+----
+
+When `:page-role: index` is present, Golem's `index` plugin populates `site_index` in the template context.
+
+=== Glossary Page (`docs/glossary.adoc`)
+
+.docs/glossary.adoc
+[source,asciidoc]
+----
+= Project Glossary
+:page-role: glossary
+
+Comprehensive dictionary of project terminology and definitions.
+----
+
+When `:page-role: glossary` is present, Golem's `glossary` plugin populates `site_glossary` in the template context.
+
+== Template Context Structures
+
+=== `site_index` Data Structure
+
+`site_index` is an alphabetized dictionary mapping capital letter headers to primary terms:
+
+[source,python]
+----
+{
+    "A": {
+        "Abstract Semantic Graph": {
+            "locations": ["docs/pipeline.adoc", "docs/plugins.adoc"],
+            "secondary": {
+                "resolution": {
+                    "locations": ["docs/pipeline.adoc"],
+                    "secondary": {},
+                }
+            }
+        }
+    }
+}
+----
+
+=== `site_glossary` Data Structure
+
+`site_glossary` is an alphabetized dictionary mapping capital letter headers to lists of term entries:
+
+[source,python]
+----
+{
+    "A": [
+        {
+            "term": "Abstract Semantic Graph (ASG)",
+            "definition": "The resolved graph of typed document nodes...",
+            "doc_path": "docs/concepts/architecture.adoc",
+        }
+    ]
+}
+----
+
+== Chameleon TAL Rendering Examples
+
+=== Rendering the Index Page
+
+In your custom theme or page template:
+
+[source,html]
+----
+<div tal:condition="site_index | nothing" class="site-index">
+    <div tal:repeat="letter site_index" class="index-section">
+        <h2 class="index-letter">${letter}</h2>
+        <ul class="index-primary-list">
+            <li tal:repeat="term python: sorted(site_index[letter].keys())">
+                <span class="index-term">${term}</span>
+                <span class="index-locations" tal:condition="site_index[letter][term]['locations']">
+                    (Page: 
+                    <span tal:repeat="loc site_index[letter][term]['locations']">
+                        <a href="${loc.replace('.adoc', '.html')}">${loc}</a>
+                    </span>)
+                </span>
+                <!-- Secondary subterms -->
+                <ul tal:condition="site_index[letter][term]['secondary']" class="index-secondary-list">
+                    <li tal:repeat="sec_term python: sorted(site_index[letter][term]['secondary'].keys())">
+                        <span class="index-subterm">${sec_term}</span>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+</div>
+----
+
+=== Rendering the Glossary Page
+
+[source,html]
+----
+<div tal:condition="site_glossary | nothing" class="site-glossary">
+    <div tal:repeat="letter site_glossary" class="glossary-section">
+        <h2 class="glossary-letter">${letter}</h2>
+        <dl class="glossary-list">
+            <tal:block tal:repeat="entry site_glossary[letter]">
+                <dt id="glossary-${entry['term'].lower().replace(' ', '-')}">
+                    ${entry['term']}
+                </dt>
+                <dd>${entry['definition']}</dd>
+            </tal:block>
+        </dl>
+    </div>
+</div>
+----

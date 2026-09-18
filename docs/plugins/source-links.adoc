@@ -1,0 +1,160 @@
+= Source Links Plugin
+:nav_order: 10
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+The `source_links` plugin generates canonical source links for every documentation page, allowing readers to view the source file or submit edits directly on GitHub, GitLab, or custom git services.
+
+== Overview & Features
+
+* *Automatic Git Detection*: Auto-detects the remote repository URL (`origin`) and active default branch from local `.git` metadata if not explicitly specified.
+* *Multi-Provider Support*: Pre-configured URL schemas for GitHub and GitLab, with fully customizable formatting templates for Gitea, Bitbucket, or self-hosted servers.
+* *Seamless Template Integration*: Automatically enriches the Chameleon template context with ready-to-render URLs utilized by Golem's default `skeleton.pt` footer.
+
+== Enabling the Plugin
+
+Add `"source_links"` to your `plugins` array in `golem.toml`:
+
+.golem.toml
+[source,toml]
+----
+[plugins]
+plugins = [
+    "source_links",
+]
+----
+
+Or in `pyproject.toml`:
+
+.pyproject.toml
+[source,toml]
+----
+[tool.golem.plugins]
+plugins = [
+    "source_links",
+]
+----
+
+== Configuration Reference
+
+Configure the plugin in the `[plugins.source_links]` table in `golem.toml`:
+
+.golem.toml
+[source,toml]
+----
+[plugins.source_links]
+repo_url = "https://github.com/webmaven/golem"
+branch = "main"
+docs_dir = "docs"
+provider = "github"
+----
+
+.Configuration Options
+[cols="1,1,1,3"]
+|===
+| Option | Type | Default | Description
+
+| `repo_url`
+| `str`
+| _Auto-detected_
+| Web URL of the git repository (e.g. `https://github.com/owner/repo`). If omitted, Golem inspects local git remotes (`origin`). Normalizes SSH and SCP shorthand (`git@github.com:...`).
+
+| `branch`
+| `str`
+| _Auto-detected_
+| Default git branch to target for viewing and editing. If omitted, Golem inspects the current HEAD or default branch, falling back to `"main"`.
+
+| `docs_dir`
+| `str`
+| `content_dir`
+| Subdirectory within the repository where documentation files reside (e.g. `"docs"`). Ensures correct relative repository paths.
+
+| `provider`
+| `str`
+| _Auto-detected_
+| Git host provider: `"github"`, `"gitlab"`, or `"custom"`. Automatically inferred from `repo_url` hostname if omitted.
+
+| `edit_url_template`
+| `str`
+| _Provider default_
+| Custom Python format string for constructing edit URLs. Available placeholder tokens: `{repo_url}`, `{branch}`, `{doc_path}`.
+
+| `view_url_template`
+| `str`
+| _Provider default_
+| Custom Python format string for constructing view URLs. Available placeholder tokens: `{repo_url}`, `{branch}`, `{doc_path}`.
+|===
+
+=== Git Remote Auto-Detection
+
+When `repo_url` is omitted, `source_links` executes `git config --get remote.origin.url` (falling back to direct inspection of `.git/config`).
+
+It automatically converts common SSH clone URLs to HTTPS browser URLs:
+* `git@github.com:webmaven/golem.git` -> `https://github.com/webmaven/golem`
+* `ssh://git@gitlab.com/group/project.git` -> `https://gitlab.com/group/project`
+
+=== Custom Git Providers
+
+For self-hosted instances (such as Gitea or Bitbucket), set `provider = "custom"` and supply custom URL templates:
+
+.golem.toml
+[source,toml]
+----
+[plugins.source_links]
+repo_url = "https://gitea.example.com/team/docs"
+branch = "master"
+docs_dir = "docs"
+provider = "custom"
+edit_url_template = "{repo_url}/_edit/{branch}/{doc_path}"
+view_url_template = "{repo_url}/src/branch/{branch}/{doc_path}"
+----
+
+== Template Context Variables
+
+When active, `source_links` injects the following variables into every page's template rendering scope:
+
+[cols="1,1,3"]
+|===
+| Variable | Type | Description
+
+| `source_edit_url`
+| `str \| None`
+| Web URL to edit the source document directly in the git provider's web editor.
+
+| `source_view_url`
+| `str \| None`
+| Web URL to view the raw source document on the git hosting platform.
+
+| `source_repo_url`
+| `str \| None`
+| Normalized root URL of the git repository.
+
+| `source_provider`
+| `str`
+| Identified git provider identifier (`"github"`, `"gitlab"`, or `"custom"`).
+|===
+
+== Chameleon Template Integration
+
+In custom themes or overrides, you can render edit buttons and repository links using Chameleon TAL:
+
+.themes/mytheme/skeleton.pt
+[source,html]
+----
+<!-- Edit this page link -->
+<div tal:condition="source_edit_url | nothing" class="edit-page-container">
+    <a href="${source_edit_url}" class="edit-link" target="_blank" rel="noopener noreferrer">
+        <svg class="icon-pencil" width="16" height="16" viewBox="0 0 24 24">...</svg>
+        <span>Edit this page on ${source_provider.capitalize()}</span>
+    </a>
+</div>
+
+<!-- Header repository link -->
+<header>
+    <a href="${source_repo_url}" tal:condition="source_repo_url | nothing" class="repo-badge">
+        View Repository
+    </a>
+</header>
+----
