@@ -7,8 +7,8 @@ Initial Base: `56d66e26ca25d71de1b6c5e3720234801176f870`
 - [x] Task 2: CSS Extraction & METAL Macro Slots in `skeleton.pt` (Issue #12 & #16)
 - [x] Task 3: Typed ASG Domain Models & Visitors (Issue #14)
 - [x] Task 4: Complete AST-Level NodeTransformer Macro Splicing (Issue #10)
-- [ ] Task 5: Canonical GitHub/GitLab Source Links Plugin (Issue #3)
-- [ ] Task 6: Navigation Helpers Plugin (Issue #4)
+- [x] Task 5: Canonical GitHub/GitLab Source Links Plugin (Issue #3)
+- [x] Task 6: Navigation Helpers Plugin (Issue #4)
 - [ ] Task 7: Index & Glossary Compilation Plugins (Issue #5)
 - [ ] Task 8: `golem ingest` External Source Conversion CLI (Issue #8) - DEFERRED
 
@@ -25,4 +25,8 @@ Initial Base: `56d66e26ca25d71de1b6c5e3720234801176f870`
 - [x] Task 1 Minor Fix: Unify `_invoke_asg_hook` and `_invoke_template_context_hook` into `_invoke_doc_hook` (commit b35e76f, review clean)
 - [x] Task 4: AST-Level NodeTransformer Macro Splicing (commit f227830, review clean)
   Key outcome: Syntax updated to `golem.apidoc::target[...]` (dot-separated block macro), parsing into `BlockNode(name='golem.apidoc')`. Deprecated `on_pre_parse` and untyped dict helpers completely removed. `AsciiDocApi.get_asg_nodes` returns typed `list[Node]`. Upstream issue filed: webmaven/asciidoctrine#132.
+- [x] Task 5: Canonical GitHub/GitLab Source Links Plugin (commit 131c3fb, review clean)
+  Key outcome: `SourceLinksPlugin` via `on_template_context` hook; injects `source_repo_url`, `source_edit_url`, `source_view_url`, `source_url`, `source_provider`. SSH/git:// URL normalization. Git CLI + .git/config fallback auto-detection. Provider detection (GitHub, GitLab, custom). `GolemConfig` extended with `repo_url`, `branch`, `docs_dir`, `plugin_configs`. Edit link rendered in skeleton.pt footer with CSS. 16 new tests; 413 total passing.
+- [x] Task 6: Navigation Helpers Plugin (fixes #4)
+  Key outcome: `NavigationHelpersPlugin` via `on_template_context` hook; injects `breadcrumbs` (ancestor chain starting with Home, section hierarchy, and current page marked `is_current: True`), `nav_tree_flat` (DFS preorder flattening with depth), preserves pre-existing `prev_page`/`next_page`. Duck-typed navigation entries. Breadcrumbs rendering conditional on length > 1 added to `skeleton.pt` with `.golem-breadcrumbs` styling in `golem.css`. 10 new tests; 423 total passing.
 

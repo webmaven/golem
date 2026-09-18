@@ -967,6 +967,46 @@ details summary:focus-visible,
     vertical-align: middle;
 }
 
+/* ── Breadcrumbs ───────────────────────────────────── */
+.golem-breadcrumbs {
+    margin-bottom: 1.5rem;
+    font-family: var(--golem-font-ui);
+    font-size: 0.875rem;
+}
+.golem-breadcrumbs ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+.golem-breadcrumbs li {
+    display: inline-flex;
+    align-items: center;
+    color: var(--golem-text-muted);
+}
+.golem-breadcrumbs li:not(:last-child)::after {
+    content: "›";
+    margin-left: 0.5rem;
+    color: var(--golem-text-muted);
+    opacity: 0.6;
+}
+.golem-breadcrumbs a {
+    color: var(--golem-link);
+    text-decoration: none;
+}
+.golem-breadcrumbs a:hover {
+    color: var(--golem-link-hover);
+    text-decoration: underline;
+}
+.golem-breadcrumbs [aria-current="page"] span,
+.golem-breadcrumbs [aria-current="page"] {
+    color: var(--golem-text);
+    font-weight: 500;
+}
+
 /* ── Chapter Pagination (Prev / Next) ──────────────── */
 .golem-pagination {
     display: flex;
