@@ -367,3 +367,120 @@ def test_get_plugin_manager_caches_entry_points(monkeypatch):
     assert pm3 is not None
     # Entry points should not have been scanned again
     assert ep_call_count == 0
+
+
+def test_uniform_class_resolution_with_from_config(tmp_path, monkeypatch):
+    """Verify get_plugin_manager resolves a class plugin with from_config."""
+    from golem.config import GolemConfig
+    from golem.plugins import get_plugin_manager
+
+    pkg_dir = tmp_path / "custom_class_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text("", encoding="utf-8")
+    (pkg_dir / "plugin.py").write_text(
+        """\
+from typing import Any
+from golem.plugins import hookimpl, GolemPlugin
+
+class ConfigurablePlugin(GolemPlugin):
+    name = "custom_class_pkg.configurable"
+
+    def __init__(self, greeting: str = "hello") -> None:
+        super().__init__(greeting=greeting)
+        self.greeting = greeting
+
+    @classmethod
+    def from_config(cls, config: Any = None) -> "ConfigurablePlugin":
+        plugin_configs = getattr(config, "plugin_configs", {}) or {}
+        cfg = plugin_configs.get("custom_class_pkg.configurable", {})
+        return cls(**cfg)
+
+    @hookimpl
+    def on_pre_parse(self, raw_content: str) -> str:
+        return f"{self.greeting}: {raw_content}"
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    config = GolemConfig(
+        plugins=["custom_class_pkg.plugin:ConfigurablePlugin"],
+        plugin_configs={"custom_class_pkg.configurable": {"greeting": "howdy"}},
+    )
+    pm = get_plugin_manager(config=config)
+    plugin = pm.get_plugin("custom_class_pkg.plugin:ConfigurablePlugin")
+    assert plugin is not None
+    assert plugin.greeting == "howdy"
+    res = pm.hook.on_pre_parse(raw_content="world")
+    assert "howdy: world" in res
+
+
+def test_uniform_class_resolution_without_from_config(tmp_path, monkeypatch):
+    """Verify get_plugin_manager instantiates class without from_config using cls()."""
+    from golem.config import GolemConfig
+    from golem.plugins import get_plugin_manager
+
+    pkg_dir = tmp_path / "simple_class_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text("", encoding="utf-8")
+    (pkg_dir / "plugin.py").write_text(
+        """\
+from golem.plugins import hookimpl
+
+class SimpleClassPlugin:
+    def __init__(self) -> None:
+        self.initialized = True
+
+    @hookimpl
+    def on_pre_parse(self, raw_content: str) -> str:
+        return f"simple: {raw_content}"
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    config = GolemConfig(plugins=["simple_class_pkg.plugin:SimpleClassPlugin"])
+    pm = get_plugin_manager(config=config)
+    plugin = pm.get_plugin("simple_class_pkg.plugin:SimpleClassPlugin")
+    assert plugin is not None
+    assert plugin.initialized is True
+    res = pm.hook.on_pre_parse(raw_content="test")
+    assert "simple: test" in res
+
+
+def test_uniform_class_resolution_config_none(tmp_path, monkeypatch):
+    """Verify get_plugin_manager calls cls() when config is None."""
+    from golem.plugins import get_plugin_manager
+
+    pkg_dir = tmp_path / "none_cfg_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text("", encoding="utf-8")
+    (pkg_dir / "plugin.py").write_text(
+        """\
+from typing import Any
+from golem.plugins import hookimpl
+
+class FallbackClassPlugin:
+    def __init__(self, mode: str = "default") -> None:
+        self.mode = mode
+
+    @classmethod
+    def from_config(cls, config: Any = None) -> "FallbackClassPlugin":
+        return cls(mode="from_config")
+
+    @hookimpl
+    def on_pre_parse(self, raw_content: str) -> str:
+        return f"{self.mode}: {raw_content}"
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    # Without config, should fall back to cls() instead of from_config
+    from golem.config import GolemConfig
+
+    config = GolemConfig(plugins=["none_cfg_pkg.plugin:FallbackClassPlugin"])
+    pm = get_plugin_manager(config=config)
+    plugin = pm.get_plugin("none_cfg_pkg.plugin:FallbackClassPlugin")
+    assert plugin is not None
+    assert plugin.mode == "from_config"

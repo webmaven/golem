@@ -1,6 +1,7 @@
 import golem.plugins
 from golem.plugins import (
     HOOK_NAMESPACE,
+    GolemPlugin,
     GolemSpecs,
     get_plugin_manager,
     hookimpl,
@@ -20,3 +21,4 @@ def test_plugins_exports():
     assert hookimpl is not None
     assert GolemSpecs is not None
     assert callable(get_plugin_manager)
+    assert GolemPlugin is not None

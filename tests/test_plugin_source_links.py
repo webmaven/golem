@@ -141,9 +141,13 @@ def test_source_links_plugin_missing_repo_url(tmp_path):
 
 def test_source_links_from_config(tmp_path):
     config = GolemConfig(
-        repo_url="git@github.com:webmaven/golem.git",
-        branch="develop",
-        docs_dir="docs",
+        plugin_configs={
+            "source_links": {
+                "repo_url": "git@github.com:webmaven/golem.git",
+                "branch": "develop",
+                "docs_dir": "docs",
+            }
+        }
     )
     plugin = SourceLinksPlugin.from_config(config)
     assert plugin.repo_url == "https://github.com/webmaven/golem"
@@ -160,9 +164,13 @@ def test_source_links_integration_build_site(tmp_path):
     config = GolemConfig(
         content_dir=str(content_dir),
         output_dir=str(tmp_path / "dist"),
-        repo_url="https://github.com/webmaven/golem",
-        branch="main",
-        docs_dir="content",
+        plugin_configs={
+            "source_links": {
+                "repo_url": "https://github.com/webmaven/golem",
+                "branch": "main",
+                "docs_dir": "content",
+            }
+        },
     )
     engine = BuildEngine(config)
     plugin = SourceLinksPlugin.from_config(config)
@@ -180,8 +188,12 @@ def test_source_links_registered_via_plugin_manager(tmp_path):
 
     config = GolemConfig(
         plugins=["golem.plugins.source_links"],
-        repo_url="https://github.com/webmaven/golem",
-        branch="main",
+        plugin_configs={
+            "source_links": {
+                "repo_url": "https://github.com/webmaven/golem",
+                "branch": "main",
+            }
+        },
     )
     pm = get_plugin_manager(config=config)
     plugin = pm.get_plugin("golem.plugins.source_links")
@@ -240,9 +252,9 @@ provider = "github"
         encoding="utf-8",
     )
     config = load_config(config_file)
-    assert config.repo_url == "git@github.com:myorg/myrepo.git"
-    assert config.branch == "staging"
-    assert config.docs_dir == "documentation"
+    assert config.plugin_configs["source_links"]["repo_url"] == "git@github.com:myorg/myrepo.git"
+    assert config.plugin_configs["source_links"]["branch"] == "staging"
+    assert config.plugin_configs["source_links"]["docs_dir"] == "documentation"
 
     plugin = SourceLinksPlugin.from_config(config)
     assert plugin.repo_url == "https://github.com/myorg/myrepo"

@@ -47,7 +47,7 @@ import importlib.util
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 from asciidoctrine.nodes import Node
 import click
@@ -56,10 +56,45 @@ import pluggy
 if TYPE_CHECKING:
     from golem.config import GolemConfig
 
+__all__ = [
+    "GolemPlugin",
+    "GolemSpecs",
+    "HOOK_NAMESPACE",
+    "get_plugin_manager",
+    "hookimpl",
+    "hookspec",
+]
+
 HOOK_NAMESPACE = "golem"
 
 hookspec = pluggy.HookspecMarker(HOOK_NAMESPACE)
 hookimpl = pluggy.HookimplMarker(HOOK_NAMESPACE)
+
+
+class GolemPlugin:
+    """Base class for stateful Golem plugins."""
+
+    name: str = ""
+
+    def __init__(self, **config: Any) -> None:
+        self.config = config
+
+    @classmethod
+    def from_config(cls, config: GolemConfig | dict[str, Any] | None = None) -> Self:
+        """Construct plugin instance from GolemConfig or dictionary options."""
+        if config is None:
+            return cls()
+        if isinstance(config, dict):
+            plugin_configs = config.get("plugin_configs", config)
+        else:
+            plugin_configs = getattr(config, "plugin_configs", {}) or {}
+        cfg = plugin_configs.get(cls.name, {}) if isinstance(plugin_configs, dict) else {}
+        if not cfg and isinstance(plugin_configs, dict):
+            short_name = cls.name.split(".")[-1]
+            cfg = plugin_configs.get(short_name, {})
+        if not isinstance(cfg, dict):
+            cfg = {}
+        return cls(**cfg)
 
 
 class GolemSpecs:
@@ -325,6 +360,10 @@ def _get_entry_point_plugins(clear_cache: bool = False) -> dict[str, tuple[str, 
                     eps[ep_name] = ("entrypoint", ep)
                 if ep_value and ep_value not in eps:
                     eps[ep_value] = ("entrypoint", ep)
+                if ep_value and ":" in ep_value:
+                    ep_mod = ep_value.split(":", 1)[0]
+                    if ep_mod not in eps:
+                        eps[ep_mod] = ("entrypoint", ep)
         _CACHED_ENTRY_POINTS = eps
     return _CACHED_ENTRY_POINTS
 
@@ -390,31 +429,48 @@ def get_plugin_manager(
 
     for plugin_name in configured:
         try:
-            if plugin_name in ("golem.plugins.source_links", "source_links"):
-                from golem.plugins.source_links import SourceLinksPlugin
-
-                source_links_plugin = SourceLinksPlugin.from_config(config)
-                if not pm.is_registered(source_links_plugin):
-                    pm.register(source_links_plugin, name=plugin_name)
-            elif plugin_name in available:
+            plugin: Any = None
+            if plugin_name in available:
                 kind, source = available[plugin_name]
                 if kind == "entrypoint":
                     plugin = source.load()
-                    if not pm.is_registered(plugin):
-                        pm.register(plugin, name=plugin_name)
                 elif kind == "local_file":
                     spec = importlib.util.spec_from_file_location(source.stem, source)
                     if spec and spec.loader:
                         module = importlib.util.module_from_spec(spec)
                         sys.modules[source.stem] = module
                         spec.loader.exec_module(module)
-                        if not pm.is_registered(module):
-                            pm.register(module, name=plugin_name)
+                        plugin = module
             else:
-                # Fall back to importlib for fully-qualified module paths
-                mod = importlib.import_module(plugin_name)
-                if not pm.is_registered(mod):
-                    pm.register(mod)
+                # Fall back to importlib for fully-qualified module or class paths
+                if ":" in plugin_name:
+                    mod_name, attr = plugin_name.split(":", 1)
+                    mod = importlib.import_module(mod_name)
+                    plugin = getattr(mod, attr)
+                else:
+                    try:
+                        plugin = importlib.import_module(plugin_name)
+                    except ModuleNotFoundError:
+                        if "." in plugin_name:
+                            mod_name, attr = plugin_name.rsplit(".", 1)
+                            mod = importlib.import_module(mod_name)
+                            plugin = getattr(mod, attr)
+                        else:
+                            raise
+
+            if plugin is None:
+                continue
+
+            if isinstance(plugin, type):
+                if hasattr(plugin, "from_config") and callable(plugin.from_config) and config is not None:
+                    instance = plugin.from_config(config)
+                else:
+                    instance = plugin()
+                if not pm.is_registered(instance):
+                    pm.register(instance, name=plugin_name)
+            else:
+                if not pm.is_registered(plugin):
+                    pm.register(plugin, name=plugin_name)
         except Exception as e:
             logging.warning("Failed to load plugin %s: %s", plugin_name, e)
 

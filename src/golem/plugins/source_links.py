@@ -13,7 +13,7 @@ import urllib.parse
 from pathlib import Path
 from typing import Any
 
-from golem.plugins import hookimpl
+from golem.plugins import GolemPlugin, hookimpl
 
 __all__ = [
     "SourceLinksPlugin",
@@ -235,7 +235,7 @@ def _resolve_relative_doc_path(
     return rel_str
 
 
-class SourceLinksPlugin:
+class SourceLinksPlugin(GolemPlugin):
     """Golem plugin providing canonical repository view and edit links in page template contexts.
 
     Injects `source_repo_url`, `source_edit_url`, `source_view_url`, `source_url`, and `source_provider`
@@ -251,6 +251,8 @@ class SourceLinksPlugin:
     `root_dir` (Path | None, optional):: Base directory used for local git repository discovery.
     """
 
+    name = "source_links"
+
     def __init__(
         self,
         repo_url: str | None = None,
@@ -260,7 +262,17 @@ class SourceLinksPlugin:
         edit_url_template: str | None = None,
         view_url_template: str | None = None,
         root_dir: Path | None = None,
+        **extra: Any,
     ) -> None:
+        super().__init__(
+            repo_url=repo_url,
+            branch=branch,
+            docs_dir=docs_dir,
+            provider=provider,
+            edit_url_template=edit_url_template,
+            view_url_template=view_url_template,
+            **extra,
+        )
         self.root_dir = root_dir.resolve() if root_dir else Path.cwd().resolve()
 
         # 1. Resolve repo_url
@@ -310,20 +322,15 @@ class SourceLinksPlugin:
         if isinstance(config, dict):
             source_links_cfg = config.get("source_links", config)
 
-        repo_url = getattr(config, "repo_url", None) or (
-            source_links_cfg.get("repo_url") if isinstance(source_links_cfg, dict) else None
-        )
-        branch = getattr(config, "branch", None) or (
-            source_links_cfg.get("branch") if isinstance(source_links_cfg, dict) else None
-        )
-        docs_dir = (
-            getattr(config, "docs_dir", None)
-            or (source_links_cfg.get("docs_dir") if isinstance(source_links_cfg, dict) else None)
-            or getattr(config, "content_dir", None)
-        )
-        provider = source_links_cfg.get("provider") if isinstance(source_links_cfg, dict) else None
-        edit_url_template = source_links_cfg.get("edit_url_template") if isinstance(source_links_cfg, dict) else None
-        view_url_template = source_links_cfg.get("view_url_template") if isinstance(source_links_cfg, dict) else None
+        if not isinstance(source_links_cfg, dict):
+            source_links_cfg = {}
+
+        repo_url = source_links_cfg.get("repo_url")
+        branch = source_links_cfg.get("branch")
+        docs_dir = source_links_cfg.get("docs_dir") or getattr(config, "content_dir", None)
+        provider = source_links_cfg.get("provider")
+        edit_url_template = source_links_cfg.get("edit_url_template")
+        view_url_template = source_links_cfg.get("view_url_template")
 
         root_dir = None
         if hasattr(config, "config_path") and config.config_path:
