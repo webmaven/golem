@@ -32,22 +32,6 @@ from golem.plugins import get_plugin_manager
 
 __all__ = ["check", "main", "report_engine_diagnostics", "PROFILE_NAMES"]
 
-BUILTIN_PLUGINS: list[str] = [
-    "doctest",
-    "apidoc",
-    "source_links",
-    "nav_helpers",
-    "index",
-    "glossary",
-]
-BUILTIN_PLUGIN_TARGETS: dict[str, str] = {
-    "doctest": "golem.plugins.doctest",
-    "apidoc": "golem.plugins.apidoc",
-    "source_links": "golem.plugins.source_links:SourceLinksPlugin",
-    "nav_helpers": "golem.plugins.nav_helpers:NavigationHelpersPlugin",
-    "index": "golem.plugins.index_glossary:IndexPlugin",
-    "glossary": "golem.plugins.index_glossary:GlossaryPlugin",
-}
 PROFILE_NAMES: frozenset[str] = frozenset({"library", "cli", "paper", "blog"})
 
 
@@ -886,49 +870,18 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
         plugins_list: list[dict[str, Any]] = []
         seen_names: set[str] = set()
 
-        # Discover entry points for golem.plugins
+        # 1. Entry points for golem.plugins (both built-in and third-party)
         eps: tuple[Any, ...] | list[Any]
         try:
             eps = list(importlib.metadata.entry_points(group="golem.plugins"))
         except Exception:
             eps = []
 
-        eps_by_name: dict[str, Any] = {getattr(ep, "name", str(ep)): ep for ep in eps}
-
-        # 1. Built-in plugins (discovered dynamically from entry points, with standard fallback)
-        for name in BUILTIN_PLUGINS:
-            ep = eps_by_name.get(name)
-            if ep is not None:
-                ep_val = getattr(ep, "value", "")
-            else:
-                ep_val = BUILTIN_PLUGIN_TARGETS.get(name, f"golem.plugins.{name}")
-            ep_mod = ep_val.split(":")[0] if ep_val else ""
-
-            is_enabled = (
-                name in configured_plugins
-                or (bool(ep_val) and ep_val in configured_plugins)
-                or (bool(ep_mod) and ep_mod in configured_plugins)
-            )
-
-            plugins_list.append(
-                {
-                    "name": name,
-                    "enabled": is_enabled,
-                    "source": "built-in",
-                    "description": "(built-in)",
-                }
-            )
-            seen_names.add(name)
-            if ep_val:
-                seen_names.add(ep_val)
-            if ep_mod:
-                seen_names.add(ep_mod)
-
-        # 2. Other entry points (third-party plugins or additional entry points)
         for ep in eps:
             ep_name = getattr(ep, "name", str(ep))
             if ep_name in seen_names:
                 continue
+
             dist = getattr(ep, "dist", None)
             dist_name = getattr(dist, "name", "") if dist else ""
             if dist_name in ("golem", "golem-docs"):
@@ -947,6 +900,7 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
                 or (bool(ep_value) and ep_value in configured_plugins)
                 or (bool(ep_module) and ep_module in configured_plugins)
             )
+
             plugins_list.append(
                 {
                     "name": ep_name,
