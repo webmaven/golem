@@ -185,6 +185,11 @@ class PageCompiler:
             "content_class": effective_content_class,
             "pygments_css": effective_pygments_css,
             "default_layout": default_layout,
+            "source_repo_url": None,
+            "source_edit_url": None,
+            "source_view_url": None,
+            "source_url": None,
+            "source_provider": None,
         }
         template_kwargs.update(extra_context)
 

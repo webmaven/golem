@@ -948,6 +948,24 @@ details summary:focus-visible,
 #golem-footer p {
     margin: 0;
 }
+.golem-source-links {
+    margin-bottom: 0.5rem;
+}
+.golem-edit-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--golem-link);
+    text-decoration: none;
+    font-weight: 500;
+}
+.golem-edit-link:hover {
+    color: var(--golem-link-hover);
+    text-decoration: underline;
+}
+.golem-edit-link svg {
+    vertical-align: middle;
+}
 
 /* ── Chapter Pagination (Prev / Next) ──────────────── */
 .golem-pagination {

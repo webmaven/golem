@@ -32,7 +32,11 @@ from golem.plugins import get_plugin_manager
 
 __all__ = ["check", "main", "report_engine_diagnostics", "PROFILE_NAMES"]
 
-BUILTIN_PLUGINS: list[str] = ["golem.plugins.doctest", "golem.plugins.apidoc"]
+BUILTIN_PLUGINS: list[str] = [
+    "golem.plugins.doctest",
+    "golem.plugins.apidoc",
+    "golem.plugins.source_links",
+]
 PROFILE_NAMES: frozenset[str] = frozenset({"library", "cli", "paper", "blog"})
 
 

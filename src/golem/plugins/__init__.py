@@ -390,7 +390,13 @@ def get_plugin_manager(
 
     for plugin_name in configured:
         try:
-            if plugin_name in available:
+            if plugin_name in ("golem.plugins.source_links", "source_links"):
+                from golem.plugins.source_links import SourceLinksPlugin
+
+                source_links_plugin = SourceLinksPlugin.from_config(config)
+                if not pm.is_registered(source_links_plugin):
+                    pm.register(source_links_plugin, name=plugin_name)
+            elif plugin_name in available:
                 kind, source = available[plugin_name]
                 if kind == "entrypoint":
                     plugin = source.load()
