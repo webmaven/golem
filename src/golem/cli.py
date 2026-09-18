@@ -33,10 +33,21 @@ from golem.plugins import get_plugin_manager
 __all__ = ["check", "main", "report_engine_diagnostics", "PROFILE_NAMES"]
 
 BUILTIN_PLUGINS: list[str] = [
-    "golem.plugins.doctest",
-    "golem.plugins.apidoc",
-    "golem.plugins.source_links",
+    "doctest",
+    "apidoc",
+    "source_links",
+    "nav_helpers",
+    "index",
+    "glossary",
 ]
+BUILTIN_PLUGIN_TARGETS: dict[str, str] = {
+    "doctest": "golem.plugins.doctest",
+    "apidoc": "golem.plugins.apidoc",
+    "source_links": "golem.plugins.source_links:SourceLinksPlugin",
+    "nav_helpers": "golem.plugins.nav_helpers:NavigationHelpersPlugin",
+    "index": "golem.plugins.index_glossary:IndexPlugin",
+    "glossary": "golem.plugins.index_glossary:GlossaryPlugin",
+}
 PROFILE_NAMES: frozenset[str] = frozenset({"library", "cli", "paper", "blog"})
 
 
@@ -870,15 +881,35 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
         except Exception:
             config = GolemConfig()
 
-        builtin_plugin_names = BUILTIN_PLUGINS
         configured_plugins = list(config.plugins) if config.plugins else []
 
         plugins_list: list[dict[str, Any]] = []
         seen_names: set[str] = set()
 
-        # 1. Built-in plugins
-        for name in builtin_plugin_names:
-            is_enabled = name in configured_plugins
+        # Discover entry points for golem.plugins
+        eps: tuple[Any, ...] | list[Any]
+        try:
+            eps = list(importlib.metadata.entry_points(group="golem.plugins"))
+        except Exception:
+            eps = []
+
+        eps_by_name: dict[str, Any] = {getattr(ep, "name", str(ep)): ep for ep in eps}
+
+        # 1. Built-in plugins (discovered dynamically from entry points, with standard fallback)
+        for name in BUILTIN_PLUGINS:
+            ep = eps_by_name.get(name)
+            if ep is not None:
+                ep_val = getattr(ep, "value", "")
+            else:
+                ep_val = BUILTIN_PLUGIN_TARGETS.get(name, f"golem.plugins.{name}")
+            ep_mod = ep_val.split(":")[0] if ep_val else ""
+
+            is_enabled = (
+                name in configured_plugins
+                or (bool(ep_val) and ep_val in configured_plugins)
+                or (bool(ep_mod) and ep_mod in configured_plugins)
+            )
+
             plugins_list.append(
                 {
                     "name": name,
@@ -888,36 +919,47 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
                 }
             )
             seen_names.add(name)
+            if ep_val:
+                seen_names.add(ep_val)
+            if ep_mod:
+                seen_names.add(ep_mod)
 
-        # 2. Entry points
-        eps: tuple[Any, ...] | list[Any]
-        try:
-            eps = list(importlib.metadata.entry_points(group="golem.plugins"))
-        except Exception:
-            eps = []
-
+        # 2. Other entry points (third-party plugins or additional entry points)
         for ep in eps:
             ep_name = getattr(ep, "name", str(ep))
             if ep_name in seen_names:
                 continue
             dist = getattr(ep, "dist", None)
-            if dist:
-                dist_name = getattr(dist, "name", ep_name)
-                dist_version = getattr(dist, "version", "")
-                dist_desc = f"{dist_name} {dist_version}".strip() if dist_version else f"{dist_name}"
+            dist_name = getattr(dist, "name", "") if dist else ""
+            if dist_name in ("golem", "golem-docs"):
+                source = "built-in"
+                description = "(built-in)"
             else:
-                dist_desc = ep_name
+                dist_version = getattr(dist, "version", "") if dist else ""
+                dist_desc = f"{dist_name} {dist_version}".strip() if dist_version else f"{dist_name or ep_name}"
+                source = "entry_point"
+                description = f"(entry_point: {dist_desc})"
+
             ep_value = getattr(ep, "value", "")
-            is_enabled = ep_name in configured_plugins or (bool(ep_value) and ep_value in configured_plugins)
+            ep_module = ep_value.split(":")[0] if ep_value else ""
+            is_enabled = (
+                ep_name in configured_plugins
+                or (bool(ep_value) and ep_value in configured_plugins)
+                or (bool(ep_module) and ep_module in configured_plugins)
+            )
             plugins_list.append(
                 {
                     "name": ep_name,
                     "enabled": is_enabled,
-                    "source": "entry_point",
-                    "description": f"(entry_point: {dist_desc})",
+                    "source": source,
+                    "description": description,
                 }
             )
             seen_names.add(ep_name)
+            if ep_value:
+                seen_names.add(ep_value)
+            if ep_module:
+                seen_names.add(ep_module)
 
         # 3. Local plugins in plugins_dir
         plugins_dir_path = Path(config.plugins_dir) if getattr(config, "plugins_dir", None) else Path("plugins")

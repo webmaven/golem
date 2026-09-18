@@ -64,6 +64,26 @@ def test_cli_plugins_help_flags():
     assert "--directory" in result.output or "-C" in result.output
 
 
+def test_cli_plugins_bundled_entry_points_discovery():
+    import json
+    import importlib.metadata
+
+    # Verify importlib entry points directly
+    eps = {ep.name: ep.value for ep in importlib.metadata.entry_points(group="golem.plugins")}
+    expected_plugins = ["doctest", "apidoc", "source_links", "nav_helpers", "index", "glossary"]
+    for name in expected_plugins:
+        assert name in eps
+
+    # Verify CLI command output
+    runner = CliRunner()
+    result = runner.invoke(main, ["plugins", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    discovered_names = [p["name"] for p in data]
+    for name in expected_plugins:
+        assert name in discovered_names
+
+
 def test_cli_themes_help_flags():
     runner = CliRunner()
     result = runner.invoke(main, ["themes", "--help"])

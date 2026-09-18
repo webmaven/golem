@@ -217,7 +217,7 @@ def test_source_links_cli_inspection():
     result = runner.invoke(main, ["plugins", "--json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    plugin_entry = next((p for p in data if p["name"] == "golem.plugins.source_links"), None)
+    plugin_entry = next((p for p in data if p["name"] in ("source_links", "golem.plugins.source_links")), None)
     assert plugin_entry is not None
     assert plugin_entry["source"] == "built-in"
 

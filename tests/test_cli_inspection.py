@@ -46,8 +46,8 @@ def test_cli_plugins_default(tmp_path):
         result = runner.invoke(main, ["plugins"])
         assert result.exit_code == 0
         assert "[DISABLED]" in result.output
-        assert "golem.plugins.doctest" in result.output
-        assert "golem.plugins.apidoc" in result.output
+        for name in ["doctest", "apidoc", "source_links", "nav_helpers", "index", "glossary"]:
+            assert name in result.output
         assert "(built-in)" in result.output
 
 
@@ -59,10 +59,10 @@ def test_cli_plugins_json_default(tmp_path):
         data = json.loads(result.output)
         assert isinstance(data, list)
         names = [p["name"] for p in data]
-        assert "golem.plugins.doctest" in names
-        assert "golem.plugins.apidoc" in names
+        for expected in ["doctest", "apidoc", "source_links", "nav_helpers", "index", "glossary"]:
+            assert expected in names
         for p in data:
-            if p["name"] in ("golem.plugins.doctest", "golem.plugins.apidoc"):
+            if p["name"] in ("doctest", "apidoc", "source_links", "nav_helpers", "index", "glossary"):
                 assert p["enabled"] is False
                 assert p["source"] == "built-in"
 
@@ -81,10 +81,10 @@ plugins = ["golem.plugins.doctest", "custom_pkg.plugin"]
         assert result.exit_code == 0
         # doctest is enabled
         assert "[ENABLED]" in result.output
-        assert "golem.plugins.doctest" in result.output
+        assert "doctest" in result.output
         # apidoc is disabled since it was omitted from config.plugins
         assert "[DISABLED]" in result.output
-        assert "golem.plugins.apidoc" in result.output
+        assert "apidoc" in result.output
         # custom_pkg.plugin is enabled
         assert "custom_pkg.plugin" in result.output
 

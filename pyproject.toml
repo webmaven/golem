@@ -53,6 +53,14 @@ docs = [
 [project.scripts]
 golem = "golem.cli:main"
 
+[project.entry-points."golem.plugins"]
+doctest = "golem.plugins.doctest"
+apidoc = "golem.plugins.apidoc"
+source_links = "golem.plugins.source_links:SourceLinksPlugin"
+nav_helpers = "golem.plugins.nav_helpers:NavigationHelpersPlugin"
+index = "golem.plugins.index_glossary:IndexPlugin"
+glossary = "golem.plugins.index_glossary:GlossaryPlugin"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/golem"]
 
