@@ -240,3 +240,19 @@ def test_integration_with_engine(tmp_path):
     assert "Home" in intro_html
     assert "User Guide" in intro_html
     assert "Intro Page" in intro_html
+
+
+def test_navigation_helpers_plugin_inheritance():
+    from golem.plugins import GolemPlugin
+
+    assert issubclass(NavigationHelpersPlugin, GolemPlugin)
+    assert NavigationHelpersPlugin.name == "nav_helpers"
+    plugin = NavigationHelpersPlugin()
+    assert plugin.name == "nav_helpers"
+
+
+def test_find_chain_edge_cases():
+    from golem.plugins.nav_helpers import _find_chain
+
+    assert _find_chain([], "index.adoc", Path("index.adoc")) is None
+    assert _find_chain([{"title": "Other", "path": "other.adoc"}], "index.adoc", Path("index.adoc")) is None

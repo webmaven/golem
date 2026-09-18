@@ -8,47 +8,19 @@ structured alphabetized indexes and glossaries.
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from asciidoctrine.nodes import IndexTerm, Node
-from golem.plugins import hookimpl
+from asciidoctrine.nodes import DescriptionList, IndexTerm
+from golem.model import AsgVisitor, Node
+from golem.plugins import GolemPlugin, hookimpl
 
 __all__ = [
     "GlossaryPlugin",
-    "IndexGlossaryPlugin",
     "IndexPlugin",
 ]
 
 logger = logging.getLogger(__name__)
-
-
-def _walk_asg(node: Any) -> Iterator[Any]:
-    """Recursively traverse AST/ASG nodes and dict representations.
-
-    [parameters]
-    `node` (Any):: Root AST/ASG Node or dictionary to traverse.
-
-    [returns]
-    `Iterator[Any]`:: Generator yielding every node in the graph depth-first.
-    """
-    if node is None:
-        return
-    yield node
-    if hasattr(node, "walk"):
-        for child in node.walk():
-            if child is not node:
-                yield child
-    elif isinstance(node, dict):
-        for key in ("blocks", "items", "inlines", "children"):
-            children = node.get(key)
-            if isinstance(children, list):
-                for child in children:
-                    yield from _walk_asg(child)
-    elif isinstance(node, (list, tuple)):
-        for item in node:
-            yield from _walk_asg(item)
 
 
 def _extract_text(node: Any) -> str:
@@ -90,23 +62,14 @@ def _extract_text(node: Any) -> str:
 
 
 def _is_glossary_list(node: Any) -> bool:
-    """Determine whether an AST node represents a glossary description list.
+    """Determine whether a description list node represents a glossary.
 
     [parameters]
-    `node` (Any):: AST node or dictionary to inspect.
+    `node` (Any):: DescriptionList AST node or dictionary to inspect.
 
     [returns]
     `bool`:: True if the node is a description list with a glossary style or role.
     """
-    name = getattr(node, "name", "")
-    type_name = type(node).__name__
-    if not (
-        type_name in ("DescriptionList", "Dlist")
-        or name in ("descriptionList", "dlist", "description_list")
-        or (isinstance(node, dict) and node.get("name") in ("descriptionList", "dlist", "description_list"))
-    ):
-        return False
-
     if isinstance(node, dict):
         attrs = node.get("attributes")
     else:
@@ -205,7 +168,191 @@ def _extract_definition_list_blocks(item: Any) -> str:
     return ""
 
 
-class IndexPlugin:
+def _is_page_role(context: dict[str, Any], role_name: str) -> bool:
+    """Check if template context or document attributes declare a specific page role.
+
+    [parameters]
+    `context` (dict[str, Any]):: Chameleon template context dictionary.
+    `role_name` (str):: Expected role string (e.g. `"index"` or `"glossary"`).
+
+    [returns]
+    `bool`:: True if context or attributes declare the target role.
+    """
+    target = role_name.strip().lower()
+
+    # Direct context keys
+    for key in ("page-role", "page_role", "role"):
+        val = context.get(key)
+        if isinstance(val, str) and val.strip().lower() == target:
+            return True
+
+    # Nested document attributes (doc_attributes, attributes)
+    for attr_key in ("doc_attributes", "attributes"):
+        attrs = context.get(attr_key)
+        if isinstance(attrs, dict):
+            for key in ("page-role", "page_role", "role"):
+                val = attrs.get(key)
+                if isinstance(val, str) and val.strip().lower() == target:
+                    return True
+
+    return False
+
+
+class AsgCollectorVisitor(AsgVisitor):
+    """AST/ASG visitor for extracting index terms and glossary definition lists."""
+
+    def __init__(
+        self,
+        index_entries: dict[str, dict[str, Any]] | None = None,
+        glossary_entries: dict[str, dict[str, Any]] | None = None,
+        doc_path_str: str = "",
+    ) -> None:
+        self.index_entries = index_entries
+        self.glossary_entries = glossary_entries
+        self.doc_path_str = doc_path_str
+
+    def visit(self, node: Any, **kwargs: Any) -> Any:
+        """Visit an AST node or dictionary representation."""
+        if node is None:
+            return None
+        if isinstance(node, IndexTerm):
+            return self.visit_indexterm(node, **kwargs)
+        if isinstance(node, DescriptionList):
+            return self.visit_descriptionlist(node, **kwargs)
+        if isinstance(node, dict):
+            name = str(node.get("name", "")).lower()
+            if name == "indexterm" or ("terms" in node and node.get("type") == "inline"):
+                return self.visit_indexterm(node, **kwargs)
+            if name in ("descriptionlist", "dlist", "description_list"):
+                return self.visit_descriptionlist(node, **kwargs)
+            method_name = f"visit_{name}"
+            visitor = getattr(self, method_name, self.generic_visit)
+            return visitor(node, **kwargs)
+        if isinstance(node, Node):
+            method_name = f"visit_{node.name.lower()}"
+            visitor = getattr(self, method_name, self.generic_visit)
+            return visitor(node, **kwargs)
+        return self.generic_visit(node, **kwargs)
+
+    def generic_visit(self, node: Any, **kwargs: Any) -> Any:
+        """Traverse child collections of a Node or dictionary."""
+        if isinstance(node, Node):
+            super().generic_visit(node, **kwargs)
+        elif isinstance(node, dict):
+            for key in ("blocks", "items", "inlines", "children"):
+                children = node.get(key)
+                if isinstance(children, list):
+                    for child in children:
+                        self.visit(child, **kwargs)
+        elif isinstance(node, (list, tuple)):
+            for item in node:
+                self.visit(item, **kwargs)
+
+    def visit_indexterm(self, node: Any, **kwargs: Any) -> Any:
+        """Collect index term components into accumulated index entries."""
+        if self.index_entries is not None:
+            self._collect_index_term(node)
+        return self.generic_visit(node, **kwargs)
+
+    def visit_descriptionlist(self, node: Any, **kwargs: Any) -> Any:
+        """Collect glossary definition entries from glossary description lists."""
+        if self.glossary_entries is not None and _is_glossary_list(node):
+            self._collect_glossary_list(node)
+        return self.generic_visit(node, **kwargs)
+
+    def _collect_index_term(self, node: Any) -> None:
+        if self.index_entries is None:
+            return
+
+        if isinstance(node, dict):
+            raw_terms = node.get("terms")
+            if not raw_terms:
+                prim = node.get("primary")
+                if prim:
+                    raw_terms = [prim]
+                    if node.get("secondary"):
+                        raw_terms.append(node.get("secondary"))
+                        if node.get("tertiary"):
+                            raw_terms.append(node.get("tertiary"))
+        else:
+            raw_terms = getattr(node, "terms", None)
+
+        if not raw_terms:
+            return
+
+        terms: list[str] = []
+        for t in raw_terms:
+            txt = _extract_text(t) if not isinstance(t, str) else t.strip()
+            if txt:
+                terms.append(txt)
+
+        if not terms:
+            return
+
+        primary = terms[0]
+        secondary = terms[1] if len(terms) > 1 else None
+        tertiary = terms[2] if len(terms) > 2 else None
+
+        letter = primary[0].upper() if primary else ""
+        if letter not in self.index_entries:
+            self.index_entries[letter] = {}
+
+        if primary not in self.index_entries[letter]:
+            self.index_entries[letter][primary] = {
+                "locations": [],
+                "secondary": {},
+            }
+
+        entry = self.index_entries[letter][primary]
+        if self.doc_path_str and self.doc_path_str not in entry["locations"]:
+            entry["locations"].append(self.doc_path_str)
+
+        if secondary:
+            sec_map = entry["secondary"]
+            if secondary not in sec_map:
+                sec_map[secondary] = {
+                    "locations": [],
+                    "secondary": {},
+                }
+            sec_entry = sec_map[secondary]
+            if self.doc_path_str and self.doc_path_str not in sec_entry["locations"]:
+                sec_entry["locations"].append(self.doc_path_str)
+
+            if tertiary:
+                tert_map = sec_entry["secondary"]
+                if tertiary not in tert_map:
+                    tert_map[tertiary] = {
+                        "locations": [],
+                        "secondary": {},
+                    }
+                tert_entry = tert_map[tertiary]
+                if self.doc_path_str and self.doc_path_str not in tert_entry["locations"]:
+                    tert_entry["locations"].append(self.doc_path_str)
+
+    def _collect_glossary_list(self, node: Any) -> None:
+        if self.glossary_entries is None:
+            return
+
+        if isinstance(node, dict):
+            items = node.get("items") or node.get("children") or node.get("blocks")
+        else:
+            items = getattr(node, "items", None)
+
+        if not items or not isinstance(items, (list, tuple)):
+            return
+
+        for item in items:
+            terms = _extract_definition_list_terms(item)
+            definition = _extract_definition_list_blocks(item)
+            for term in terms:
+                self.glossary_entries[term] = {
+                    "term": term,
+                    "definition": definition,
+                    "doc_path": self.doc_path_str,
+                }
+
+
+class IndexPlugin(GolemPlugin):
     """Collect and compile index terms across documentation pages.
 
     Traverses ASG documents for `IndexTerm` occurrences, accumulating primary,
@@ -213,7 +360,10 @@ class IndexPlugin:
     alphabetized hierarchical index structures.
     """
 
-    def __init__(self) -> None:
+    name = "index"
+
+    def __init__(self, **extra: Any) -> None:
+        super().__init__(**extra)
         self._entries: dict[str, dict[str, Any]] = {}
 
     @classmethod
@@ -240,83 +390,8 @@ class IndexPlugin:
         `Node`:: Unmodified ASG node.
         """
         doc_path_str = str(doc_path) if doc_path is not None else ""
-
-        for node in _walk_asg(asg):
-            is_index_term = (
-                isinstance(node, IndexTerm)
-                or (
-                    isinstance(node, dict)
-                    and (node.get("name") in ("indexterm", "IndexTerm") or ("terms" in node and node.get("type") == "inline"))
-                )
-                or getattr(node, "name", "") == "indexterm"
-            )
-            if not is_index_term:
-                continue
-
-            if isinstance(node, dict):
-                raw_terms = node.get("terms")
-                if not raw_terms:
-                    prim = node.get("primary")
-                    if prim:
-                        raw_terms = [prim]
-                        if node.get("secondary"):
-                            raw_terms.append(node.get("secondary"))
-                            if node.get("tertiary"):
-                                raw_terms.append(node.get("tertiary"))
-            else:
-                raw_terms = getattr(node, "terms", None)
-            if not raw_terms:
-                continue
-
-            terms: list[str] = []
-            for t in raw_terms:
-                txt = _extract_text(t) if not isinstance(t, str) else t.strip()
-                if txt:
-                    terms.append(txt)
-
-            if not terms:
-                continue
-
-            primary = terms[0]
-            secondary = terms[1] if len(terms) > 1 else None
-            tertiary = terms[2] if len(terms) > 2 else None
-
-            letter = primary[0].upper() if primary else ""
-            if letter not in self._entries:
-                self._entries[letter] = {}
-
-            if primary not in self._entries[letter]:
-                self._entries[letter][primary] = {
-                    "locations": [],
-                    "secondary": {},
-                }
-
-            entry = self._entries[letter][primary]
-            if doc_path_str and doc_path_str not in entry["locations"]:
-                entry["locations"].append(doc_path_str)
-
-            if secondary:
-                sec_map = entry["secondary"]
-                if secondary not in sec_map:
-                    sec_map[secondary] = {
-                        "locations": [],
-                        "secondary": {},
-                    }
-                sec_entry = sec_map[secondary]
-                if doc_path_str and doc_path_str not in sec_entry["locations"]:
-                    sec_entry["locations"].append(doc_path_str)
-
-                if tertiary:
-                    tert_map = sec_entry["secondary"]
-                    if tertiary not in tert_map:
-                        tert_map[tertiary] = {
-                            "locations": [],
-                            "secondary": {},
-                        }
-                    tert_entry = tert_map[tertiary]
-                    if doc_path_str and doc_path_str not in tert_entry["locations"]:
-                        tert_entry["locations"].append(doc_path_str)
-
+        visitor = AsgCollectorVisitor(index_entries=self._entries, doc_path_str=doc_path_str)
+        visitor.visit(asg)
         return asg
 
     def compile_index(self) -> dict[str, dict[str, Any]]:
@@ -367,20 +442,21 @@ class IndexPlugin:
 
     @hookimpl
     def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
-        """Inject compiled index into template context.
+        """Inject compiled index into template context if page declares index role.
 
         [parameters]
         `context` (dict[str, Any]):: Chameleon template context dictionary.
         `doc_path` (Path):: Path to the documentation source file being processed.
 
         [returns]
-        `dict[str, Any]`:: Enriched template context containing the `site_index` mapping.
+        `dict[str, Any]`:: Enriched template context containing `site_index` if role matches.
         """
-        context.setdefault("site_index", self.compile_index())
+        if _is_page_role(context, "index"):
+            context.update({"site_index": self.compile_index()})
         return context
 
 
-class GlossaryPlugin:
+class GlossaryPlugin(GolemPlugin):
     """Collect and compile glossary definitions across documentation pages.
 
     Traverses ASG documents for description list blocks annotated with `[glossary]`,
@@ -388,7 +464,10 @@ class GlossaryPlugin:
     alphabetized glossary collections.
     """
 
-    def __init__(self) -> None:
+    name = "glossary"
+
+    def __init__(self, **extra: Any) -> None:
+        super().__init__(**extra)
         self._entries: dict[str, dict[str, Any]] = {}
 
     @classmethod
@@ -415,28 +494,8 @@ class GlossaryPlugin:
         `Node`:: Unmodified ASG node.
         """
         doc_path_str = str(doc_path) if doc_path is not None else ""
-
-        for node in _walk_asg(asg):
-            if not _is_glossary_list(node):
-                continue
-
-            if isinstance(node, dict):
-                items = node.get("items") or node.get("children") or node.get("blocks")
-            else:
-                items = getattr(node, "items", None)
-            if not items or not isinstance(items, (list, tuple)):
-                continue
-
-            for item in items:
-                terms = _extract_definition_list_terms(item)
-                definition = _extract_definition_list_blocks(item)
-                for term in terms:
-                    self._entries[term] = {
-                        "term": term,
-                        "definition": definition,
-                        "doc_path": doc_path_str,
-                    }
-
+        visitor = AsgCollectorVisitor(glossary_entries=self._entries, doc_path_str=doc_path_str)
+        visitor.visit(asg)
         return asg
 
     def compile_glossary(self) -> dict[str, list[dict[str, Any]]]:
@@ -476,89 +535,15 @@ class GlossaryPlugin:
 
     @hookimpl
     def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
-        """Inject compiled glossary into template context.
+        """Inject compiled glossary into template context if page declares glossary role.
 
         [parameters]
         `context` (dict[str, Any]):: Chameleon template context dictionary.
         `doc_path` (Path):: Path to the documentation source file being processed.
 
         [returns]
-        `dict[str, Any]`:: Enriched template context containing the `site_glossary` mapping.
+        `dict[str, Any]`:: Enriched template context containing `site_glossary` if role matches.
         """
-        context.setdefault("site_glossary", self.compile_glossary())
-        return context
-
-
-class IndexGlossaryPlugin:
-    """Combined plugin providing both index and glossary accumulation and compilation."""
-
-    def __init__(self) -> None:
-        self.index_plugin = IndexPlugin()
-        self.glossary_plugin = GlossaryPlugin()
-
-    @classmethod
-    def from_config(cls, config: Any = None) -> IndexGlossaryPlugin:
-        """Construct an IndexGlossaryPlugin instance from configuration.
-
-        [parameters]
-        `config` (Any, optional):: Site configuration object or dictionary. Defaults to `None`.
-
-        [returns]
-        `IndexGlossaryPlugin`:: Configured combined index and glossary plugin instance.
-        """
-        return cls()
-
-    @hookimpl
-    def on_asg_created(self, asg: Node, doc_path: Path | None = None) -> Node:
-        """Walk the ASG collecting both index terms and glossary definitions.
-
-        [parameters]
-        `asg` (Node):: Root ASG document node to inspect.
-        `doc_path` (Path | None, optional):: Path to the documentation source file.
-
-        [returns]
-        `Node`:: Unmodified ASG node.
-        """
-        self.index_plugin.on_asg_created(asg, doc_path=doc_path)
-        self.glossary_plugin.on_asg_created(asg, doc_path=doc_path)
-        return asg
-
-    def compile_index(self) -> dict[str, dict[str, Any]]:
-        """Return compiled alphabetized index.
-
-        [returns]
-        `dict[str, dict[str, Any]]`:: Nested dictionary mapping first letters to term entries and subterms.
-        """
-        return self.index_plugin.compile_index()
-
-    def compile_glossary(self) -> dict[str, list[dict[str, Any]]]:
-        """Return compiled alphabetized glossary.
-
-        [returns]
-        `dict[str, list[dict[str, Any]]]`:: Grouped dictionary mapping first letters to term entries.
-        """
-        return self.glossary_plugin.compile_glossary()
-
-    def reset(self) -> None:
-        """Clear accumulated index and glossary entries.
-
-        [returns]
-        `None`:: Clears state in place with no return value.
-        """
-        self.index_plugin.reset()
-        self.glossary_plugin.reset()
-
-    @hookimpl
-    def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
-        """Inject compiled index and glossary into template context.
-
-        [parameters]
-        `context` (dict[str, Any]):: Chameleon template context dictionary.
-        `doc_path` (Path):: Path to the documentation source file being processed.
-
-        [returns]
-        `dict[str, Any]`:: Enriched template context containing both index and glossary mappings.
-        """
-        self.index_plugin.on_template_context(context, doc_path=doc_path)
-        self.glossary_plugin.on_template_context(context, doc_path=doc_path)
+        if _is_page_role(context, "glossary"):
+            context.update({"site_glossary": self.compile_glossary()})
         return context

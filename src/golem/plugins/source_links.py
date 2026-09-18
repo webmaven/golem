@@ -210,26 +210,18 @@ def _resolve_relative_doc_path(
     [returns]
     `str`:: Normalized POSIX path relative to repository root.
     """
-    clean_docs_dir = docs_dir.strip("/") if docs_dir else None
-
-    # Check if doc_path is absolute and inside root_dir
     if doc_path.is_absolute() and root_dir:
         try:
-            rel = doc_path.resolve().relative_to(root_dir.resolve())
-            return rel.as_posix()
+            return doc_path.resolve().relative_to(root_dir.resolve()).as_posix()
         except ValueError:
             pass
 
-    if doc_path.is_absolute() and current_path:
-        rel_str = current_path.lstrip("/")
-    elif doc_path.is_absolute():
-        rel_str = doc_path.name
-    else:
-        rel_str = doc_path.as_posix().lstrip("/")
+    rel_str = (current_path or (doc_path.name if doc_path.is_absolute() else doc_path.as_posix())).lstrip("/")
 
+    clean_docs_dir = docs_dir.strip("/") if docs_dir else None
     if clean_docs_dir:
-        parts = rel_str.split("/")
-        if parts and parts[0] == clean_docs_dir:
+        parts = rel_str.split("/", 1)
+        if parts[0] == clean_docs_dir:
             return rel_str
         return f"{clean_docs_dir}/{rel_str}"
     return rel_str

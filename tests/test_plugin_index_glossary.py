@@ -18,7 +18,6 @@ from asciidoctrine.nodes import (
 
 from golem.plugins.index_glossary import (
     GlossaryPlugin,
-    IndexGlossaryPlugin,
     IndexPlugin,
 )
 
@@ -208,8 +207,9 @@ def test_glossary_reset() -> None:
     assert plugin.compile_glossary() == {}
 
 
-def test_combined_plugin_collects_both() -> None:
-    plugin = IndexGlossaryPlugin()
+def test_plugins_collect_both_from_same_doc() -> None:
+    idx_plugin = IndexPlugin()
+    glo_plugin = GlossaryPlugin()
 
     glossary_item = DescriptionListItem(
         terms=[DescriptionListTerm([Text("API")])],
@@ -224,11 +224,13 @@ def test_combined_plugin_collects_both() -> None:
     doc = Document([dlist, p])
     doc_path = Path("docs/combined.adoc")
 
-    res = plugin.on_asg_created(doc, doc_path=doc_path)
-    assert res is doc
+    res_idx = idx_plugin.on_asg_created(doc, doc_path=doc_path)
+    res_glo = glo_plugin.on_asg_created(doc, doc_path=doc_path)
+    assert res_idx is doc
+    assert res_glo is doc
 
-    index = plugin.compile_index()
-    glossary = plugin.compile_glossary()
+    index = idx_plugin.compile_index()
+    glossary = glo_plugin.compile_glossary()
 
     assert "C" in index
     assert "Compiler" in index["C"]
@@ -243,13 +245,11 @@ def test_combined_plugin_collects_both() -> None:
 def test_on_asg_created_returns_node_unchanged() -> None:
     idx_plugin = IndexPlugin()
     glo_plugin = GlossaryPlugin()
-    comb_plugin = IndexGlossaryPlugin()
 
     doc = Document([Paragraph([Text("Simple paragraph")])])
 
     assert idx_plugin.on_asg_created(doc) is doc
     assert glo_plugin.on_asg_created(doc) is doc
-    assert comb_plugin.on_asg_created(doc) is doc
 
 
 def test_index_deduplicates_locations_in_same_doc() -> None:
@@ -323,7 +323,8 @@ def test_glossary_multiple_terms_single_item() -> None:
 
 
 def test_real_asciidoctrine_parsing() -> None:
-    plugin = IndexGlossaryPlugin()
+    idx_plugin = IndexPlugin()
+    glo_plugin = GlossaryPlugin()
     doc_src = """= Reference Manual
 
 [glossary]
@@ -333,10 +334,11 @@ CLI:: Command Line Interface
 Here is an indexterm:[Compiler] and ((Parser)).
 """
     doc = asciidoctrine.loads(doc_src)
-    plugin.on_asg_created(doc, doc_path=Path("docs/ref.adoc"))
+    idx_plugin.on_asg_created(doc, doc_path=Path("docs/ref.adoc"))
+    glo_plugin.on_asg_created(doc, doc_path=Path("docs/ref.adoc"))
 
-    index = plugin.compile_index()
-    glossary = plugin.compile_glossary()
+    index = idx_plugin.compile_index()
+    glossary = glo_plugin.compile_glossary()
 
     assert "C" in index
     assert "Compiler" in index["C"]
@@ -374,14 +376,16 @@ A paragraph with indexterm:[Compiler] and ((Parser)).
         site_title="Test Site",
     )
     engine = BuildEngine(config)
-    plugin = IndexGlossaryPlugin()
-    engine.pm.register(plugin)
+    idx_plugin = IndexPlugin()
+    glo_plugin = GlossaryPlugin()
+    engine.pm.register(idx_plugin)
+    engine.pm.register(glo_plugin)
 
     compiled = engine.build_site()
     assert len(compiled) == 1
 
-    index = plugin.compile_index()
-    glossary = plugin.compile_glossary()
+    index = idx_plugin.compile_index()
+    glossary = glo_plugin.compile_glossary()
 
     assert "C" in index
     assert "Compiler" in index["C"]
@@ -512,3 +516,83 @@ def test_index_raw_dict_asg() -> None:
     assert "P" in index
     assert "Parser" in index["P"]
     assert index["P"]["Parser"]["locations"] == ["docs/raw_index.adoc"]
+
+
+def test_index_plugin_inheritance():
+    from golem.plugins import GolemPlugin
+
+    assert issubclass(IndexPlugin, GolemPlugin)
+    assert IndexPlugin.name == "index"
+    plugin = IndexPlugin()
+    assert plugin.name == "index"
+
+
+def test_glossary_plugin_inheritance():
+    from golem.plugins import GolemPlugin
+
+    assert issubclass(GlossaryPlugin, GolemPlugin)
+    assert GlossaryPlugin.name == "glossary"
+    plugin = GlossaryPlugin()
+    assert plugin.name == "glossary"
+
+
+def test_index_template_context_conditional_injection():
+    plugin = IndexPlugin()
+    doc = Document([Paragraph([IndexTerm(terms=["Compiler"])])])
+    plugin.on_asg_created(doc, doc_path=Path("docs/compiler.adoc"))
+
+    # 1. Ordinary page: site_index should NOT be injected
+    ctx_normal: dict[str, Any] = {"title": "Normal Page"}
+    res_normal = plugin.on_template_context(ctx_normal, Path("docs/normal.adoc"))
+    assert "site_index" not in res_normal
+
+    # 2. Page with page-role: "index" in doc_attributes: site_index MUST be injected
+    ctx_role_attr: dict[str, Any] = {"doc_attributes": {"page-role": "index"}}
+    res_role_attr = plugin.on_template_context(ctx_role_attr, Path("docs/index.adoc"))
+    assert "site_index" in res_role_attr
+    assert "C" in res_role_attr["site_index"]
+    assert "Compiler" in res_role_attr["site_index"]["C"]
+
+    # 3. Page with page_role: "index" directly: site_index MUST be injected
+    ctx_role_direct: dict[str, Any] = {"page_role": "index"}
+    res_role_direct = plugin.on_template_context(ctx_role_direct, Path("docs/index.adoc"))
+    assert "site_index" in res_role_direct
+
+    # 4. Page with page-role: "glossary" (wrong role): site_index should NOT be injected
+    ctx_wrong_role: dict[str, Any] = {"doc_attributes": {"page-role": "glossary"}}
+    res_wrong_role = plugin.on_template_context(ctx_wrong_role, Path("docs/glossary.adoc"))
+    assert "site_index" not in res_wrong_role
+
+
+def test_glossary_template_context_conditional_injection():
+    plugin = GlossaryPlugin()
+    item = DescriptionListItem(
+        terms=[DescriptionListTerm([Text("API")])],
+        blocks=[Paragraph([Text("Application Programming Interface")])],
+    )
+    dlist = DescriptionList([item])
+    dlist.attributes["role"] = "glossary"
+    doc = Document([dlist])
+    plugin.on_asg_created(doc, doc_path=Path("docs/glossary.adoc"))
+
+    # 1. Ordinary page: site_glossary should NOT be injected
+    ctx_normal: dict[str, Any] = {"title": "Normal Page"}
+    res_normal = plugin.on_template_context(ctx_normal, Path("docs/normal.adoc"))
+    assert "site_glossary" not in res_normal
+
+    # 2. Page with page-role: "glossary" in doc_attributes: site_glossary MUST be injected
+    ctx_role_attr: dict[str, Any] = {"doc_attributes": {"page-role": "glossary"}}
+    res_role_attr = plugin.on_template_context(ctx_role_attr, Path("docs/glossary.adoc"))
+    assert "site_glossary" in res_role_attr
+    assert "A" in res_role_attr["site_glossary"]
+    assert res_role_attr["site_glossary"]["A"][0]["term"] == "API"
+
+    # 3. Page with page_role: "glossary" directly: site_glossary MUST be injected
+    ctx_role_direct: dict[str, Any] = {"page_role": "glossary"}
+    res_role_direct = plugin.on_template_context(ctx_role_direct, Path("docs/glossary.adoc"))
+    assert "site_glossary" in res_role_direct
+
+    # 4. Page with page-role: "index" (wrong role): site_glossary should NOT be injected
+    ctx_wrong_role: dict[str, Any] = {"doc_attributes": {"page-role": "index"}}
+    res_wrong_role = plugin.on_template_context(ctx_wrong_role, Path("docs/index.adoc"))
+    assert "site_glossary" not in res_wrong_role

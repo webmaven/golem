@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from golem.metadata import clean_index_url, title_from_filename
-from golem.plugins import hookimpl
+from golem.plugins import GolemPlugin, hookimpl
 
 __all__ = [
     "NavigationHelpersPlugin",
@@ -92,7 +92,7 @@ def _matches(node: Any, current_path_str: str | None, doc_path: Path) -> bool:
 
 
 def _find_chain(nodes: list[Any], current_path_str: str | None, doc_path: Path) -> list[Any] | None:
-    """Recursively traverse navigation nodes to find the ancestor chain to current page.
+    """Iteratively traverse navigation nodes to find the ancestor chain to current page.
 
     [parameters]
     `nodes` (list[Any]):: List of navigation tree nodes.
@@ -102,14 +102,24 @@ def _find_chain(nodes: list[Any], current_path_str: str | None, doc_path: Path) 
     [returns]
     `list[Any] | None`:: Ordered chain of nodes from top level to current page, or `None` if not found.
     """
-    for node in nodes:
+    if not nodes:
+        return None
+
+    stack: list[tuple[Any, int]] = [(node, 0) for node in reversed(nodes)]
+    active_chain: list[Any] = []
+
+    while stack:
+        node, depth = stack.pop()
+        active_chain[depth:] = [node]
+
         if _matches(node, current_path_str, doc_path):
-            return [node]
+            return list(active_chain)
+
         children = _get(node, "children", []) or []
         if children:
-            child_chain = _find_chain(children, current_path_str, doc_path)
-            if child_chain is not None:
-                return [node] + child_chain
+            for child in reversed(children):
+                stack.append((child, depth + 1))
+
     return None
 
 
@@ -190,7 +200,7 @@ def _is_home_node(node: Any, home_title: str, home_url: str) -> bool:
     return False
 
 
-class NavigationHelpersPlugin:
+class NavigationHelpersPlugin(GolemPlugin):
     """Provide breadcrumbs navigation, flattened nav tree, and context helpers.
 
     [attributes]
@@ -207,13 +217,17 @@ class NavigationHelpersPlugin:
     ----
     """
 
-    def __init__(self, home_title: str = "Home", home_url: str | None = None) -> None:
+    name = "nav_helpers"
+
+    def __init__(self, home_title: str = "Home", home_url: str | None = None, **extra: Any) -> None:
         """Initialize navigation helpers plugin with home breadcrumb configuration.
 
         [parameters]
         `home_title` (str, optional):: Label for the site root breadcrumb entry. Defaults to `"Home"`.
         `home_url` (str | None, optional):: Link URL for the root breadcrumb entry. Defaults to `None`.
+        `**extra`:: Additional plugin configuration options.
         """
+        super().__init__(home_title=home_title, home_url=home_url, **extra)
         self.home_title = home_title
         self.home_url = home_url
 

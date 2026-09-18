@@ -448,7 +448,7 @@ class SimpleClassPlugin:
     assert "simple: test" in res
 
 
-def test_uniform_class_resolution_config_none(tmp_path, monkeypatch):
+def test_uniform_class_resolution_default_config(tmp_path, monkeypatch):
     """Verify get_plugin_manager calls cls() when config is None."""
     from golem.plugins import get_plugin_manager
 
