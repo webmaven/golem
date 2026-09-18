@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import asciidoctrine
 from asciidoctrine.nodes import (
@@ -391,3 +392,123 @@ A paragraph with indexterm:[Compiler] and ((Parser)).
     assert glossary["A"][0]["term"] == "API"
     assert "C" in glossary
     assert glossary["C"][0]["term"] == "CLI"
+
+
+def test_glossary_raw_dict_asg() -> None:
+    plugin = GlossaryPlugin()
+    raw_asg: dict[str, Any] = {
+        "name": "document",
+        "type": "block",
+        "blocks": [
+            {
+                "name": "descriptionList",
+                "type": "block",
+                "attributes": {"style": "glossary"},
+                "items": [
+                    {
+                        "name": "descriptionListItem",
+                        "type": "block",
+                        "terms": [
+                            {
+                                "name": "descriptionListTerm",
+                                "type": "inline",
+                                "inlines": [{"name": "text", "type": "string", "value": "API"}],
+                            }
+                        ],
+                        "blocks": [
+                            {
+                                "name": "paragraph",
+                                "type": "block",
+                                "inlines": [
+                                    {
+                                        "name": "text",
+                                        "type": "string",
+                                        "value": "Application Programming Interface",
+                                    }
+                                ],
+                            }
+                        ],
+                    },
+                    {
+                        "name": "descriptionListItem",
+                        "type": "block",
+                        "terms": [
+                            {
+                                "name": "descriptionListTerm",
+                                "type": "inline",
+                                "inlines": [{"name": "text", "type": "string", "value": "CLI"}],
+                            }
+                        ],
+                        "blocks": [
+                            {
+                                "name": "paragraph",
+                                "type": "block",
+                                "inlines": [
+                                    {
+                                        "name": "text",
+                                        "type": "string",
+                                        "value": "Command Line Interface",
+                                    }
+                                ],
+                            }
+                        ],
+                    },
+                ],
+            }
+        ],
+    }
+
+    result = plugin.on_asg_created(raw_asg, doc_path=Path("docs/raw_glossary.adoc"))  # type: ignore[arg-type]
+    assert result is raw_asg
+
+    glossary = plugin.compile_glossary()
+    assert "A" in glossary
+    assert "C" in glossary
+    assert glossary["A"][0] == {
+        "term": "API",
+        "definition": "Application Programming Interface",
+        "doc_path": "docs/raw_glossary.adoc",
+    }
+    assert glossary["C"][0] == {
+        "term": "CLI",
+        "definition": "Command Line Interface",
+        "doc_path": "docs/raw_glossary.adoc",
+    }
+
+
+def test_index_raw_dict_asg() -> None:
+    plugin = IndexPlugin()
+    raw_asg: dict[str, Any] = {
+        "name": "document",
+        "type": "block",
+        "blocks": [
+            {
+                "name": "paragraph",
+                "type": "block",
+                "inlines": [
+                    {
+                        "name": "indexterm",
+                        "type": "inline",
+                        "terms": ["Compiler", "Optimization"],
+                    },
+                    {
+                        "name": "indexterm",
+                        "type": "inline",
+                        "primary": "Parser",
+                    },
+                ],
+            }
+        ],
+    }
+
+    result = plugin.on_asg_created(raw_asg, doc_path=Path("docs/raw_index.adoc"))  # type: ignore[arg-type]
+    assert result is raw_asg
+
+    index = plugin.compile_index()
+    assert "C" in index
+    assert "Compiler" in index["C"]
+    assert index["C"]["Compiler"]["locations"] == ["docs/raw_index.adoc"]
+    assert "Optimization" in index["C"]["Compiler"]["secondary"]
+    assert "P" in index
+    assert "Parser" in index["P"]
+    assert index["P"]["Parser"]["locations"] == ["docs/raw_index.adoc"]

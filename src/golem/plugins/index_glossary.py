@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from asciidoctrine.nodes import Node
+from asciidoctrine.nodes import IndexTerm, Node
 from golem.plugins import hookimpl
 
 __all__ = [
@@ -107,9 +107,10 @@ def _is_glossary_list(node: Any) -> bool:
     ):
         return False
 
-    attrs = getattr(node, "attributes", None)
-    if attrs is None and isinstance(node, dict):
+    if isinstance(node, dict):
         attrs = node.get("attributes")
+    else:
+        attrs = getattr(node, "attributes", None)
 
     if isinstance(attrs, dict):
         if attrs.get("role") == "glossary" or attrs.get("style") == "glossary":
@@ -125,7 +126,10 @@ def _is_glossary_list(node: Any) -> bool:
         if isinstance(roles, str) and "glossary" in roles.split():
             return True
 
-    if getattr(node, "role", None) == "glossary" or getattr(node, "style", None) == "glossary":
+    if isinstance(node, dict):
+        if node.get("role") == "glossary" or node.get("style") == "glossary":
+            return True
+    elif getattr(node, "role", None) == "glossary" or getattr(node, "style", None) == "glossary":
         return True
 
     return False
@@ -141,9 +145,10 @@ def _extract_definition_list_terms(item: Any) -> list[str]:
     `list[str]`:: List of cleaned term strings.
     """
     terms: list[str] = []
-    raw_terms = getattr(item, "terms", None)
-    if raw_terms is None and isinstance(item, dict):
+    if isinstance(item, dict):
         raw_terms = item.get("terms")
+    else:
+        raw_terms = getattr(item, "terms", None)
 
     if raw_terms is not None:
         if isinstance(raw_terms, (list, tuple)):
@@ -176,11 +181,6 @@ def _extract_definition_list_blocks(item: Any) -> str:
     [returns]
     `str`:: Combined definition text formatted across paragraphs.
     """
-    blocks = getattr(item, "blocks", None)
-    if blocks:
-        parts = [_extract_text(b) for b in blocks]
-        return "\n\n".join(p for p in parts if p)
-
     if isinstance(item, dict):
         if "definition" in item:
             return str(item["definition"]).strip()
@@ -191,11 +191,16 @@ def _extract_definition_list_blocks(item: Any) -> str:
             return "\n\n".join(p for p in parts if p)
         if "text" in item:
             return str(item["text"]).strip()
+    else:
+        blocks = getattr(item, "blocks", None)
+        if blocks:
+            parts = [_extract_text(b) for b in blocks]
+            return "\n\n".join(p for p in parts if p)
 
-    for attr in ("definition", "description", "text"):
-        val = getattr(item, attr, None)
-        if val is not None:
-            return _extract_text(val)
+        for attr in ("definition", "description", "text"):
+            val = getattr(item, attr, None)
+            if val is not None:
+                return _extract_text(val)
 
     return ""
 
@@ -213,7 +218,14 @@ class IndexPlugin:
 
     @classmethod
     def from_config(cls, config: Any = None) -> IndexPlugin:
-        """Construct an IndexPlugin instance from configuration."""
+        """Construct an IndexPlugin instance from configuration.
+
+        [parameters]
+        `config` (Any, optional):: Site configuration object or dictionary. Defaults to `None`.
+
+        [returns]
+        `IndexPlugin`:: Configured index plugin instance.
+        """
         return cls()
 
     @hookimpl
@@ -230,20 +242,29 @@ class IndexPlugin:
         doc_path_str = str(doc_path) if doc_path is not None else ""
 
         for node in _walk_asg(asg):
-            type_name = type(node).__name__
-            name = getattr(node, "name", "")
             is_index_term = (
-                type_name == "IndexTerm"
-                or name == "indexterm"
-                or (isinstance(node, dict) and node.get("name") == "indexterm")
-                or (isinstance(node, dict) and "terms" in node and node.get("type") == "inline")
+                isinstance(node, IndexTerm)
+                or (
+                    isinstance(node, dict)
+                    and (node.get("name") in ("indexterm", "IndexTerm") or ("terms" in node and node.get("type") == "inline"))
+                )
+                or getattr(node, "name", "") == "indexterm"
             )
             if not is_index_term:
                 continue
 
-            raw_terms = getattr(node, "terms", None)
-            if raw_terms is None and isinstance(node, dict):
+            if isinstance(node, dict):
                 raw_terms = node.get("terms")
+                if not raw_terms:
+                    prim = node.get("primary")
+                    if prim:
+                        raw_terms = [prim]
+                        if node.get("secondary"):
+                            raw_terms.append(node.get("secondary"))
+                            if node.get("tertiary"):
+                                raw_terms.append(node.get("tertiary"))
+            else:
+                raw_terms = getattr(node, "terms", None)
             if not raw_terms:
                 continue
 
@@ -299,7 +320,11 @@ class IndexPlugin:
         return asg
 
     def compile_index(self) -> dict[str, dict[str, Any]]:
-        """Return alphabetized index: {letter: {primary_term: {"locations": [doc_path_strings]}}}."""
+        """Return alphabetized hierarchical index compiled from collected terms.
+
+        [returns]
+        `dict[str, dict[str, Any]]`:: Nested dictionary mapping first letters to term entries and subterms.
+        """
         result: dict[str, dict[str, Any]] = {}
         for letter in sorted(self._entries.keys()):
             result[letter] = {}
@@ -333,12 +358,24 @@ class IndexPlugin:
         return result
 
     def reset(self) -> None:
-        """Clear accumulated index entries (for fresh builds)."""
+        """Clear accumulated index entries.
+
+        [returns]
+        `None`:: Clears state in place with no return value.
+        """
         self._entries.clear()
 
     @hookimpl
     def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
-        """Inject compiled index into template context."""
+        """Inject compiled index into template context.
+
+        [parameters]
+        `context` (dict[str, Any]):: Chameleon template context dictionary.
+        `doc_path` (Path):: Path to the documentation source file being processed.
+
+        [returns]
+        `dict[str, Any]`:: Enriched template context containing the `site_index` mapping.
+        """
         context.setdefault("site_index", self.compile_index())
         return context
 
@@ -356,7 +393,14 @@ class GlossaryPlugin:
 
     @classmethod
     def from_config(cls, config: Any = None) -> GlossaryPlugin:
-        """Construct a GlossaryPlugin instance from configuration."""
+        """Construct a GlossaryPlugin instance from configuration.
+
+        [parameters]
+        `config` (Any, optional):: Site configuration object or dictionary. Defaults to `None`.
+
+        [returns]
+        `GlossaryPlugin`:: Configured glossary plugin instance.
+        """
         return cls()
 
     @hookimpl
@@ -376,9 +420,10 @@ class GlossaryPlugin:
             if not _is_glossary_list(node):
                 continue
 
-            items = getattr(node, "items", None)
-            if items is None and isinstance(node, dict):
+            if isinstance(node, dict):
                 items = node.get("items") or node.get("children") or node.get("blocks")
+            else:
+                items = getattr(node, "items", None)
             if not items or not isinstance(items, (list, tuple)):
                 continue
 
@@ -395,7 +440,11 @@ class GlossaryPlugin:
         return asg
 
     def compile_glossary(self) -> dict[str, list[dict[str, Any]]]:
-        """Return alphabetized glossary: {letter: [{"term": str, "definition": str, "doc_path": str}]}."""
+        """Return alphabetized glossary compiled from collected definition lists.
+
+        [returns]
+        `dict[str, list[dict[str, Any]]]`:: Grouped dictionary mapping first letters to term entries.
+        """
         grouped: dict[str, list[dict[str, Any]]] = {}
         for term, entry in self._entries.items():
             if not term:
@@ -418,12 +467,24 @@ class GlossaryPlugin:
         return result
 
     def reset(self) -> None:
-        """Clear accumulated glossary entries (for fresh builds)."""
+        """Clear accumulated glossary entries.
+
+        [returns]
+        `None`:: Clears state in place with no return value.
+        """
         self._entries.clear()
 
     @hookimpl
     def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
-        """Inject compiled glossary into template context."""
+        """Inject compiled glossary into template context.
+
+        [parameters]
+        `context` (dict[str, Any]):: Chameleon template context dictionary.
+        `doc_path` (Path):: Path to the documentation source file being processed.
+
+        [returns]
+        `dict[str, Any]`:: Enriched template context containing the `site_glossary` mapping.
+        """
         context.setdefault("site_glossary", self.compile_glossary())
         return context
 
@@ -437,7 +498,14 @@ class IndexGlossaryPlugin:
 
     @classmethod
     def from_config(cls, config: Any = None) -> IndexGlossaryPlugin:
-        """Construct an IndexGlossaryPlugin instance from configuration."""
+        """Construct an IndexGlossaryPlugin instance from configuration.
+
+        [parameters]
+        `config` (Any, optional):: Site configuration object or dictionary. Defaults to `None`.
+
+        [returns]
+        `IndexGlossaryPlugin`:: Configured combined index and glossary plugin instance.
+        """
         return cls()
 
     @hookimpl
@@ -456,21 +524,41 @@ class IndexGlossaryPlugin:
         return asg
 
     def compile_index(self) -> dict[str, dict[str, Any]]:
-        """Return compiled alphabetized index."""
+        """Return compiled alphabetized index.
+
+        [returns]
+        `dict[str, dict[str, Any]]`:: Nested dictionary mapping first letters to term entries and subterms.
+        """
         return self.index_plugin.compile_index()
 
     def compile_glossary(self) -> dict[str, list[dict[str, Any]]]:
-        """Return compiled alphabetized glossary."""
+        """Return compiled alphabetized glossary.
+
+        [returns]
+        `dict[str, list[dict[str, Any]]]`:: Grouped dictionary mapping first letters to term entries.
+        """
         return self.glossary_plugin.compile_glossary()
 
     def reset(self) -> None:
-        """Clear accumulated index and glossary entries."""
+        """Clear accumulated index and glossary entries.
+
+        [returns]
+        `None`:: Clears state in place with no return value.
+        """
         self.index_plugin.reset()
         self.glossary_plugin.reset()
 
     @hookimpl
     def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
-        """Inject compiled index and glossary into template context."""
+        """Inject compiled index and glossary into template context.
+
+        [parameters]
+        `context` (dict[str, Any]):: Chameleon template context dictionary.
+        `doc_path` (Path):: Path to the documentation source file being processed.
+
+        [returns]
+        `dict[str, Any]`:: Enriched template context containing both index and glossary mappings.
+        """
         self.index_plugin.on_template_context(context, doc_path=doc_path)
         self.glossary_plugin.on_template_context(context, doc_path=doc_path)
         return context
