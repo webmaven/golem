@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from asciidoctrine.nodes import DescriptionList, IndexTerm
-from golem.model import AsgVisitor, Node
+from golem.model import AsgVisitor, GlossaryEntry, Node, PageContext
 from golem.plugins import GolemPlugin, hookimpl
 
 __all__ = [
@@ -168,11 +168,11 @@ def _extract_definition_list_blocks(item: Any) -> str:
     return ""
 
 
-def _is_page_role(context: dict[str, Any], role_name: str) -> bool:
+def _is_page_role(context: PageContext | dict[str, Any], role_name: str) -> bool:
     """Check if template context or document attributes declare a specific page role.
 
     [parameters]
-    `context` (dict[str, Any]):: Chameleon template context dictionary.
+    `context` (PageContext | dict[str, Any]):: Chameleon template context dictionary.
     `role_name` (str):: Expected role string (e.g. `"index"` or `"glossary"`).
 
     [returns]
@@ -441,15 +441,15 @@ class IndexPlugin(GolemPlugin):
         self._entries.clear()
 
     @hookimpl
-    def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+    def on_template_context(self, context: PageContext, doc_path: Path) -> PageContext:
         """Inject compiled index into template context if page declares index role.
 
         [parameters]
-        `context` (dict[str, Any]):: Chameleon template context dictionary.
+        `context` (PageContext):: Chameleon template context dictionary.
         `doc_path` (Path):: Path to the documentation source file being processed.
 
         [returns]
-        `dict[str, Any]`:: Enriched template context containing `site_index` if role matches.
+        `PageContext`:: Enriched template context containing `site_index` if role matches.
         """
         if _is_page_role(context, "index"):
             context.update({"site_index": self.compile_index()})
@@ -498,13 +498,13 @@ class GlossaryPlugin(GolemPlugin):
         visitor.visit(asg)
         return asg
 
-    def compile_glossary(self) -> dict[str, list[dict[str, Any]]]:
+    def compile_glossary(self) -> dict[str, list[GlossaryEntry]]:
         """Return alphabetized glossary compiled from collected definition lists.
 
         [returns]
-        `dict[str, list[dict[str, Any]]]`:: Grouped dictionary mapping first letters to term entries.
+        `dict[str, list[GlossaryEntry]]`:: Grouped dictionary mapping first letters to term entries.
         """
-        grouped: dict[str, list[dict[str, Any]]] = {}
+        grouped: dict[str, list[GlossaryEntry]] = {}
         for term, entry in self._entries.items():
             if not term:
                 continue
@@ -519,7 +519,7 @@ class GlossaryPlugin(GolemPlugin):
                 }
             )
 
-        result: dict[str, list[dict[str, Any]]] = {}
+        result: dict[str, list[GlossaryEntry]] = {}
         for letter in sorted(grouped.keys()):
             result[letter] = sorted(grouped[letter], key=lambda e: (e["term"].lower(), e["term"]))
 
@@ -534,15 +534,15 @@ class GlossaryPlugin(GolemPlugin):
         self._entries.clear()
 
     @hookimpl
-    def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+    def on_template_context(self, context: PageContext, doc_path: Path) -> PageContext:
         """Inject compiled glossary into template context if page declares glossary role.
 
         [parameters]
-        `context` (dict[str, Any]):: Chameleon template context dictionary.
+        `context` (PageContext):: Chameleon template context dictionary.
         `doc_path` (Path):: Path to the documentation source file being processed.
 
         [returns]
-        `dict[str, Any]`:: Enriched template context containing `site_glossary` if role matches.
+        `PageContext`:: Enriched template context containing `site_glossary` if role matches.
         """
         if _is_page_role(context, "glossary"):
             context.update({"site_glossary": self.compile_glossary()})

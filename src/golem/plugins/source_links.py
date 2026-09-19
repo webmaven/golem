@@ -13,6 +13,7 @@ import urllib.parse
 from pathlib import Path
 from typing import Any
 
+from golem.model import PageContext, SourceLinksContext
 from golem.plugins import GolemPlugin, hookimpl
 
 __all__ = [
@@ -362,15 +363,15 @@ class SourceLinksPlugin(GolemPlugin):
         )
 
     @hookimpl
-    def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+    def on_template_context(self, context: PageContext, doc_path: Path) -> PageContext:
         """Inject repository, file edit, and file view URLs into template context.
 
         [parameters]
-        `context` (dict[str, Any]):: Chameleon template context dictionary.
+        `context` (PageContext):: Chameleon template context dictionary.
         `doc_path` (Path):: Path to the documentation source file being processed.
 
         [returns]
-        `dict[str, Any]`:: Enriched template context containing source URL keys.
+        `PageContext`:: Enriched template context containing source URL keys.
         """
         if not self.repo_url:
             return context
@@ -393,7 +394,7 @@ class SourceLinksPlugin(GolemPlugin):
         edit_url = self._format_url(self.edit_url_template, default_edit, file_path)
         view_url = self._format_url(self.view_url_template, default_view, file_path)
 
-        injected = {
+        injected: SourceLinksContext = {
             "source_repo_url": self.repo_url,
             "source_edit_url": edit_url,
             "source_view_url": view_url,

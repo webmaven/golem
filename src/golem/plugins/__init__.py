@@ -58,6 +58,8 @@ from asciidoctrine.nodes import Node
 import click
 import pluggy
 
+from golem.model import PageContext
+
 if TYPE_CHECKING:
     from golem.config import GolemConfig
 
@@ -263,7 +265,7 @@ class GolemSpecs:
         return asg
 
     @hookspec
-    def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+    def on_template_context(self, context: PageContext, doc_path: Path) -> PageContext | dict[str, Any]:
         """Intercept and modify or enrich the template context dictionary before Chameleon page rendering.
 
         Executed sequentially per document before Chameleon layout template compilation.
@@ -271,20 +273,21 @@ class GolemSpecs:
         navigation structures, timestamps, or author details) or modify existing context values.
 
         [parameters]
-        `context` (dict[str, Any]):: Dictionary of context variables prepared for the template.
+        `context` (PageContext):: Dictionary of context variables prepared for the template.
         `doc_path` (Path):: Path to the AsciiDoc document being compiled.
 
         [returns]
-        `dict[str, Any]`:: Updated context dictionary or new keys to merge into the template context.
+        `PageContext | dict[str, Any]`:: Updated context dictionary or new keys to merge into the template context.
 
         [source,python]
         ----
         from pathlib import Path
         from typing import Any
+        from golem.model import PageContext
         from golem.plugins import hookimpl
 
         @hookimpl
-        def on_template_context(context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+        def on_template_context(context: PageContext, doc_path: Path) -> PageContext:
             context["github_url"] = f"https://github.com/myorg/myrepo/edit/main/{doc_path.name}"
             return context
         ----

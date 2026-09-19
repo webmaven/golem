@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from golem.metadata import clean_index_url, title_from_filename
+from golem.model import BreadcrumbItem, NavFlatItem, NavHelpersContext, PageContext
 from golem.plugins import GolemPlugin, hookimpl
 
 __all__ = [
@@ -123,7 +124,7 @@ def _find_chain(nodes: list[Any], current_path_str: str | None, doc_path: Path) 
     return None
 
 
-def _flatten_nav_tree(nodes: list[Any], current_depth: int = 0) -> list[dict[str, Any]]:
+def _flatten_nav_tree(nodes: list[Any], current_depth: int = 0) -> list[NavFlatItem]:
     """Flatten a hierarchical navigation tree in depth-first order.
 
     [parameters]
@@ -131,9 +132,9 @@ def _flatten_nav_tree(nodes: list[Any], current_depth: int = 0) -> list[dict[str
     `current_depth` (int, optional):: Current nesting depth level. Defaults to `0`.
 
     [returns]
-    `list[dict[str, Any]]`:: Flattened ordered list of navigation entries with depth.
+    `list[NavFlatItem]`:: Flattened ordered list of navigation entries with depth.
     """
-    flat: list[dict[str, Any]] = []
+    flat: list[NavFlatItem] = []
     for node in nodes:
         title = _get(node, "title", "")
         url = _get(node, "url", "")
@@ -256,15 +257,15 @@ class NavigationHelpersPlugin(GolemPlugin):
         return cls(home_title=home_title, home_url=home_url)
 
     @hookimpl
-    def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+    def on_template_context(self, context: PageContext, doc_path: Path) -> PageContext:
         """Intercept and enrich template context with breadcrumbs and flattened nav tree.
 
         [parameters]
-        `context` (dict[str, Any]):: Chameleon template context dictionary.
+        `context` (PageContext):: Chameleon template context dictionary.
         `doc_path` (Path):: Path to the documentation source file being processed.
 
         [returns]
-        `dict[str, Any]`:: Enriched template context containing breadcrumbs and nav_tree_flat.
+        `PageContext`:: Enriched template context containing breadcrumbs and nav_tree_flat.
         """
         current_path = context.get("current_path")
         current_path_str = str(current_path) if current_path is not None else None
@@ -282,7 +283,7 @@ class NavigationHelpersPlugin(GolemPlugin):
         nav_tree_flat = _flatten_nav_tree(nav_tree)
 
         # Build breadcrumbs
-        breadcrumbs: list[dict[str, Any]] = []
+        breadcrumbs: list[BreadcrumbItem] = []
         is_home = _is_home_page(current_path_str, doc_path, self.home_title, page_title)
 
         if not nav_tree:
@@ -391,7 +392,7 @@ class NavigationHelpersPlugin(GolemPlugin):
                             }
                         )
 
-        injected: dict[str, Any] = {
+        injected: NavHelpersContext = {
             "breadcrumbs": breadcrumbs,
             "nav_tree_flat": nav_tree_flat,
         }
