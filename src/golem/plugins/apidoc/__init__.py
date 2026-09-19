@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 import sys
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 from asciidoctrine.nodes import Admonition, Paragraph, Text
 import click
@@ -12,11 +12,15 @@ from golem.model import AsgTransformer, Node
 from golem.plugins import hookimpl
 from .core import ApiGenOptions, AsciiDocApi
 
+if TYPE_CHECKING:
+    from golem.config import GolemConfig
+
 __all__ = [
     "AsciiDocApi",
     "ApiGenOptions",
     "ApidocMacroTransformer",
     "on_asg_created",
+    "on_build_start",
     "golem_add_subcommands",
     "generate_api_docs",
 ]
@@ -114,6 +118,40 @@ def generate_api_docs(
             all_generated[str(dest)] = content
 
     return all_generated
+
+
+@hookimpl
+def on_build_start(config: GolemConfig) -> None:
+    """Generate API documentation before compilation begins.
+
+    Runs when `config.api_packages` is set.
+    Writes AsciiDoc source files into `config.content_dir / config.api_output_dir`
+    (defaults to `content_dir/api`) using the `generate_api_docs` core pipeline.
+    When `config.api_packages` is empty or `None`, this hook is a no-op.
+
+    On failure, logs a warning and continues unless `config.strict` is `True`,
+    in which case the original exception propagates and the build is halted.
+
+    [parameters]
+    `config` (GolemConfig):: The active site configuration for this build.
+
+    [raises]
+    `Exception`:: Re-raised verbatim when `config.strict` is `True` and API
+        doc generation fails. Swallowed with a warning when `config.strict` is `False`.
+    """
+    if getattr(config, "api_packages", None):
+        try:
+            dest_dir = Path(config.content_dir) / getattr(config, "api_output_dir", "api")
+            generate_api_docs(
+                packages=config.api_packages,
+                output_dir=dest_dir,
+                search_paths=[Path.cwd(), Path("src")] + [Path(p) for p in sys.path if p],
+                docstring_style=getattr(config, "api_docstring_style", "auto"),
+            )
+        except Exception as e:
+            logger.warning("Failed to generate API documentation during build: %s", e)
+            if getattr(config, "strict", False):
+                raise
 
 
 @hookimpl

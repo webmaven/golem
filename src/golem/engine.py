@@ -25,6 +25,7 @@ during concurrent builds.
 
 The compilation pipeline proceeds through sequential phases:
 
+0. Build Pre-flight Hook Execution: Triggers registered `on_build_start` plugin hooks before stale detection.
 1. Stale Detection: Scans `content_dir` for `.adoc` files, purges deleted cache entries, and identifies outdated documents.
 2. Static Asset Synchronization: Copies package theme, user theme, and custom static directory assets into `output_dir / "static"`.
 3. Pre-Parse Hook Execution: Triggers registered `on_pre_parse` plugin hooks on raw source text.
@@ -34,6 +35,7 @@ The compilation pipeline proceeds through sequential phases:
 7. Navigation & Pagination Assembly: Discovers site navigation trees and calculates page-specific sequential pagination links.
 8. Template Context Framing & Post-Render Hooks: Executes `on_template_context` hooks, compiles the complete HTML page via Chameleon templates (`PageCompiler`), and executes `on_post_render` hooks.
 9. Disk Output & Cache Update: Writes compiled HTML files to `output_dir` and updates content hashes and include dependencies in the cache.
+10. Build Finish Hook Execution: Triggers registered `on_build_finish` plugin hooks with a `BuildResult`.
 """
 
 from __future__ import annotations
@@ -41,7 +43,6 @@ from __future__ import annotations
 import inspect
 import logging
 from pathlib import Path
-import sys
 from typing import Any
 
 import asciidoctrine
@@ -57,7 +58,11 @@ from golem.metadata import (
     extract_metadata_from_doc,
 )
 from golem.navigation import NavigationBuilder
-from golem.plugins import get_plugin_manager
+from golem.plugins import (
+    BuildResult,
+    GolemBuildAbortError,
+    get_plugin_manager,
+)
 from golem.renderer import (
     collect_node_types,
     generate_toc_html,
@@ -67,6 +72,23 @@ from golem.staleness import StalenessTracker, is_partial
 from golem.templates import PageCompiler
 
 __all__ = ["BuildEngine", "GolemEngine"]
+
+
+def _invoke_build_start_hook(impl: Any, config: GolemConfig) -> None:
+    """Invoke an on_build_start hook implementation with argument filtering."""
+    fn = getattr(impl, "function", None)
+    accepts_config = True
+    if fn is not None:
+        try:
+            sig = inspect.signature(fn)
+            params = sig.parameters
+            accepts_config = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()) or "config" in params
+        except (ValueError, TypeError):
+            pass
+    if accepts_config:
+        impl.function(config=config)
+    else:
+        impl.function()
 
 
 def _invoke_doc_hook(impl: Any, arg_name: str, arg_val: Any, doc_path: Path) -> Any:
@@ -238,18 +260,21 @@ class BuildEngine:
         """Orchestrate the incremental compilation pipeline for outdated AsciiDoc documents.
 
         Executes the complete documentation compilation lifecycle:
-        1. Generates automated API reference documentation via `golem.plugins.apidoc` if `config.api_packages` is configured.
+        1. Executes `on_build_start` plugin hooks before stale detection.
         2. Identifies stale or modified documents via `staleness_tracker.get_outdated_files()`.
         3. Synchronizes static assets into the output directory via `sync_static_assets()`.
         4. Compiles each outdated document through sequential AST parsing (`asciidoctrine`), ASG semantic resolution (`ASGResolver`), body rendering (`render_body`), navigation and TOC generation, and Chameleon template layout compilation (`PageCompiler`).
         5. Executes plugin hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_template_context`, `on_post_render`) across each lifecycle phase.
         6. Writes compiled HTML files to disk and updates the DAG cache via `staleness_tracker.update_cache_for_file()`.
+        7. Executes `on_build_finish` after all documents have been compiled and written to disk.
 
         [returns]
         `list[Path]`:: List of output `Path` objects for all compiled HTML documents.
 
         [raises]
-        `Exception`:: If compilation fails for any document while `config.strict` is `True`.
+        `GolemBuildAbortError`:: If any `on_build_start` hookimpl raises `GolemBuildAbortError`.
+            All pre-flight hooks run before the build halts; individual messages are aggregated.
+        `Exception`:: Any document compilation error when `config.strict` is `True`.
 
         === Examples
 
@@ -267,22 +292,28 @@ class BuildEngine:
         self._nav_tree_cache = None
         compiled_files = []
 
-        # Automated API doc generation when api_packages is configured
-        if getattr(self.config, "api_packages", None):
-            try:
-                from golem.plugins.apidoc import generate_api_docs
+        # Execute on_build_start lifecycle hooks with collect-all-errors pattern
+        abort_errors: list[GolemBuildAbortError] = []
+        if hasattr(self, "pm") and self.pm:
+            for impl in self.pm.hook.on_build_start.get_hookimpls():
+                try:
+                    _invoke_build_start_hook(impl, self.config)
+                except GolemBuildAbortError as exc:
+                    abort_errors.append(exc)
+                except Exception as exc:
+                    logging.warning(
+                        "[Plugin] %s raised an unexpected exception in on_build_start: %s",
+                        getattr(impl, "plugin_name", None) or str(impl.function),
+                        exc,
+                    )
+                    if getattr(self.config, "strict", False):
+                        raise
 
-                dest_dir = self.content_dir / getattr(self.config, "api_output_dir", "api")
-                generate_api_docs(
-                    packages=self.config.api_packages,
-                    output_dir=dest_dir,
-                    search_paths=[Path.cwd(), Path("src")] + [Path(p) for p in sys.path if p],
-                    docstring_style=getattr(self.config, "api_docstring_style", "auto"),
-                )
-            except Exception as e:
-                logging.warning(f"Failed to generate API documentation during build: {e}")
-                if getattr(self.config, "strict", False):
-                    raise
+        if abort_errors:
+            for err in abort_errors:
+                logging.error("Build pre-flight check failed: %s", err)
+            summary = "; ".join(str(e) for e in abort_errors)
+            raise GolemBuildAbortError(f"Build aborted: {len(abort_errors)} pre-flight check(s) failed: {summary}")
 
         outdated = self.staleness_tracker.get_outdated_files()
 
@@ -578,6 +609,13 @@ class BuildEngine:
                 logging.error(f"Failed to build file {doc_path}: {e}")
                 if getattr(self.config, "strict", False):
                     raise e
+
+        result = BuildResult(
+            compiled_files=compiled_files,
+            output_dir=output_dir,
+        )
+        if hasattr(self, "pm") and self.pm:
+            self.pm.hook.on_build_finish(config=self.config, result=result)
 
         return compiled_files
 
