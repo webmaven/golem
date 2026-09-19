@@ -1,4 +1,4 @@
-<!--
+<tal:comment tal:replace="nothing">
   =============================================================================
   Golem Default Layout Template (skeleton.pt)
   =============================================================================
@@ -70,7 +70,7 @@
   * site_glossary (dict[str, list[dict]]): Alphabetized glossary entries grouped by letter.
       (Injected by 'glossary' plugin on pages with :page-role: glossary)
   =============================================================================
--->
+</tal:comment>
 <!DOCTYPE html>
 <html lang="en" metal:define-macro="layout">
 <!-- METAL Slot: head - Document <head> metadata, custom CSS, and syntax styling -->

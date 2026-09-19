@@ -369,7 +369,7 @@ class LiveReloadServer:
                         encoded = html_content.encode("utf-8")
                         f_mem = io.BytesIO(encoded)
                         self.send_response(200)
-                        self.send_header("Content-Type", "text/html")
+                        self.send_header("Content-Type", "text/html; charset=utf-8")
                         self.send_header("Content-Length", str(len(encoded)))
                         self.end_headers()
                         return f_mem
