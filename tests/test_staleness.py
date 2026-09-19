@@ -1,7 +1,11 @@
-"""Unit tests for golem.staleness (StalenessTracker and is_partial)."""
+from pathlib import Path
+from typing import Any
+
+import pluggy
 
 from golem.cache import BuildCache
 from golem.config import GolemConfig
+from golem.plugins import GolemSpecs, hookimpl
 from golem.staleness import StalenessTracker, is_partial
 
 
@@ -117,3 +121,57 @@ def test_staleness_tracker_outdated_file_detection(tmp_path):
     outdated = tracker.get_outdated_files()
     assert doc1.resolve() in outdated
     assert doc2.resolve() not in outdated
+
+
+def test_staleness_tracker_golem_mark_stale_ordering_captures_modified_files(tmp_path: Path) -> None:
+    content = tmp_path / "content"
+    content.mkdir()
+    doc1 = content / "page1.adoc"
+    doc2 = content / "page2.adoc"
+    doc1.write_text("= Page 1", encoding="utf-8")
+    doc2.write_text("= Page 2", encoding="utf-8")
+
+    config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+    cache = BuildCache(tmp_path / "cache.json")
+
+    # Set up a plugin manager with a spy hook for golem_mark_stale
+    pm = pluggy.PluginManager("golem")
+    pm.add_hookspecs(GolemSpecs)
+
+    captured_changed_files: list[list[Path]] = []
+
+    class SpyPlugin:
+        @hookimpl
+        def golem_mark_stale(
+            self,
+            changed_files: list[Path],
+            cache_metadata: dict[str, dict[str, Any]],
+        ) -> list[Path] | None:
+            captured_changed_files.append(list(changed_files))
+            return None
+
+    pm.register(SpyPlugin())
+    tracker = StalenessTracker(config, cache, content, plugin_manager=pm)
+
+    # Populate cache for both documents initially
+    tracker.update_cache_for_file(doc1)
+    tracker.update_cache_for_file(doc2)
+    cache.save_cache()
+
+    # Modify doc1 on disk so its hash differs from cache
+    doc1.write_text("= Page 1 - Modified Content", encoding="utf-8")
+
+    # Call get_outdated_files()
+    outdated = tracker.get_outdated_files(commit=False)
+
+    # Verify spy captured changed_files
+    assert len(captured_changed_files) == 1, "golem_mark_stale hook must have been called once"
+    passed_files = captured_changed_files[0]
+    passed_files_resolved = {p.resolve() for p in passed_files}
+
+    # Assert that doc1 is present in changed_files passed to the hook
+    assert doc1.resolve() in passed_files_resolved, (
+        "Modified file must be present in changed_files passed to golem_mark_stale (proving the hook runs after hash scanning)"
+    )
+    assert doc2.resolve() not in passed_files_resolved, "Unmodified file must not be in changed_files"
+    assert doc1.resolve() in {p.resolve() for p in outdated}
