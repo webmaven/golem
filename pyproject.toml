@@ -78,7 +78,17 @@ theme = "default"
 plugins = [
     "golem.plugins.apidoc",
     "golem.plugins.doctest",
+    "golem.plugins.source_links:SourceLinksPlugin",
+    "golem.plugins.nav_helpers:NavigationHelpersPlugin",
+    "golem.plugins.index_glossary:GlossaryPlugin",
 ]
+
+[tool.golem.plugins.source_links]
+branch = "main"
+docs_dir = "docs"
+
+[tool.golem.plugins.nav_helpers]
+home_title = "Home"
 
 [tool.golem.api]
 packages = ["golem"]

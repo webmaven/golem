@@ -1,0 +1,100 @@
+= Glossary
+:page-role: glossary
+:nav_order: 92
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+Definitions for terminology used throughout the Golem documentation.
+Terms are collected by the Glossary plugin across all documentation pages
+and rendered below in alphabetical order.
+
+[glossary]
+AsciiDoc::
+  The document markup language used as Golem's primary source format.
+  AsciiDoc is a lightweight yet semantically rich plain-text format with
+  first-class support for cross-references, description lists, callout lists,
+  admonition blocks, and extensible macro syntax.
+
+ASG (Abstract Semantic Graph)::
+  Golem's processed in-memory document representation produced after semantic
+  analysis passes over the raw AST. The ASG is the structure that plugins
+  receive via `on_asg_created` hooks and that the renderer traverses to
+  produce HTML output.
+
+AST (Abstract Syntax Tree)::
+  The raw parse output from `asciidoctrine` before Golem's semantic passes
+  are applied. The AST faithfully mirrors the syntactic structure of the
+  source document; the ASG is derived from it after analysis and enrichment.
+
+Chameleon::
+  Golem's HTML templating engine, implementing Zope Page Templates (ZPT).
+  Chameleon renders `skeleton.pt` layout files using TAL for logic and METAL
+  for macro composition.
+
+DAG (Directed Acyclic Graph)::
+  The build dependency graph Golem maintains to track which pages are stale
+  when source files change. Edges in the DAG represent `include::` and other
+  transitive dependencies between documents.
+
+Golem::
+  The static site generator this documentation describes. Also: a figure from
+  Jewish folklore, animated by inscription, shaped from common clay — an
+  apt metaphor for documents brought to life through markup.
+
+hookimpl::
+  A Pluggy decorator (`@hookimpl`) that marks a method as an implementation
+  of a declared hook. A plugin registers hook implementations so Golem can
+  call them at the appropriate lifecycle point.
+
+hookspec::
+  A Pluggy decorator (`@hookspec`) that declares a hook interface — its name,
+  arguments, and calling convention. Golem defines hookspecs for events such
+  as `on_asg_created`, `on_template_context`, and `golem_add_subcommands`.
+
+METAL (Macro Expansion Template Attribute Language)::
+  The macro and slot system within Chameleon / ZPT. `metal:define-macro`
+  and `metal:define-slot` declare reusable layout regions; `metal:use-macro`
+  and `metal:fill-slot` let theme templates override individual regions
+  without duplicating the whole layout.
+
+nav_order::
+  An AsciiDoc document attribute (`:nav_order: N`) that controls a page's
+  sort position within Golem's auto-discovered navigation tree. Lower numbers
+  sort earlier. Pages without `nav_order` are sorted alphabetically after
+  all numbered pages.
+
+page-role::
+  An AsciiDoc document attribute (`:page-role: <role>`) that signals a page's
+  special function to Golem plugins. Recognized roles: `glossary` (triggers
+  the Glossary plugin to inject `site_glossary`) and `index` (triggers the
+  Index plugin to inject `site_index`).
+
+partial::
+  A Golem AsciiDoc file that is included into other documents via `include::`
+  rather than rendered as a standalone page. Golem detects partials by
+  filename convention (prefix `_`) or by their absence from the navigation
+  tree, and skips compiling them as independent HTML pages.
+
+Pluggy::
+  The plugin and hook dispatch framework used by Golem's extension system.
+  Pluggy provides the `hookspec` / `hookimpl` pair, call-time first-result
+  and call-all strategies, and runtime plugin registration.
+
+skeleton.pt::
+  The default Chameleon layout template at
+  `src/golem/templates/default/skeleton.pt`. Defines six METAL slots
+  (`head`, `header`, `navigation`, `content`, `table-of-contents`, `footer`)
+  that custom themes can selectively override.
+
+TAL (Template Attribute Language)::
+  The in-template logic language used by Chameleon. TAL directives such as
+  `tal:condition`, `tal:repeat`, `tal:content`, and `tal:attributes` let
+  templates iterate over data, conditionally render blocks, and substitute
+  values without leaving HTML syntax.
+
+ZPT (Zope Page Templates)::
+  The overall template system combining TAL (Template Attribute Language) for
+  logic and METAL (Macro Expansion Template Attribute Language) for layout
+  composition. Chameleon is Golem's ZPT engine.
