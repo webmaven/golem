@@ -479,7 +479,12 @@ class BuildEngine:
                 resolved_body_class = (body_class or page_class or "").strip()
                 resolved_content_class = (content_class or "").strip()
 
-                page_role = asg_attrs.get("page-role") or asg_attrs.get("page_role") or asg_attrs.get("role")
+                page_role = (
+                    asg_attrs.get("page-role")
+                    or asg_attrs.get("page_role")
+                    or asg_attrs.get("role")
+                    or (doc_meta.get("page_role") if doc_meta else None)
+                )
 
                 context_dict: dict[str, Any] = {
                     "title": title_str,

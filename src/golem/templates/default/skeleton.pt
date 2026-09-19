@@ -134,7 +134,7 @@
                             <span class="index-primary" tal:content="term">Term</span>
                             <span class="index-locations" tal:condition="site_index[letter][term]['locations']">
                                 : <span tal:repeat="loc site_index[letter][term]['locations']">
-                                    <a href="${loc}" tal:attributes="href loc" tal:content="loc">Page</a>
+                                    <a href="${loc.replace('.adoc', '.html')}" tal:attributes="href python: loc.replace('.adoc', '.html')" tal:content="loc">Page</a>
                                 </span>
                             </span>
                             <ul tal:condition="site_index[letter][term]['secondary']" class="index-secondary-list">
@@ -142,7 +142,7 @@
                                     <span class="index-secondary" tal:content="sec_term">Subterm</span>
                                     <span class="index-locations" tal:condition="site_index[letter][term]['secondary'][sec_term]['locations']">
                                         : <span tal:repeat="loc site_index[letter][term]['secondary'][sec_term]['locations']">
-                                            <a href="${loc}" tal:attributes="href loc" tal:content="loc">Page</a>
+                                            <a href="${loc.replace('.adoc', '.html')}" tal:attributes="href python: loc.replace('.adoc', '.html')" tal:content="loc">Page</a>
                                         </span>
                                     </span>
                                 </li>

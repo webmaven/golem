@@ -10,5 +10,5 @@ Initial Base: `cc73fa91a12668e2a2ce58431b31f21687f6f73c`
 - [x] Task 3: Bundled Plugin Refactoring (`source_links`, `nav_helpers`, `index_glossary`), AST Simplification, and `IndexGlossaryPlugin` Removal — commit 16d9481, review clean
   Minor: in `IndexPlugin` and `GlossaryPlugin`, delegate `from_config` to `super().from_config(config)`.
 - [x] Task 4: Template Metal Slot Comments & Documentation (`skeleton.pt`, `theme-development.adoc`, `plugin-system.adoc`, `docs/plugins/*.adoc`) — commits 16d9481..b85c166, review clean
-- [x] Task 5: End-to-End Integration Verification, Test Suite Updates, and Quality Gates
-
+- [x] Task 5: End-to-End Integration Verification, Test Suite Updates, and Quality Gates — commit 8b67ace, review clean
+  Minor: in `BuildEngine`, add fallback to `doc_meta.get("page_role")`.
