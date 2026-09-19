@@ -321,23 +321,110 @@
       font-weight: 600;
     }
 
-    /* Principle 6: Adaptive Split Screen Grid */
-    .content-split-grid {
+    /* Principle 6 & Displacement Extension: Multi-Section Split Rows */
+    .doc-content-stream {
+      min-width: 0;
+    }
+
+    .split-row {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       gap: 2rem;
-      padding: 2rem;
+      padding: 2.5rem 2rem;
+      border-bottom: 1px solid var(--border-color);
+      align-items: start;
+      position: relative;
     }
 
     @media (min-width: 1180px) {
-      .content-split-grid {
+      .split-row {
         grid-template-columns: minmax(0, 1fr) minmax(420px, 480px);
+        gap: 3rem;
       }
     }
 
-    /* Article Documentation Stream */
-    .doc-main {
+    .split-row:last-of-type {
+      border-bottom: none;
+    }
+
+    .prose-column {
       min-width: 0;
+    }
+
+    .sidebar-column {
+      position: relative;
+      height: 100%;
+    }
+
+    .sticky-sidebar-card {
+      position: sticky;
+      top: 4.5rem;
+      max-height: calc(100vh - 6rem);
+      overflow-y: auto;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    @media (max-width: 1179px) {
+      .sticky-sidebar-card {
+        position: static;
+        max-height: none;
+        margin-top: 1.5rem;
+      }
+    }
+
+    /* Narrative Aside Card Variants */
+    .narrative-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+    }
+    .narrative-card-header {
+      background: var(--bg-surface-muted);
+      padding: 0.625rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .narrative-card-body {
+      padding: 1rem;
+      font-size: 0.8125rem;
+    }
+    .dag-node-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+    .dag-node-item {
+      background: var(--bg-surface-muted);
+      border: 1px solid var(--border-color);
+      padding: 0.4rem 0.6rem;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .displacement-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      background: var(--color-primary-subtle);
+      color: var(--color-primary);
+      border: 1px solid var(--color-primary);
+      font-size: 0.6875rem;
+      font-weight: 700;
+      padding: 0.1rem 0.4rem;
+      border-radius: var(--radius-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     /* Breadcrumbs */
@@ -907,7 +994,23 @@
         <li class="nav-item"><a href="#golem.views"><code>golem.views</code></a></li>
       </ul>
 
-      <div class="nav-section-title">In this Module</div>
+      <div class="nav-section-title">Narrative Architecture</div>
+      <ul class="nav-list">
+        <li class="nav-item">
+          <a href="#narrative-dag">
+            <span class="symbol-glyph glyph-interface" style="width: 18px; height: 18px; font-size: 0.65rem;">1</span>
+            <code>DAG Pipeline</code>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#narrative-cache">
+            <span class="symbol-glyph glyph-interface" style="width: 18px; height: 18px; font-size: 0.65rem;">2</span>
+            <code>Cache & Staleness</code>
+          </a>
+        </li>
+      </ul>
+
+      <div class="nav-section-title">API Reference: DagEngine</div>
       <ul class="nav-list">
         <li class="nav-item">
           <a href="#DagEngine">
@@ -936,169 +1039,319 @@
       </ul>
     </nav>
 
-    <!-- Main Content Area with Split-Screen Responsive Grid -->
-    <main id="main-content" class="content-split-grid" role="main">
+    <!-- Main Content Area with Sequential Split-Row Displacement -->
+    <main id="main-content" class="doc-content-stream" role="main">
 
-      <!-- Left / Primary Column: Structural API Documentation -->
-      <article class="doc-main">
+      <!-- =========================================================================
+           ROW 1: Narrative Architecture Part 1 — DAG Pipeline + Sidebar 1
+           ========================================================================= -->
+      <section class="split-row" id="narrative-dag" aria-labelledby="dag-arch-heading">
+        <div class="prose-column">
 
-        <!-- Breadcrumb Bar -->
-        <div class="breadcrumbs" aria-label="Breadcrumb navigation">
-          <a href="#docs">API Reference</a>
-          <span>/</span>
-          <a href="#golem">golem</a>
-          <span>/</span>
-          <a href="#golem.engine">golem.engine</a>
-          <span>/</span>
-          <span aria-current="page">DagEngine</span>
+          <!-- Breadcrumb Bar -->
+          <div class="breadcrumbs" aria-label="Breadcrumb navigation">
+            <a href="#docs">Documentation</a>
+            <span>/</span>
+            <a href="#golem">golem</a>
+            <span>/</span>
+            <a href="#golem.engine">golem.engine</a>
+            <span>/</span>
+            <span aria-current="page">Architecture Guide</span>
+          </div>
+
+          <!-- Class Hero Section -->
+          <div class="doc-hero" id="DagEngine">
+            <div class="doc-title-row">
+              <!-- Principle 2: Dual Coding Glyph -->
+              <span class="symbol-glyph glyph-class" title="Class Symbol" aria-label="Class">C</span>
+              <h1 class="doc-title">DagEngine</h1>
+              <span class="pill pill-baseline">Stable v0.4+</span>
+              <span class="pill pill-runtime">Thread-Safe</span>
+              <span class="annotation-marker" title="Principle 2: Dual Coding">P2</span>
+            </div>
+
+            <div class="annotation-callout-box">
+              <strong>Principle 2: Dual-Coded Differentiation (Glyph + Color + Semantic Pills)</strong>
+              Unlike Sphinx's plain monochromatic text <code>class DagEngine</code>, the high-contrast <code>[C]</code> glyph and blue color variable immediately cue the reader pre-attentively, while status pills convey production stability and concurrency guarantees without reading prose.
+            </div>
+
+            <p style="font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 1rem;">
+              Orchestrates incremental Directed Acyclic Graph (DAG) compilation, persistent cache invalidation, and multi-view static site generation for Golem workspaces.
+            </p>
+          </div>
+
+          <h2 id="dag-arch-heading" style="font-size: 1.35rem; font-weight: 700; margin-bottom: 0.75rem; letter-spacing: -0.01em;">
+            Architecture: Directed Acyclic Graph Compilation
+          </h2>
+
+          <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            Golem coordinates static site generation through an explicit Directed Acyclic Graph (DAG) dependency network. When a build initiates, Golem does not perform a brute-force sweep of the filesystem. Instead, it reads workspace manifests (<code>golem.toml</code>), parses AsciiDoc document frontmatter, and registers each document view as a distinct node in the dependency graph.
+          </p>
+
+          <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            Parent templates (such as Chameleon <code>.pt</code> layout files), AsciiDoc include files, and static asset references form directed edges pointing to child artifact targets. This topology ensures that compilation tasks are strictly ordered, circular dependencies are trapped at validation time, and independent branches can execute across asynchronous worker threads in parallel.
+          </p>
+
+          <div class="meta-callout">
+            <span class="meta-label">Pipeline</span>
+            <div>
+              <strong>Phase 1:</strong> Dependency Scanning &rarr; <strong>Phase 2:</strong> DAG Ingestion &rarr; <strong>Phase 3:</strong> Cache Evaluation &rarr; <strong>Phase 4:</strong> Async Compilation.
+            </div>
+          </div>
+
         </div>
 
-        <!-- Class Hero Section -->
-        <section class="doc-hero" id="DagEngine">
-          <div class="doc-title-row">
-            <!-- Principle 2: Dual Coding Glyph -->
-            <span class="symbol-glyph glyph-class" title="Class Symbol" aria-label="Class">C</span>
-            <h1 class="doc-title">DagEngine</h1>
-            <span class="pill pill-baseline">Stable v0.4+</span>
-            <span class="pill pill-runtime">Thread-Safe</span>
-            <span class="annotation-marker" title="Principle 2: Dual Coding">P2</span>
-          </div>
-
-          <div class="annotation-callout-box">
-            <strong>Principle 2: Dual-Coded Differentiation (Glyph + Color + Semantic Pills)</strong>
-            Unlike Sphinx's plain monochromatic text <code>class DagEngine</code>, the high-contrast <code>[C]</code> glyph and blue color variable immediately cue the reader pre-attentively, while status pills convey production stability and concurrency guarantees without reading prose.
-          </div>
-
-          <p style="font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 1rem;">
-            Orchestrates incremental Directed Acyclic Graph (DAG) compilation, persistent cache invalidation, and multi-view static site generation for Golem workspaces.
-          </p>
-        </section>
-
-        <!-- Principle 3: Structural Containment Card for Method 1 -->
-        <section class="member-card doc-rail" id="DagEngine.compile_view_async">
-          <div class="doc-title-row">
-            <!-- Principle 2: Method Glyph -->
-            <span class="symbol-glyph glyph-method" title="Method Symbol" aria-label="Method">M</span>
-            <h2 style="font-size: 1.25rem; font-family: var(--font-mono); font-weight: 700;">compile_view_async</h2>
-            <span class="pill pill-async">Async</span>
-            <span class="pill pill-runtime">Idempotent</span>
-            <span class="annotation-marker" title="Principle 3: Structural Left Rail">P3</span>
-          </div>
-
-          <div class="annotation-callout-box">
-            <strong>Principle 3: Structural Left Rail Containment</strong>
-            Rather than letting nested methods drift rightward with fragile <code>margin-left</code> indents (which break on mobile), the 3px vertical left rail encapsulates the method visually and dynamically highlights on focus or hover.
-          </div>
-
-          <!-- Principle 4: Atomic AST Token Interlinking -->
-          <div class="signature-container" aria-label="Method Signature">
-            <span class="ast-keyword">async def</span> <span class="ast-name">compile_view_async</span><span class="ast-punct">(</span><br>
-            &nbsp;&nbsp;self<span class="ast-punct">,</span><br>
-            &nbsp;&nbsp;view<span class="ast-punct">:</span> <a href="#golem.views.AsciiDocView" class="ast-token" title="Navigate to AsciiDocView definition">AsciiDocView</a><span class="ast-punct">,</span><br>
-            &nbsp;&nbsp;context<span class="ast-punct">:</span> <a href="#golem.views.RenderContext" class="ast-token" title="Navigate to RenderContext definition">RenderContext</a><span class="ast-punct">,</span><br>
-            &nbsp;&nbsp;config<span class="ast-punct">:</span> <button class="ast-token" popovertarget="popover-engine-config" style="background: none; border: none; font-size: inherit; font-family: inherit; font-weight: inherit;" title="Click for In-Situ Type Preview">EngineConfig</button> <span class="annotation-marker" title="Principle 5: Popover Type Preview">P5</span> <span class="ast-punct">=</span> <span class="ast-keyword">None</span><span class="ast-punct">,</span><br>
-            &nbsp;&nbsp;cache_policy<span class="ast-punct">:</span> <a href="#golem.cache.CachePolicy" class="ast-token">CachePolicy</a> <span class="ast-punct">=</span> CachePolicy<span class="ast-punct">.</span>ADVISORY<br>
-            <span class="ast-punct">) -&gt;</span> <a href="#golem.engine.CompilationResult" class="ast-token" title="Navigate to CompilationResult">CompilationResult</a><span class="annotation-marker" title="Principle 4: Atomic AST Token Interlinking">P4</span>
-          </div>
-
-          <div class="annotation-callout-box">
-            <strong>Principle 4: Atomic AST Token Interlinking</strong>
-            Notice that <code>AsciiDocView</code>, <code>RenderContext</code>, <code>EngineConfig</code>, and <code>CompilationResult</code> are distinct interactive tokens. Clicking <code>EngineConfig</code> triggers an in-situ popover preview without forcing the user away from their reading position!
-          </div>
-
-          <p style="margin: 0.75rem 0; color: var(--text-secondary);">
-            Compiles an individual AsciiDoc view within the execution graph. Handles asynchronous template hydration, image asset resolution, and incremental disk caching.
-          </p>
-
-          <!-- Principle 1: Tiered Progressive Parameter Disclosure -->
-          <div class="param-section">
-            <div class="param-section-title">
-              Tier 1: Essential Parameters
-              <span class="annotation-marker" title="Principle 1: Progressive Parameter Disclosure">P1</span>
+        <!-- Sidebar 1: DAG Topology Visualizer -->
+        <div class="sidebar-column">
+          <aside class="sticky-sidebar-card narrative-card" aria-label="Live Compilation DAG Aside">
+            <div class="narrative-card-header">
+              <span>Active Compilation DAG</span>
+              <span class="pill pill-baseline">Phase 2: Ingestion</span>
             </div>
-            <table class="param-table" aria-label="Essential Parameters">
-              <thead>
-                <tr>
-                  <th scope="col" style="width: 28%;">Parameter</th>
-                  <th scope="col" style="width: 25%;">Type</th>
-                  <th scope="col">Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>
-                    <span class="param-name">view</span>
-                    <span class="param-required-tag">*required</span>
-                  </td>
-                  <td><a href="#golem.views.AsciiDocView" class="ast-token">AsciiDocView</a></td>
-                  <td>The parsed AsciiDoc AST view object containing frontmatter and AST blocks.</td>
-                </tr>
-                <tr>
-                  <td>
-                    <span class="param-name">context</span>
-                    <span class="param-required-tag">*required</span>
-                  </td>
-                  <td><a href="#golem.views.RenderContext" class="ast-token">RenderContext</a></td>
-                  <td>Runtime metadata including site configuration, global navigation tree, and environment variables.</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <!-- Tier 2: Collapsible Secondary Parameters -->
-            <details class="secondary-params-drawer">
-              <summary>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-                <span>Show 2 Advanced Parameters (<code>config</code>, <code>cache_policy</code>)</span>
-              </summary>
-              <div style="padding: 0.75rem;">
-                <table class="param-table" style="margin-bottom: 0;">
-                  <tbody>
-                    <tr>
-                      <td style="width: 28%;">
-                        <span class="param-name">config</span>
-                        <span class="param-default">default: None</span>
-                      </td>
-                      <td style="width: 25%;">
-                        <button class="ast-token" popovertarget="popover-engine-config" style="background: none; border: none; font-size: inherit;">EngineConfig</button>
-                      </td>
-                      <td>Override workspace compilation settings (concurrency limits, strict diagnostics).</td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <span class="param-name">cache_policy</span>
-                        <span class="param-default">default: ADVISORY</span>
-                      </td>
-                      <td><a href="#golem.cache.CachePolicy" class="ast-token">CachePolicy</a></td>
-                      <td>Advisory file locking and SHA-256 DAG hash validation behavior.</td>
-                    </tr>
-                  </tbody>
-                </table>
+            <div class="narrative-card-body">
+              <p style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 0.75rem;">
+                Visual representation of directed node dependencies for the active workspace:
+              </p>
+              
+              <div class="dag-node-list">
+                <div class="dag-node-item">
+                  <span><code>golem.toml</code> (Root Config)</span>
+                  <span class="pill pill-runtime">Root</span>
+                </div>
+                <div style="padding-left: 1rem; color: var(--text-muted); font-size: 0.7rem;">&darr; depends on</div>
+                <div class="dag-node-item">
+                  <span><code>templates/base.pt</code> (Chameleon)</span>
+                  <span class="pill pill-baseline">Clean</span>
+                </div>
+                <div style="padding-left: 1rem; color: var(--text-muted); font-size: 0.7rem;">&darr; references</div>
+                <div class="dag-node-item">
+                  <span><code>docs/index.adoc</code> (AsciiDoc)</span>
+                  <span class="pill pill-async">In-Flight</span>
+                </div>
+                <div style="padding-left: 1rem; color: var(--text-muted); font-size: 0.7rem;">&darr; renders</div>
+                <div class="dag-node-item" style="background: var(--color-primary-subtle); border-color: var(--color-primary);">
+                  <span><code>dist/index.html</code> (Target)</span>
+                  <span class="pill pill-baseline">Output</span>
+                </div>
               </div>
-            </details>
-          </div>
 
-          <div class="annotation-callout-box">
-            <strong>Principle 1: Progressive Disclosure Over Exhaustive Flattening</strong>
-            Rather than dumping all 4 parameters in an overwhelming flat table, the 2 mandatory parameters are emphasized upfront, while optional runtime options are folded into a clean disclosure drawer.
-          </div>
-
-          <!-- Return Callout -->
-          <div class="meta-callout">
-            <span class="meta-label">Returns</span>
-            <div>
-              <a href="#golem.engine.CompilationResult" class="ast-token">CompilationResult</a> — Dataclass containing generated HTML artifact path, staleness hash, and diagnostics log.
+              <div class="status-badge-group">
+                <span class="displacement-indicator">Sidebar 1: Active in Section 1</span>
+              </div>
             </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- =========================================================================
+           ROW 2: Narrative Architecture Part 2 — Cache & Staleness + Sidebar 2 (DISPLACEMENT)
+           ========================================================================= -->
+      <section class="split-row" id="narrative-cache" aria-labelledby="cache-arch-heading">
+        <div class="prose-column">
+
+          <h2 id="cache-arch-heading" style="font-size: 1.35rem; font-weight: 700; margin-bottom: 0.75rem; letter-spacing: -0.01em;">
+            Architecture: Incremental Caching & Fingerprinting
+          </h2>
+
+          <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            The foundation of Golem's sub-second incremental builds is cryptographic content addressing. Every registered file in the workspace receives a SHA-256 content digest stored within <code>.golem/cache/digests.db</code>. When an asset or AsciiDoc document is modified, Golem compares its immediate disk hash against the persistent cache baseline.
+          </p>
+
+          <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            If a parent template changes (such as <code>templates/base.pt</code>), Golem calculates the transitive closure of all downstream views that depend upon that template. Rather than rebuilding the entire documentation set, only the invalidated subgraph is scheduled for recompilation. Thread synchronization is handled via POSIX advisory locks (<code>fcntl.flock</code>), guaranteeing safe concurrent access between the development server and command-line build workers.
+          </p>
+
+          <!-- Sequential Displacement Annotation Callout -->
+          <div class="annotation-callout-box" style="margin-top: 1.5rem;">
+            <strong>Principle 6 Extension: Sequential Sidebar Displacement [DISPLACE]</strong>
+            Notice what just occurred in the right-hand column: as you scrolled from the DAG overview into this caching discussion, <strong>Sidebar 2 physically displaced Sidebar 1</strong>!
+            Because each narrative segment is styled as an independent <code>.split-row</code> containing block, CSS <code>position: sticky</code> holds the companion sidebar in view alongside its prose, and naturally rolls it off the screen when the section ends. This allows a single narrative section to seamlessly support 2, 3, or more contextual sidebars without JavaScript scroll listeners or overlapping cards!
           </div>
 
-          <!-- Principle 5: In-Situ Source Drawer -->
-          <details class="source-drawer">
-            <summary>
-              <span>Implementation Source (Python 3.12)</span>
-              <span style="font-size: 0.75rem; color: var(--color-primary);">[View Source Code]</span>
-            </summary>
-            <pre class="source-code-block"><code><span class="code-keyword">async def</span> <span class="code-function">compile_view_async</span>(
+        </div>
+
+        <!-- Sidebar 2: Cache Fingerprint Matrix (Displaces Sidebar 1) -->
+        <div class="sidebar-column">
+          <aside class="sticky-sidebar-card narrative-card" aria-label="Live Cache Invalidation Matrix Aside">
+            <div class="narrative-card-header">
+              <span>SHA-256 Staleness Fingerprints</span>
+              <span class="pill pill-baseline">94.2% Hit Rate</span>
+            </div>
+            <div class="narrative-card-body">
+              <p style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 0.75rem;">
+                Cryptographic hash verification against <code>.golem/cache/digests.db</code>:
+              </p>
+
+              <table class="param-table" style="font-size: 0.75rem; margin-bottom: 0.75rem;">
+                <thead>
+                  <tr>
+                    <th>Source File</th>
+                    <th>Digest (SHA-256)</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>docs/index.adoc</code></td>
+                    <td><code>9f8a1b4e</code></td>
+                    <td><span class="pill pill-baseline">HIT (0.4ms)</span></td>
+                  </tr>
+                  <tr>
+                    <td><code>templates/base.pt</code></td>
+                    <td><code>c4e20d91</code></td>
+                    <td><span class="pill pill-async">MODIFIED</span></td>
+                  </tr>
+                  <tr>
+                    <td><code>docs/api/engine.adoc</code></td>
+                    <td><code>7a19ff20</code></td>
+                    <td><span class="pill pill-runtime">CASCADE</span></td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div style="font-size: 0.75rem; color: var(--text-muted); line-height: 1.5;">
+                <strong>Lock Protocol:</strong> POSIX Advisory (<code>fcntl.flock</code>) &bull; <strong>Status:</strong> RELEASED (0.2ms)
+              </div>
+
+              <div class="status-badge-group">
+                <span class="displacement-indicator" style="background: #ecfeff; color: #0891b2; border-color: #0891b2;">Sidebar 2: Displaced Sidebar 1</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- =========================================================================
+           ROW 3: API Reference Method 1 — compile_view_async + Sidebar 3 (DISPLACEMENT)
+           ========================================================================= -->
+      <section class="split-row" id="DagEngine.compile_view_async" aria-labelledby="method-compile-heading">
+        <div class="prose-column">
+
+          <!-- Principle 3: Structural Containment Card for Method 1 -->
+          <div class="member-card doc-rail">
+            <div class="doc-title-row">
+              <!-- Principle 2: Method Glyph -->
+              <span class="symbol-glyph glyph-method" title="Method Symbol" aria-label="Method">M</span>
+              <h2 id="method-compile-heading" style="font-size: 1.25rem; font-family: var(--font-mono); font-weight: 700;">compile_view_async</h2>
+              <span class="pill pill-async">Async</span>
+              <span class="pill pill-runtime">Idempotent</span>
+              <span class="annotation-marker" title="Principle 3: Structural Left Rail">P3</span>
+            </div>
+
+            <div class="annotation-callout-box">
+              <strong>Principle 3: Structural Left Rail Containment</strong>
+              Rather than letting nested methods drift rightward with fragile <code>margin-left</code> indents (which break on mobile), the 3px vertical left rail encapsulates the method visually and dynamically highlights on focus or hover.
+            </div>
+
+            <!-- Principle 4: Atomic AST Token Interlinking -->
+            <div class="signature-container" aria-label="Method Signature">
+              <span class="ast-keyword">async def</span> <span class="ast-name">compile_view_async</span><span class="ast-punct">(</span><br>
+              &nbsp;&nbsp;self<span class="ast-punct">,</span><br>
+              &nbsp;&nbsp;view<span class="ast-punct">:</span> <a href="#golem.views.AsciiDocView" class="ast-token" title="Navigate to AsciiDocView definition">AsciiDocView</a><span class="ast-punct">,</span><br>
+              &nbsp;&nbsp;context<span class="ast-punct">:</span> <a href="#golem.views.RenderContext" class="ast-token" title="Navigate to RenderContext definition">RenderContext</a><span class="ast-punct">,</span><br>
+              &nbsp;&nbsp;config<span class="ast-punct">:</span> <button class="ast-token" popovertarget="popover-engine-config" style="background: none; border: none; font-size: inherit; font-family: inherit; font-weight: inherit;" title="Click for In-Situ Type Preview">EngineConfig</button> <span class="annotation-marker" title="Principle 5: Popover Type Preview">P5</span> <span class="ast-punct">=</span> <span class="ast-keyword">None</span><span class="ast-punct">,</span><br>
+              &nbsp;&nbsp;cache_policy<span class="ast-punct">:</span> <a href="#golem.cache.CachePolicy" class="ast-token">CachePolicy</a> <span class="ast-punct">=</span> CachePolicy<span class="ast-punct">.</span>ADVISORY<br>
+              <span class="ast-punct">) -&gt;</span> <a href="#golem.engine.CompilationResult" class="ast-token" title="Navigate to CompilationResult">CompilationResult</a><span class="annotation-marker" title="Principle 4: Atomic AST Token Interlinking">P4</span>
+            </div>
+
+            <div class="annotation-callout-box">
+              <strong>Principle 4: Atomic AST Token Interlinking</strong>
+              Notice that <code>AsciiDocView</code>, <code>RenderContext</code>, <code>EngineConfig</code>, and <code>CompilationResult</code> are distinct interactive tokens. Clicking <code>EngineConfig</code> triggers an in-situ popover preview without forcing the user away from their reading position!
+            </div>
+
+            <p style="margin: 0.75rem 0; color: var(--text-secondary);">
+              Compiles an individual AsciiDoc view within the execution graph. Handles asynchronous template hydration, image asset resolution, and incremental disk caching.
+            </p>
+
+            <!-- Principle 1: Tiered Progressive Parameter Disclosure -->
+            <div class="param-section">
+              <div class="param-section-title">
+                Tier 1: Essential Parameters
+                <span class="annotation-marker" title="Principle 1: Progressive Parameter Disclosure">P1</span>
+              </div>
+              <table class="param-table" aria-label="Essential Parameters">
+                <thead>
+                  <tr>
+                    <th scope="col" style="width: 28%;">Parameter</th>
+                    <th scope="col" style="width: 25%;">Type</th>
+                    <th scope="col">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <span class="param-name">view</span>
+                      <span class="param-required-tag">*required</span>
+                    </td>
+                    <td><a href="#golem.views.AsciiDocView" class="ast-token">AsciiDocView</a></td>
+                    <td>The parsed AsciiDoc AST view object containing frontmatter and AST blocks.</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <span class="param-name">context</span>
+                      <span class="param-required-tag">*required</span>
+                    </td>
+                    <td><a href="#golem.views.RenderContext" class="ast-token">RenderContext</a></td>
+                    <td>Runtime metadata including site configuration, global navigation tree, and environment variables.</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Tier 2: Collapsible Secondary Parameters -->
+              <details class="secondary-params-drawer">
+                <summary>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                  <span>Show 2 Advanced Parameters (<code>config</code>, <code>cache_policy</code>)</span>
+                </summary>
+                <div style="padding: 0.75rem;">
+                  <table class="param-table" style="margin-bottom: 0;">
+                    <tbody>
+                      <tr>
+                        <td style="width: 28%;">
+                          <span class="param-name">config</span>
+                          <span class="param-default">default: None</span>
+                        </td>
+                        <td style="width: 25%;">
+                          <button class="ast-token" popovertarget="popover-engine-config" style="background: none; border: none; font-size: inherit;">EngineConfig</button>
+                        </td>
+                        <td>Override workspace compilation settings (concurrency limits, strict diagnostics).</td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <span class="param-name">cache_policy</span>
+                          <span class="param-default">default: ADVISORY</span>
+                        </td>
+                        <td><a href="#golem.cache.CachePolicy" class="ast-token">CachePolicy</a></td>
+                        <td>Advisory file locking and SHA-256 DAG hash validation behavior.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </div>
+
+            <div class="annotation-callout-box">
+              <strong>Principle 1: Progressive Disclosure Over Exhaustive Flattening</strong>
+              Rather than dumping all 4 parameters in an overwhelming flat table, the 2 mandatory parameters are emphasized upfront, while optional runtime options are folded into a clean disclosure drawer.
+            </div>
+
+            <!-- Return Callout -->
+            <div class="meta-callout">
+              <span class="meta-label">Returns</span>
+              <div>
+                <a href="#golem.engine.CompilationResult" class="ast-token">CompilationResult</a> — Dataclass containing generated HTML artifact path, staleness hash, and diagnostics log.
+              </div>
+            </div>
+
+            <!-- Principle 5: In-Situ Source Drawer -->
+            <details class="source-drawer">
+              <summary>
+                <span>Implementation Source (Python 3.12)</span>
+                <span style="font-size: 0.75rem; color: var(--color-primary);">[View Source Code]</span>
+              </summary>
+              <pre class="source-code-block"><code><span class="code-keyword">async def</span> <span class="code-function">compile_view_async</span>(
     self,
     view: AsciiDocView,
     context: RenderContext,
@@ -1114,73 +1367,40 @@
         
     html_output = <span class="code-keyword">await</span> self.renderer.render_async(view, context)
     <span class="code-keyword">return</span> self.commit_artifact(dag_node, html_output)</code></pre>
-          </details>
+            </details>
 
-          <div class="annotation-callout-box" style="margin-top: 0.75rem;">
-            <strong>Principle 5: In-Situ Inspection Over Disorienting Navigation <span class="annotation-marker">P5</span></strong>
-            Keep the developer anchored in their reading context. Traditional generators force external page hops or GitHub link jumps for auxiliary types and implementation code. Here, two native mechanisms eliminate context switching:
-            <ul style="margin: 0.5rem 0 0 1.25rem; line-height: 1.5;">
-              <li><strong>Type Definition Popover:</strong> Clicking the <button class="ast-token" popovertarget="popover-engine-config" style="background: none; border: none; font-size: inherit; font-family: inherit; font-weight: inherit; cursor: pointer; text-decoration: underline;"><code>EngineConfig</code></button> token immediately renders its full dataclass fields in a native top-layer popover without navigating away.</li>
-              <li><strong>Collapsible Source Drawer:</strong> Expanding <code>[View Source Code]</code> above exposes the exact syntax-highlighted implementation in-place.</li>
-            </ul>
-          </div>
-        </section>
+            <div class="annotation-callout-box" style="margin-top: 0.75rem;">
+              <strong>Principle 5: In-Situ Inspection Over Disorienting Navigation <span class="annotation-marker">P5</span></strong>
+              Keep the developer anchored in their reading context. Traditional generators force external page hops or GitHub link jumps for auxiliary types and implementation code. Here, two native mechanisms eliminate context switching:
+              <ul style="margin: 0.5rem 0 0 1.25rem; line-height: 1.5;">
+                <li><strong>Type Definition Popover:</strong> Clicking the <button class="ast-token" popovertarget="popover-engine-config" style="background: none; border: none; font-size: inherit; font-family: inherit; font-weight: inherit; cursor: pointer; text-decoration: underline;"><code>EngineConfig</code></button> token immediately renders its full dataclass fields in a native top-layer popover without navigating away.</li>
+                <li><strong>Collapsible Source Drawer:</strong> Expanding <code>[View Source Code]</code> above exposes the exact syntax-highlighted implementation in-place.</li>
+              </ul>
+            </div>
 
-        <!-- Method 2: invalidate_staleness -->
-        <section class="member-card doc-rail" id="DagEngine.invalidate_staleness">
-          <div class="doc-title-row">
-            <span class="symbol-glyph glyph-method" title="Method">M</span>
-            <h2 style="font-size: 1.25rem; font-family: var(--font-mono); font-weight: 700;">invalidate_staleness</h2>
-            <span class="pill pill-runtime">Synchronous</span>
-          </div>
-
-          <div class="signature-container">
-            <span class="ast-keyword">def</span> <span class="ast-name">invalidate_staleness</span><span class="ast-punct">(</span><br>
-            &nbsp;&nbsp;self<span class="ast-punct">,</span><br>
-            &nbsp;&nbsp;file_path<span class="ast-punct">:</span> <a href="#pathlib.Path" class="ast-token">Path</a><span class="ast-punct">,</span><br>
-            &nbsp;&nbsp;cascade<span class="ast-punct">:</span> <a href="#bool" class="ast-token">bool</a> <span class="ast-punct">=</span> <span class="ast-keyword">True</span><br>
-            <span class="ast-punct">) -&gt;</span> <a href="#int" class="ast-token">int</a>
-          </div>
-
-          <p style="color: var(--text-secondary); margin: 0.75rem 0;">
-            Evicts stale DAG cache artifacts when a source file or template changes on disk. If <code>cascade=True</code>, recursively invalidates all downstream dependency nodes.
-          </p>
-
-          <div class="meta-callout">
-            <span class="meta-label">Returns</span>
-            <div>
-              <a href="#int" class="ast-token">int</a> — Number of invalidated dependency nodes evicted from the cache.
+            <!-- Principle 6: Adaptive Split-Screen Layout Callout -->
+            <div class="annotation-callout-box" style="margin-top: 1rem;">
+              <strong>Principle 6: Adaptive Split-Screen Layout (Sticky Aside Playground) <span class="annotation-marker">P6</span></strong>
+              On viewports &ge; 1180px, the runnable code playground stays pinned on the right while the user reads method documentation on the left (Stripe model), preventing vertical scroll thrashing.
             </div>
           </div>
-        </section>
 
-        <!-- Principle 7: Universal Accessibility Callout -->
-        <div class="annotation-callout-box" style="margin-top: 1.5rem;">
-          <strong>Principle 7: Universal Accessibility as an Architectural Invariant <span class="annotation-marker">P7</span></strong>
-          Accessibility is baked directly into the semantic markup rather than retrofitted via CSS:
-          <ul style="margin: 0.5rem 0 0 1.25rem; line-height: 1.5;">
-            <li><strong>Semantic Landmarks:</strong> Proper HTML5 landmark structure with <code>&lt;header role="banner"&gt;</code>, <code>&lt;nav&gt;</code>, <code>&lt;main role="main"&gt;</code>, and <code>&lt;aside&gt;</code>.</li>
-            <li><strong>Keyboard Navigation &amp; Shortcuts:</strong> Accessible skip link (<kbd class="kbd-shortcut">Tab</kbd>), power-user shortcuts (<kbd class="kbd-shortcut">/</kbd> search, <kbd class="kbd-shortcut">?</kbd> shortcuts modal, <kbd class="kbd-shortcut">a</kbd> annotations toggle, <kbd class="kbd-shortcut">t</kbd> theme, <kbd class="kbd-shortcut">e</kbd> expand drawers).</li>
-            <li><strong>Contrast &amp; Motion:</strong> WCAG 2.1 AA compliant palette and strict <code>prefers-reduced-motion</code> compliance.</li>
-          </ul>
         </div>
 
-      </article>
-
-      <!-- Principle 6: Right Column - Sticky Interactive Code Playground -->
-      <aside class="interactive-aside" aria-label="Interactive Code Playground">
-        <div class="playground-card">
-          <div class="playground-header">
-            <div class="tab-group" role="tablist" aria-label="Code language selection">
-              <button class="code-tab active" role="tab" aria-selected="true" data-lang="python">Python SDK</button>
-              <button class="code-tab" role="tab" aria-selected="false" data-lang="cli">Golem CLI</button>
-              <button class="code-tab" role="tab" aria-selected="false" data-lang="async">Async Pipeline</button>
+        <!-- Sidebar 3: Interactive Code Playground for compile_view_async (Displaces Sidebar 2) -->
+        <div class="sidebar-column">
+          <aside class="sticky-sidebar-card playground-card" aria-label="Interactive Code Playground">
+            <div class="playground-header">
+              <div class="tab-group" role="tablist" aria-label="compile_view_async language selection">
+                <button class="code-tab active" role="tab" aria-selected="true" data-lang="python">Python SDK</button>
+                <button class="code-tab" role="tab" aria-selected="false" data-lang="cli">Golem CLI</button>
+                <button class="code-tab" role="tab" aria-selected="false" data-lang="async">Async Pipeline</button>
+              </div>
+              <button class="copy-button" aria-label="Copy code to clipboard">Copy</button>
             </div>
-            <button class="copy-button" id="copy-code-btn" aria-label="Copy code to clipboard">Copy</button>
-          </div>
 
-          <div class="playground-body">
-            <pre><code id="playground-code-content"><span class="code-keyword">import</span> asyncio
+            <div class="playground-body">
+              <pre><code data-lang-content="compile"><span class="code-keyword">import</span> asyncio
 <span class="code-keyword">from</span> golem.engine <span class="code-keyword">import</span> DagEngine, EngineConfig
 <span class="code-keyword">from</span> golem.views <span class="code-keyword">import</span> AsciiDocView, RenderContext
 
@@ -1194,19 +1414,101 @@ result = asyncio.run(
 )
 
 print(<span class="code-string">f"Output compiled: {result.artifact_path}"</span>)</code></pre>
-          </div>
+            </div>
 
-          <div class="playground-output-header">Live Evaluation Preview</div>
-          <pre class="playground-output"><code>[golem-dag] Ingested 12 view dependencies in 4.2ms
+            <div class="playground-output-header">Live Evaluation Preview</div>
+            <pre class="playground-output"><code>[golem-dag] Ingested 12 view dependencies in 4.2ms
 [golem-cache] Cache HIT for 'docs/index.adoc' (sha: 9f8a1b)
 Output compiled: dist/index.html (24.3 KB)</code></pre>
+
+            <div style="padding: 0.5rem 1rem; background: #020617; border-top: 1px solid var(--border-code-panel);">
+              <span class="displacement-indicator" style="background: #f5f3ff; color: #7c3aed; border-color: #7c3aed;">Sidebar 3: Displaced Sidebar 2</span>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- =========================================================================
+           ROW 4: API Reference Method 2 — invalidate_staleness + Sidebar 4 (DISPLACEMENT)
+           ========================================================================= -->
+      <section class="split-row" id="DagEngine.invalidate_staleness" aria-labelledby="method-invalidate-heading">
+        <div class="prose-column">
+
+          <!-- Method 2: invalidate_staleness Card -->
+          <div class="member-card doc-rail">
+            <div class="doc-title-row">
+              <span class="symbol-glyph glyph-method" title="Method">M</span>
+              <h2 id="method-invalidate-heading" style="font-size: 1.25rem; font-family: var(--font-mono); font-weight: 700;">invalidate_staleness</h2>
+              <span class="pill pill-runtime">Synchronous</span>
+            </div>
+
+            <div class="signature-container">
+              <span class="ast-keyword">def</span> <span class="ast-name">invalidate_staleness</span><span class="ast-punct">(</span><br>
+              &nbsp;&nbsp;self<span class="ast-punct">,</span><br>
+              &nbsp;&nbsp;file_path<span class="ast-punct">:</span> <a href="#pathlib.Path" class="ast-token">Path</a><span class="ast-punct">,</span><br>
+              &nbsp;&nbsp;cascade<span class="ast-punct">:</span> <a href="#bool" class="ast-token">bool</a> <span class="ast-punct">=</span> <span class="ast-keyword">True</span><br>
+              <span class="ast-punct">) -&gt;</span> <a href="#int" class="ast-token">int</a>
+            </div>
+
+            <p style="color: var(--text-secondary); margin: 0.75rem 0;">
+              Evicts stale DAG cache artifacts when a source file or template changes on disk. If <code>cascade=True</code>, recursively invalidates all downstream dependency nodes across the execution graph.
+            </p>
+
+            <div class="meta-callout">
+              <span class="meta-label">Returns</span>
+              <div>
+                <a href="#int" class="ast-token">int</a> — Number of invalidated dependency nodes evicted from the cache.
+              </div>
+            </div>
+          </div>
+
+          <!-- Principle 7: Universal Accessibility Callout -->
+          <div class="annotation-callout-box" style="margin-top: 1.5rem;">
+            <strong>Principle 7: Universal Accessibility as an Architectural Invariant <span class="annotation-marker">P7</span></strong>
+            Accessibility is baked directly into the semantic markup rather than retrofitted via CSS:
+            <ul style="margin: 0.5rem 0 0 1.25rem; line-height: 1.5;">
+              <li><strong>Semantic Landmarks:</strong> Proper HTML5 landmark structure with <code>&lt;header role="banner"&gt;</code>, <code>&lt;nav&gt;</code>, <code>&lt;main role="main"&gt;</code>, and <code>&lt;aside&gt;</code>.</li>
+              <li><strong>Keyboard Navigation &amp; Shortcuts:</strong> Accessible skip link (<kbd class="kbd-shortcut">Tab</kbd>), power-user shortcuts (<kbd class="kbd-shortcut">/</kbd> search, <kbd class="kbd-shortcut">?</kbd> shortcuts modal, <kbd class="kbd-shortcut">a</kbd> annotations toggle, <kbd class="kbd-shortcut">t</kbd> theme, <kbd class="kbd-shortcut">e</kbd> expand drawers).</li>
+              <li><strong>Contrast &amp; Motion:</strong> WCAG 2.1 AA compliant palette and strict <code>prefers-reduced-motion</code> compliance.</li>
+            </ul>
+          </div>
+
         </div>
 
-        <div class="annotation-callout-box" style="margin-top: 1rem;">
-          <strong>Principle 6: Adaptive Split-Screen Layout (Sticky Aside Playground)</strong>
-          On viewports $\ge 1180\text{px}$, the runnable code playground stays pinned on the right while the user reads method documentation on the left (Stripe model), preventing vertical scroll thrashing.
+        <!-- Sidebar 4: Cache Eviction Playground (Displaces Sidebar 3) -->
+        <div class="sidebar-column">
+          <aside class="sticky-sidebar-card playground-card" aria-label="Cache Invalidation Command Playground">
+            <div class="playground-header">
+              <div class="tab-group" role="tablist" aria-label="invalidate_staleness language selection">
+                <button class="code-tab active" role="tab" aria-selected="true" data-lang="cli-purge">CLI Purge</button>
+                <button class="code-tab" role="tab" aria-selected="false" data-lang="python-evict">Python API</button>
+                <button class="code-tab" role="tab" aria-selected="false" data-lang="watch-stream">Watchdog Stream</button>
+              </div>
+              <button class="copy-button" aria-label="Copy code to clipboard">Copy</button>
+            </div>
+
+            <div class="playground-body">
+              <pre><code data-lang-content="invalidate"><span class="code-comment"># Invalidate stale template and all dependent views</span>
+$ golem cache purge --target templates/base.pt --cascade
+
+<span class="code-comment"># Verify DAG state after eviction</span>
+$ golem stats --stale-nodes</code></pre>
+            </div>
+
+            <div class="playground-output-header">Eviction Event Output</div>
+            <pre class="playground-output"><code>[golem-cache] Evicted node: 'templates/base.pt'
+[golem-dag] Cascade invalidated 3 dependent views:
+  - docs/index.adoc (stale)
+  - docs/api/engine.adoc (stale)
+  - docs/user-guide/getting-started.adoc (stale)
+Total nodes invalidated: 3</code></pre>
+
+            <div style="padding: 0.5rem 1rem; background: #020617; border-top: 1px solid var(--border-code-panel);">
+              <span class="displacement-indicator" style="background: #fef2f2; color: #dc2626; border-color: #dc2626;">Sidebar 4: Displaced Sidebar 3</span>
+            </div>
+          </aside>
         </div>
-      </aside>
+      </section>
 
     </main>
   </div>
@@ -1374,8 +1676,9 @@ Output compiled: dist/index.html (24.3 KB)</code></pre>
       }
     });
 
-    // 5. Code Tabs in Aside Playground
+    // 5. Code Tabs in Aside Playgrounds (Scoped per playground card)
     const codeSnippets = {
+      // Sidebar 3: compile_view_async snippets
       python: `import asyncio
 from golem.engine import DagEngine, EngineConfig
 from golem.views import AsciiDocView, RenderContext
@@ -1408,36 +1711,100 @@ async def continuous_pipeline():
         engine.invalidate_staleness(change.path)
         await engine.compile_view_async(change.view, change.ctx)
 
-asyncio.run(continuous_pipeline())`
+asyncio.run(continuous_pipeline())`,
+
+      // Sidebar 4: invalidate_staleness snippets
+      'cli-purge': `# Invalidate stale template and all dependent views
+$ golem cache purge --target templates/base.pt --cascade
+
+# Verify DAG state after eviction
+$ golem stats --stale-nodes`,
+      'python-evict': `from pathlib import Path
+from golem.engine import DagEngine
+
+engine = DagEngine()
+
+# Evict stale file and cascade through execution graph
+evicted_count = engine.invalidate_staleness(
+    file_path=Path("templates/base.pt"),
+    cascade=True
+)
+
+print(f"Evicted {evicted_count} dependent artifacts.")`,
+      'watch-stream': `from golem.staleness import FileSystemWatcher
+
+# Subscribe to high-frequency filesystem events
+watcher = FileSystemWatcher(root="templates/")
+for event in watcher.events():
+    if event.is_modified:
+        evicted = engine.invalidate_staleness(event.path)
+        print(f"Re-queued: {event.path} ({evicted} dependents)")`
     };
 
-    const tabs = document.querySelectorAll('.code-tab');
-    const codeContent = document.getElementById('playground-code-content');
+    // Initialize all playground cards independently
+    document.querySelectorAll('.playground-card').forEach(card => {
+      const tabs = card.querySelectorAll('.code-tab');
+      const codeElem = card.querySelector('.playground-body code');
+      const copyBtn = card.querySelector('.copy-button');
 
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        tabs.forEach(t => {
-          t.classList.remove('active');
-          t.setAttribute('aria-selected', 'false');
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          tabs.forEach(t => {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+          });
+          tab.classList.add('active');
+          tab.setAttribute('aria-selected', 'true');
+          const lang = tab.getAttribute('data-lang');
+          if (codeSnippets[lang] && codeElem) {
+            codeElem.textContent = codeSnippets[lang];
+          }
         });
-        tab.classList.add('active');
-        tab.setAttribute('aria-selected', 'true');
-        const lang = tab.getAttribute('data-lang');
-        codeContent.textContent = codeSnippets[lang];
       });
-    });
 
-    // 6. Copy Code Button
-    const copyBtn = document.getElementById('copy-code-btn');
-    copyBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(codeContent.textContent);
-        copyBtn.textContent = 'Copied!';
-        setTimeout(() => copyBtn.textContent = 'Copy', 2000);
-      } catch (err) {
-        copyBtn.textContent = 'Failed';
+      if (copyBtn && codeElem) {
+        copyBtn.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(codeElem.textContent);
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => copyBtn.textContent = 'Copy', 2000);
+          } catch (err) {
+            copyBtn.textContent = 'Failed';
+          }
+        });
       }
     });
+
+    // 6. IntersectionObserver Scrollspy for Left Navigation Rail
+    const navLinks = document.querySelectorAll('.global-nav .nav-item a');
+    const sections = document.querySelectorAll('.split-row[id]');
+
+    if ('IntersectionObserver' in window && sections.length > 0) {
+      const observerOptions = {
+        root: null,
+        rootMargin: '-10% 0px -70% 0px',
+        threshold: 0
+      };
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const id = entry.target.getAttribute('id');
+            navLinks.forEach(link => {
+              const href = link.getAttribute('href');
+              const li = link.closest('.nav-item');
+              if (href === `#${id}`) {
+                li.classList.add('active');
+              } else {
+                li.classList.remove('active');
+              }
+            });
+          }
+        });
+      }, observerOptions);
+
+      sections.forEach(sec => observer.observe(sec));
+    }
   </script>
 </body>
 </html>
