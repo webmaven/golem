@@ -10,80 +10,127 @@ and this project adheres to https://semver.org/spec/v2.0.0.html[Semantic Version
 
 toc::[]
 
-== 0.1.0a3 - 2026-09-05
+== 0.1.0a3 - 2026-09-19
 
 === Added
 
-* *Headless Syntax & Diagnostic Check Command:* Added `golem check` CLI subcommand with `--strict`, `-C/--directory`, and `-v/--verbose` options for headless, non-writing compiler and resolver diagnostic verification.
-* *Event-Driven File Watching & Port Collision Fallback:* Added event-driven filesystem monitoring supporting `watchfiles` and `watchdog` with sub-100ms rebuild detection and low-latency adaptive polling fallback; added automatic port collision fallback (`port + 1` up to 10 attempts) when binding the development server.
-* *Document Path in Plugin ASG Hook:* Added `doc_path: Path | None = None` parameter to `@hookspec def on_asg_created` in `golem.plugins`, passing the active document's filesystem path to plugins with argument filtering for legacy plugins.
-* *Custom & Theme Template Caching:* Added mtime-invalidated disk `PageTemplate` caching in `PageCompiler` for user templates (`templates/page.pt`), custom template paths, and theme skeletons (`themes/<theme>/skeleton.pt`).
-* *Per-Section Doctest Isolation:* Added `--split-sections` flag to doctest plugin (`golem doctest --split-sections`) for per-section test isolation across section boundaries.
-* *Composite and Union Type Documentation:* Added composite and union type annotation support in `apidoc` formatter (lossless `Union`, `Optional`, named returns).
-* *Human-Readable Syntax Diagnostics:* Added human-readable build diagnostics in `BuildEngine.check()` using `AsciiDocSyntaxError` file/line/column info and `ASGResolver.warnings`.
+==== Plugin Architecture & Hooks
 
-* *ASG-Level API Doc Macro Splicing (Issue #10):*
-** New `on_asg_created` plugin hook implementation in `golem.plugins.apidoc` that splices `golem:apidoc[pass:[...]]` block macros directly into the document Abstract Semantic Graph after full semantic resolution.
-** New `AsciiDocApi.get_asg_nodes(symbol, depth, heading_level_offset)` method in `golem.plugins.apidoc.core` that renders a Python symbol to AsciiDoc markup and returns structured ASG block dictionaries ready for tree splicing.
-** `heading_level_offset` macro parameter: allows embedded API documentation headings to be adjusted relative to the surrounding document section depth.
-** Unresolvable macro targets now produce a visible `[WARNING]` admonition block in rendered output instead of silently disappearing.
-** Escaped macros (`\golem:apidoc[pass:[...]]`) are correctly unescaped to literal text without triggering expansion.
-* *AsciiDoc Multi-View Derived Rendering Engine:*
-** Interactive tabbed code containers generated at build time via `render`, `views`, `display`, or `formats` attributes on `[source,asciidoc]` blocks.
-** Supports four canonical compilation channels: `source` (raw AsciiDoc), `asg` (parsed ASG JSON), `html` (rendered HTML5 markup), and `preview` (live rendered component).
-** Zero-JS tab switching using modern declarative CSS `:has()` and `input[type=radio]` controls with physical folder tab styling.
-** Deterministic unique listing identifiers (`get_listing_uid`) for stable anchor targeting and navigation.
-* *Enhanced Code Listing Headers & Actions:*
-** Semantic `<header class="listing-header">` featuring listing titles, uppercase language badges (`.badge-lang`), role badges (`.badge-test`, `.badge-shared`, `.badge-reset`), and a one-click clipboard copy button (`.listing-copy-btn`).
-** Context-aware clipboard copying that dynamically copies the active tab pane.
+* *Build Lifecycle Hooks (Issue #11):*
+** `on_build_start(config)` hook invoked before page compilation; plugins may raise `GolemBuildAbortError` to abort with collect-all-errors semantics.
+** `on_build_finish(config, build_result)` hook invoked after all pages are written; `BuildResult` wraps `compiled_files: list[Path]` and `output_dir: Path`.
+** `golem.plugins.apidoc` migrated from inline `BuildEngine` coupling to an `on_build_start` hookimpl.
+* *`on_template_context` Hook (Issue #13):*
+** `on_template_context(context, doc_path)` hook invoked before page compilation; plugins may inject or override template context variables.
+** Sequential (FIFO) dispatch so downstream plugins observe mutations from upstream ones (overrides Pluggy's default LIFO order).
+** `_invoke_asg_hook` and `_invoke_template_context_hook` unified into `_invoke_doc_hook` with shared argument filtering and error isolation.
+* *Document Path in Plugin ASG Hook:* `doc_path: Path | None = None` parameter on `on_asg_created`, passing the document's filesystem path to plugins with argument filtering for legacy plugins.
+* *`GolemPlugin` Base Class:* Common base class providing `__init__`, config access, and logger setup for bundled plugins.
+* *Entry-Point Auto-Discovery:* Bundled plugins registered as `golem.plugins` entry points in `pyproject.toml`; CLI no longer hard-codes plugin module paths. `get_plugin_manager()` uses entry-point discovery with `config.plugins` as the activation authority.
+
+==== Bundled Plugins
+
+* *AST-Level API Doc Macro Splicing (Issue #10):*
+** `golem.apidoc::target[opts]` block macro expanded by a Lark `NodeTransformer` on the parsed AST, before ASG resolution. Replaces the deprecated `on_pre_parse` text-substitution path and the earlier `on_asg_created` post-resolution splice.
+** Syntax changed from prototype: `golem:apidoc[symbol]` → `golem.apidoc::target[...]` (colon-pair required for block-macro grammar; single-colon syntax is invalid in AsciiDoctrine — upstream tracked as webmaven/asciidoctrine#132).
+** `AsciiDocApi.get_asg_nodes(symbol, depth, heading_level_offset)` renders a Python symbol to ASG block dictionaries for tree splicing.
+** `heading_level_offset` parameter adjusts embedded API doc headings relative to surrounding section depth.
+** Unresolvable macro targets produce a `[WARNING]` admonition instead of disappearing.
+** Escaped macros (`\golem:apidoc[...]`) unescaped to literal text without triggering expansion.
+* *Source Links Plugin (Issue #3):* `golem.plugins.source_links` injects a per-page `source_url` template context variable linking to the GitHub or GitLab blob for the current document.
+* *Navigation Helpers Plugin (Issue #4):* `golem.plugins.nav_helpers` injects `breadcrumbs: list[dict]` and `nav_tree_flat: list[dict]` into page template context.
+* *Index & Glossary Plugins (Issue #5):*
+** `golem.plugins.index` aggregates `IndexTerm` nodes and emits an index page (activated by `:page-role: index`).
+** `golem.plugins.glossary` aggregates `GlossaryTerm` nodes and emits a glossary page (activated by `:page-role: glossary`).
+** Two separate plugins replace the combined `IndexGlossaryPlugin` from the original design.
+
+==== Typed ASG Model
+
+* *Typed ASG Node Pipeline (Issue #14):* `golem.model` module with `AsgVisitor` and `AsgTransformer` shims over `asciidoctrine.nodes` for typed ASG traversal and in-place mutation.
+
+==== Theme & Templates
+
+* *CSS Extraction & METAL Macro Slots (Issue #12):*
+** Default theme CSS extracted to a standalone `golem.css` static asset.
+** METAL macro slots in `skeleton.pt`: `head`, `header`, `navigation`, `content`, `table-of-contents`, `footer` — themes can override individual layout regions without forking the skeleton.
+* *Multi-View Derived Rendering Engine:*
+** Tabbed code containers generated at build time via `render`, `views`, `display`, or `formats` attributes on `[source,asciidoc]` blocks.
+** Four compilation channels: `source` (raw AsciiDoc), `asg` (parsed ASG JSON), `html` (rendered HTML5), `preview` (live rendered component).
+** CSS-only tab switching using `:has()` and `input[type=radio]` controls with folder tab styling.
+** Deterministic listing identifiers (`get_listing_uid`) for stable anchor targeting.
+* *Code Listing Headers & Actions:*
+** `<header class="listing-header">` with listing titles, language badges (`.badge-lang`), role badges (`.badge-test`, `.badge-shared`, `.badge-reset`), and clipboard copy button (`.listing-copy-btn`).
+** Clipboard copying targets the active tab pane.
 * *UI Macro Styling (`:experimental:`):*
-** Dedicated 3D keycap styling for `<kbd>` with border bevel and surface background.
-** Dedicated action button styling for `<b class="button">` / `.button` with sans-serif UI font and 5px rounded corners.
-** Dedicated sans-serif menu hierarchy styling for `<span class="menuseq">` and menu path components.
-* *CLI Build & Serve Enhancements:* Added `-q`/`--quiet` flag and elapsed execution timing to `golem build`, along with startup compilation status and live rebuild progress in `golem serve`.
-* *Server-Side Syntax Highlighting:* Pygments-powered syntax highlighting integrated into the build pipeline with Fired Clay styling.
-* *Project Hygiene & CI Checks:* Added `CONTRIBUTING.adoc` contributor guide and AST-based CI canary test (`tests/test_syntax_invariants.py`).
-* *Test Coverage Configuration:* Added `pytest-cov` and `coverage[toml]` to dev dependencies with configured targets in `pyproject.toml`.
+** 3D keycap styling for `<kbd>` with border bevel and surface background.
+** Button styling for `<b class="button">` / `.button` with sans-serif UI font.
+** Sans-serif menu hierarchy styling for `<span class="menuseq">` and menu path components.
+* *Template Caching:* Mtime-invalidated `PageTemplate` caching for user templates, custom template paths, and theme skeletons.
+
+==== CLI & Build
+
+* *`golem init` Scaffolding Profiles (Issue #9):*
+** `--profile` flag accepting `library`, `cli`, `paper`, `blog` presets; generates a project tree with `pyproject.toml`, `README.adoc`, and starter `docs/` sources.
+** Templates in `src/golem/templates/profiles/<profile>/` with `.template` extension for variable substitution (`${project_name}`, `${author}`, `${year}`).
+** Author defaults to `git config user.name`; non-interactive mode supported.
+** Validation prevents mixing legacy positional arguments with `--profile`.
+* *`golem check` Command:* Headless syntax and diagnostic check with `--strict`, `-C/--directory`, and `-v/--verbose`.
+* *Build Diagnostics:* Human-readable diagnostics in `BuildEngine.check()` using `AsciiDocSyntaxError` file/line/column info and `ASGResolver.warnings`.
+* *CLI Build & Serve Enhancements:* `-q`/`--quiet` flag and elapsed timing for `golem build`; startup compilation status and live rebuild progress in `golem serve`.
+* *Event-Driven File Watching:* Filesystem monitoring via `watchfiles` or `watchdog` with sub-100ms rebuild detection and adaptive polling fallback; automatic port collision fallback (`port + 1` up to 10 attempts).
+
+==== Apidoc & Doctest
+
+* *Per-Section Doctest Isolation:* `--split-sections` flag for per-section test isolation across section boundaries.
+* *Composite and Union Type Documentation:* Composite and union type annotation support in `apidoc` formatter (lossless `Union`, `Optional`, named returns).
+
+==== Build & CI
+
+* *Server-Side Syntax Highlighting:* Pygments highlighting in the build pipeline with Fired Clay styling.
+* *Project Hygiene & CI:* `CONTRIBUTING.adoc` contributor guide and AST-based CI canary test (`tests/test_syntax_invariants.py`).
+* *Test Coverage:* `pytest-cov` and `coverage[toml]` added to dev dependencies.
+* *Parallel Test Execution:* `pytest-xdist` added to dev dependencies.
+* *Documentation:* Replaced `SPECIFICATION.adoc` with `ARCHITECTURE.adoc`; added plugin authoring guide, METAL slot reference, and bundled plugin documentation.
 
 === Changed
 
-* *Decoupled Views and Renderer:* Eliminated deferred circular imports between `golem.renderer` and `golem.views` via `views_protocol.py` defining `BodyRendererProtocol` and dependency injection.
-* *Canonical Template Context Keys:* Realigned Chameleon template context keys to canonical `title`, `body_html`, `nav_html`, `body_class`, `content_class`, and `site_title`, removing deprecated aliases.
-* *Python Runtime Compatibility:* Relaxed Python constraint to `requires-python = ">=3.12"` for Python 3.13+ forward compatibility.
-* *Search Paths Typing Modernization:* `render_body` `search_paths` parameter now natively accepts `Sequence[Path | str]` (AsciiDoctype 0.1.0a6 alignment).
-* *Renderer, Template & Plugin Caching:* `GolemRenderer`, `PageCompiler` skeleton, disk templates, and plugin entry-point discovery are now cached for significant build and test performance improvement.
-* *Upstream Dependency Upgrades:* Upgraded upstream dependencies: AsciiDoctrine 0.2.0a7, AsciiDocstring 0.1.0a9, AsciiDoctype 0.1.0a6, AsciiDoctest 0.2.0a5.
-* *`on_pre_parse` Macro Expansion Deprecated:* The `on_pre_parse` hook in `golem.plugins.apidoc` is now a deprecated fallback for `golem:apidoc[...]` macro expansion. It emits a `logger.warning` when invoked and will be removed in a future release. The `on_asg_created` hook is the preferred expansion path.
-* *Table Column Alignment Propagation:* `golem.renderer` now propagates column-level `halign`/`valign` specifications from `cols=` declarations (e.g. `cols="<,^,>"`) down to individual cell nodes in the ASG. Cell-level alignment always takes precedence over column-spec defaults.
-* *Dot-Ordered List Normalization:* `golem.renderer` now detects and repairs a parser quirk in `asciidoctrine` ≥ 0.2.0a5 where the first item of a dot-ordered list (`. First item`) is promoted to the list's `title` attribute. Affected lists are normalized in-place before rendering; consecutive fractured list blocks are merged.
-* *Default Theme Table Styling:* The `default/skeleton.pt` template now ships full AsciiDoc table semantics: `halign-left/center/right/justify`, `valign-top/middle/bottom`, `stripes-even/odd/hover`, `frame-all/sides/topbot/none`, and `grid-all/cols/rows/none` CSS classes; styled `caption.title`; and `colgroup col` proportional-width support.
-* *Default Theme Palette & Radii Refinements:*
-** Lightened default light mode background to clean warm paper (`#faf9f5`).
-** Refined inline code corner radius to `2px` for crisper inline badges, and increased action button corner radius to `5px` to clearly differentiate clickable UI controls.
-** Styled dev server diagnostic error overlay with dark theme and aligned source code error carets.
-* *Plugin Execution Gating:* Refactored `get_plugin_manager()` to a two-pass discovery-registration architecture where `config.plugins` is the sole authority for activation and execution order.
-* *Dependency Upgrades:* Updated `asciidoctest` import surface to 0.2.0a4 top-level exports (`AsciiDocTestFailure`, `extract_and_run_docstring_tests` now importable from `asciidoctest` directly). Bumped `asciidoctrine` to `>=0.2.0a5`, `asciidoctype` to `>=0.1.0a4`, and added `pygments>=2.18`.
-* *AsciiDoc Docstrings:* Standardized docstrings across all internal modules to AsciiDoc format using `asciidocstring` conventions.
-* *CSS Visual Hierarchy:* Enhanced default theme typography, admonition pill labels, code listing language badges, table breakouts, and per-page layout classes.
+* *Decoupled Views and Renderer:* Eliminated circular imports between `golem.renderer` and `golem.views` via `views_protocol.py` (`BodyRendererProtocol`) and dependency injection.
+* *Template Context Keys:* Realigned Chameleon context keys to `title`, `body_html`, `nav_html`, `body_class`, `content_class`, `site_title`; removed deprecated aliases.
+* *Python Runtime Compatibility:* Relaxed constraint to `requires-python = ">=3.12"` for Python 3.13+ forward compatibility.
+* *Search Paths Typing:* `render_body` `search_paths` parameter accepts `Sequence[Path | str]` (AsciiDoctype 0.1.0a7 alignment).
+* *Renderer & Plugin Caching:* `GolemRenderer`, `PageCompiler` skeleton, and plugin entry-point discovery cached for build and test performance.
+* *Upstream Dependency Upgrades:* Bumped minimums from 0.1.0a2 baselines: AsciiDoctrine `>=0.2.0a3` → `>=0.2.0a8`, AsciiDoctest `>=0.2.0a3` → `>=0.2.0a6`, AsciiDoctype `>=0.1.0a3` → `>=0.1.0a7`, AsciiDocstring (new pin) `>=0.1.0a11`. New runtime dependencies: `pygments>=2.18`, `filelock` (replacing POSIX-only `fcntl`), `griffe>=1.5.0`.
+* *Table Column Alignment:* `golem.renderer` propagates column-level `halign`/`valign` from `cols=` declarations to cell nodes. Cell-level alignment takes precedence.
+* *Dot-Ordered List Normalization:* `golem.renderer` repairs a parser quirk in `asciidoctrine` ≥ 0.2.0a5 where the first item of a dot-ordered list is promoted to the list's `title`. Affected lists normalized in-place; fractured list blocks merged.
+* *Default Theme Table Styling:* Full AsciiDoc table semantics in `skeleton.pt`: `halign-*`, `valign-*`, `stripes-*`, `frame-*`, `grid-*` CSS classes; styled `caption.title`; `colgroup col` proportional-width support.
+* *Default Theme Palette & Radii:*
+** Lightened default light mode background to `#faf9f5`.
+** Inline code corner radius `2px`; action button corner radius `5px`.
+** Dev server error overlay with dark theme and aligned source code error carets.
+* *AsciiDoc Docstrings:* Docstrings across all internal modules converted to AsciiDoc format using `asciidocstring` conventions.
+* *CSS Visual Hierarchy:* Refined default theme typography, admonition pill labels, table breakouts, and per-page layout classes.
 
 === Fixed
 
+* *METAL Comment on Every Page:* `skeleton.pt` had a 73-line HTML comment (`<!-- ... -->`) that Chameleon preserves verbatim. Converted to `<tal:comment tal:replace="nothing">` so it is stripped at render time.
+* *Corrupted Unicode in Dev Server:* `send_head()` served HTML with `Content-Type: text/html` (no charset), causing browsers to default to Latin-1 and corrupt UTF-8 multi-byte sequences (`→`, `│`, `▼`, `★`). Added `; charset=utf-8`.
+* *`GlossaryPlugin` dict-items Collision:* `RuntimeError: dictionary changed size during iteration` — iterate over a snapshot instead.
+* *`IndexTerm` isinstance Check:* Missing `isinstance` guard in `IndexPlugin` to skip non-`IndexTerm` ASG nodes sharing the same key.
 * *Diagnostic Severity Preservation:* `Diagnostic` positional dict initialization no longer clobbers `"severity"` from the input mapping.
-* *AST Include Tracking:* Replaced fragile regex include fallback with `ast.included_files` tracking.
-* *Syntax Highlighting Callout Preservation:* Overrode `GolemRenderer.highlight_code()` to preserve AsciiDoc `<i class="conum">` callouts through Pygments and re-inject badges into highlighted lines; removed duplicate CSS counter badges on `ol.colist > li`.
-* *ApiDoc Plugin Macro Protection:* Protected delimited verbatim blocks, inline code backticks, and backslash-escaped macros (`\golem:apidoc[...]`) from unintended macro expansion in both `on_asg_created` and `on_pre_parse` paths.
-* *Listing Focus Outline Scoping:* Limited `.listingblock` focus outline highlight strictly to code content and pane interactions via `:has(.listing-content:focus-within, .listing-panes:focus-within)`.
-* *Snippet Compilation Hardening:* Hardened isolated multi-view snippet compilation against infinite recursion, attribute injection, and template leakages, with sanitized listing role identifiers.
-* *Python Exception Handling:* Corrected five occurrences of deprecated Python 2 `except A, B:` syntax to Python 3 `except (A, B):`.
-* *Plugin Hook Robustness:* Isolated plugin exceptions across all build hooks and added conflict warnings when multiple plugins modify the same value.
-* *Cross-Platform File Locking:* Replaced POSIX-only `fcntl` cache locking with cross-platform `filelock`.
-* *Configuration Normalization:* Deduplicated TOML parsing across `golem.toml` and `pyproject.toml` into a centralized normalizer helper.
-* *Navigation & TOC Performance:* Cached `discover_navigation()` tree during build cycles and eliminated duplicated text in TOC anchor generation.
-* *CLI Scaffolding and Package Info:*
-** Dynamically resolved `--version` from package metadata and author name from `git config` in `golem init`.
-* *Repository Cleanliness:* Removed internal review artifacts from tracking and added pattern ignores to `.gitignore`.
-* *Dev Server Disconnects:* Downgraded client socket disconnect exceptions to debug-level logging.
-* *Pygments HTML-Escaped Quotes in Derived Views:* Assertions in derived-view rendering now accept both raw (`"`) and HTML-escaped (`&quot;`) forms of JSON output, fixing failures when Pygments is active.
+* *AST Include Tracking:* Replaced regex include fallback with `ast.included_files` tracking.
+* *Syntax Highlighting Callout Preservation:* `GolemRenderer.highlight_code()` preserves `<i class="conum">` callouts through Pygments and re-injects badges; removed duplicate CSS counter badges on `ol.colist > li`.
+* *ApiDoc Macro Protection:* Delimited verbatim blocks, inline code backticks, and backslash-escaped macros (`\golem:apidoc[...]`) protected from unintended expansion in both `on_asg_created` and `on_pre_parse` paths.
+* *Listing Focus Outline Scoping:* `.listingblock` focus outline limited to code content and pane interactions via `:has(.listing-content:focus-within, .listing-panes:focus-within)`.
+* *Snippet Compilation:* Multi-view snippet compilation guarded against infinite recursion, attribute injection, and template leakage; listing role identifiers sanitized.
+* *Python Exception Handling:* Corrected five `except A, B:` (Python 2) to `except (A, B):`.
+* *Plugin Hook Isolation:* Plugin exceptions isolated across all build hooks; conflict warnings added when multiple plugins modify the same value.
+* *Cross-Platform File Locking:* Replaced POSIX-only `fcntl` cache locking with `filelock`.
+* *Configuration Normalization:* Unified TOML parsing across `golem.toml` and `pyproject.toml` into a shared normalizer.
+* *Navigation & TOC Performance:* Cached `discover_navigation()` tree during build cycles; eliminated duplicated text in TOC anchor generation.
+* *CLI Scaffolding and Package Info:* `--version` resolved from package metadata; author name from `git config` in `golem init`.
+* *Repository Cleanliness:* Removed internal review artifacts from tracking; added pattern ignores to `.gitignore`.
+* *Dev Server Disconnects:* Client socket disconnect exceptions downgraded to debug-level logging.
+* *Pygments HTML-Escaped Quotes:* Derived-view assertions accept both raw (`"`) and HTML-escaped (`&quot;`) JSON output.
 
 == 0.1.0a2 - 2026-08-24
 
