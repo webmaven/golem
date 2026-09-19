@@ -1,0 +1,39 @@
+= Paper Title
+{{author}}
+:affiliation: Institution Name
+:email: author@example.com
+:revdate: {{year}}-01-01
+:doctype: article
+:toc: left
+
+[abstract]
+== Abstract
+
+Replace this with your abstract (150–250 words).
+
+*Keywords:* keyword1, keyword2, keyword3
+
+== Introduction
+
+Introduce the problem and motivate your work.
+
+== Related Work
+
+Survey relevant prior work and position your contribution.
+
+== Methodology
+
+Describe your approach, experimental setup, or theoretical framework.
+
+== Results
+
+Present your findings with supporting data, tables, or figures.
+
+== Conclusion
+
+Summarize contributions and suggest future directions.
+
+[bibliography]
+== References
+
+bibliography::refs.bib[]

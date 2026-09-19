@@ -325,24 +325,19 @@ Golem implements a dedicated extractor (`golem/plugins/apidoc/core/`) to generat
 4.  For each object, the formatter (`formatter.py`) renders signatures (via `format_parameters()` and `format_function_signature()`) and docstrings into AsciiDoc markup.
 5.  Golem compiles these into standard, hyperlinked AsciiDoc reference subpages saved inside the configured `[api] output_dir` (default: `content/api/`).
 
-=== 7.2 Inline Block Macro: `golem:apidoc`
+=== 7.2 Block Macro: `golem.apidoc::`
 To splice API references directly into technical books or guides, Golem implements a custom block macro:
 
 [source,asciidoc]
 ----
-golem:apidoc[target="golem.engine.BuildEngine", depth="methods"]
+golem.apidoc::golem.engine.BuildEngine[depth=methods]
 ----
 
-The macro is implemented via the `on_pre_parse` hook in `golem/plugins/apidoc/__init__.py`.
-Before the document is parsed by Lark, the plugin performs a regex search over the raw
-AsciiDoc source for `golem:apidoc[...]` occurrences, resolves the target symbol via
-`AsciiDocApi.render_symbol()`, and replaces the macro text with the rendered AsciiDoc
-fragment in-place. The patched source is then passed to the standard parse pipeline.
-
-NOTE: This text-substitution approach means injected content is re-parsed in the context
-of the outer document. A deeper AST-level implementation (splicing pre-built ASG nodes
-via a `NodeTransformer` after parsing) is tracked in
-https://github.com/webmaven/golem/issues/10[GitHub issue #10].
+The macro is implemented via the `on_asg_created` hook in `golem/plugins/apidoc/__init__.py`.
+The plugin uses an `ApidocMacroTransformer(AsgTransformer)` to traverse the resolved ASG.
+For each macro block node matching `name == "golem.apidoc"`, the transformer calls
+`AsciiDocApi.get_asg_nodes()`, which resolves the target symbol, generates AsciiDoc markup,
+and resolves it into typed AST `Node` objects that are spliced directly into the parent block list.
 
 ---
 
@@ -602,7 +597,7 @@ Golem hosts static files from `build.output_dir` using Python's built-in `http.s
 The `golem` command-line utility routes user actions using a standard Click-based interface with global `-C/--directory` and `--version` support.
 
 === 11.1 Core Commands
-*   `golem init [--template=<type>] [--output-dir=<dir>] [-C <dir>]`
+*   `golem init [--profile=<type>] [--output-dir=<dir>] [-C <dir>]`
     *   Creates a standard directory structure and basic `golem.toml` (or `[tool.golem]` in `pyproject.toml`).
     *   Profiles: `package` (default, standard library layout), `site` / `book` / `simple` (scaffolds `templates/` and `static/css/custom.css`).
     *   NOTE: Named profiles `library`, `cli`, `paper`, and `blog` currently map to the generic package or site skeleton. Differentiated scaffolding is tracked in https://github.com/webmaven/golem/issues/9[GitHub issue #9].

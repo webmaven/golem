@@ -560,3 +560,68 @@ packages = ["pkg_golem"]
     assert pyproject_cfg.content_dir == "golem_docs"
     assert pyproject_cfg.output_dir == "golem_dist"
     assert pyproject_cfg.api_packages == ["pkg_golem"]
+
+
+def test_golem_config_no_legacy_source_links_fields():
+    config = GolemConfig()
+    assert not hasattr(config, "repo_url")
+    assert not hasattr(config, "branch")
+    assert not hasattr(config, "docs_dir")
+    assert hasattr(config, "plugin_configs")
+    assert config.plugin_configs == {}
+
+
+def test_config_plugins_subtable_parsing(tmp_path):
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+[plugins]
+plugins = ["custom_plugin", "another_plugin"]
+
+[plugins.custom_plugin]
+api_key = "secret"
+timeout = 30
+
+[plugins.another_plugin]
+debug = true
+""")
+    config = load_config(config_file)
+    assert config.plugins == ["custom_plugin", "another_plugin"]
+    assert config.plugin_configs["custom_plugin"] == {"api_key": "secret", "timeout": 30}
+    assert config.plugin_configs["another_plugin"] == {"debug": True}
+
+
+def test_config_source_links_packed_into_plugin_configs(tmp_path):
+    config_file = tmp_path / "golem.toml"
+    config_file.write_text("""
+[site]
+title = "Source Links Test"
+
+[source_links]
+repo_url = "git@github.com:webmaven/golem.git"
+branch = "staging"
+docs_dir = "documentation"
+provider = "github"
+""")
+    config = load_config(config_file)
+    assert "source_links" in config.plugin_configs
+    assert config.plugin_configs["source_links"]["repo_url"] == "git@github.com:webmaven/golem.git"
+    assert config.plugin_configs["source_links"]["branch"] == "staging"
+    assert config.plugin_configs["source_links"]["docs_dir"] == "documentation"
+    assert config.plugin_configs["source_links"]["provider"] == "github"
+
+
+def test_config_pyproject_source_links_from_project_urls(tmp_path):
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text("""
+[project]
+name = "myproject"
+
+[project.urls]
+Repository = "https://github.com/myorg/myrepo"
+
+[tool.golem.site]
+title = "URL Test"
+""")
+    config = load_config(config_file)
+    assert "source_links" in config.plugin_configs
+    assert config.plugin_configs["source_links"]["repo_url"] == "https://github.com/myorg/myrepo"

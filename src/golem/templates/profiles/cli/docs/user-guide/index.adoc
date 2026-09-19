@@ -1,0 +1,7 @@
+= User Guide
+{{author}}
+:toc: left
+
+== Getting Started
+
+Welcome to the `{{project_name}}` CLI user guide.

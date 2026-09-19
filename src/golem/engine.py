@@ -33,7 +33,7 @@ The compilation pipeline proceeds through sequential phases:
 5. ASG Resolution & Hook Execution: Resolves ASTs into Abstract Semantic Graphs (ASG) and executes `on_asg_created` hooks.
 6. Body & Table of Contents Rendering: Evaluates ASG nodes into HTML body content and generates structural table-of-contents HTML.
 7. Navigation & Pagination Assembly: Discovers site navigation trees and calculates page-specific sequential pagination links.
-8. Template Framing & Post-Render Hooks: Compiles the complete HTML page via Chameleon templates (`PageCompiler`) and executes `on_post_render` hooks.
+8. Template Context Framing & Post-Render Hooks: Executes `on_template_context` hooks, compiles the complete HTML page via Chameleon templates (`PageCompiler`), and executes `on_post_render` hooks.
 9. Disk Output & Cache Update: Writes compiled HTML files to `output_dir` and updates content hashes and include dependencies in the cache.
 10. Build Finish Hook Execution: Triggers registered `on_build_finish` plugin hooks with a `BuildResult`.
 """
@@ -91,9 +91,9 @@ def _invoke_build_start_hook(impl: Any, config: GolemConfig) -> None:
         impl.function()
 
 
-def _invoke_asg_hook(impl: Any, asg: dict[str, Any] | Node, doc_path: Path) -> Any:
-    """Invoke on_asg_created hook implementation with Pluggy argument filtering."""
-    hook_kwargs: dict[str, Any] = {"asg": asg}
+def _invoke_doc_hook(impl: Any, arg_name: str, arg_val: Any, doc_path: Path) -> Any:
+    """Invoke document hook implementation with Pluggy argument filtering."""
+    hook_kwargs: dict[str, Any] = {arg_name: arg_val}
     has_doc_path = "doc_path" in getattr(impl, "argnames", ()) or "doc_path" in getattr(impl, "kwargnames", ())
     if not has_doc_path:
         fn = getattr(impl, "function", None)
@@ -166,6 +166,9 @@ class BuildEngine:
         # Load Pluggy Plugin Manager
         plugins_dir = Path(getattr(config, "plugins_dir", "plugins"))
         self.pm = get_plugin_manager(config=config, plugins_dir=plugins_dir)
+        asg_spec = getattr(getattr(self.pm.hook, "on_asg_created", None), "spec", None)
+        if asg_spec and "doc_path" not in asg_spec.argnames:
+            asg_spec.argnames = (*asg_spec.argnames, "doc_path")
 
         self.staleness_tracker = StalenessTracker(
             config=self.config,
@@ -195,7 +198,7 @@ class BuildEngine:
         `path` (Path):: Path to the target AsciiDoc document.
 
         [returns]
-        `dict[str, Any]`:: Dictionary containing `"title"`, `"nav_title"`, `"nav_order"`, `"has_toc"`, `"page_class"`, `"body_class"`, and `"content_class"` keys.
+        `dict[str, Any]`:: Dictionary containing `"title"`, `"nav_title"`, `"nav_order"`, `"has_toc"`, `"page_class"`, `"body_class"`, `"content_class"`, and `"page_role"` keys.
         """
         p_abs = str(path.resolve())
         current_hash = self.cache.get_sha256(path)
@@ -261,7 +264,7 @@ class BuildEngine:
         2. Identifies stale or modified documents via `staleness_tracker.get_outdated_files()`.
         3. Synchronizes static assets into the output directory via `sync_static_assets()`.
         4. Compiles each outdated document through sequential AST parsing (`asciidoctrine`), ASG semantic resolution (`ASGResolver`), body rendering (`render_body`), navigation and TOC generation, and Chameleon template layout compilation (`PageCompiler`).
-        5. Executes plugin hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_post_render`) across each lifecycle phase.
+        5. Executes plugin hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_template_context`, `on_post_render`) across each lifecycle phase.
         6. Writes compiled HTML files to disk and updates the DAG cache via `staleness_tracker.update_cache_for_file()`.
         7. Executes `on_build_finish` after all documents have been compiled and written to disk.
 
@@ -325,6 +328,15 @@ class BuildEngine:
             else set(all_docs)
         )
 
+        def _get_build_priority(doc_p: Path) -> tuple[int, str]:
+            meta = self.get_file_metadata(doc_p)
+            role = (meta.get("page_role") or "").strip().lower()
+            # Compile aggregator pages (index, glossary) after content pages
+            is_aggregator = 1 if role in ("index", "glossary") else 0
+            return (is_aggregator, str(doc_p))
+
+        sorted_to_build = sorted(to_build, key=_get_build_priority)
+
         output_dir = Path(self.config.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -332,7 +344,7 @@ class BuildEngine:
 
         search_paths = self.staleness_tracker._get_template_search_paths()
 
-        for doc_path in to_build:
+        for doc_path in sorted_to_build:
             if is_partial(doc_path, self.content_dir):
                 continue
             try:
@@ -394,7 +406,7 @@ class BuildEngine:
 
                 # 2. Resolve AST to ASG
                 resolver = ASGResolver(ast)
-                asg: dict[str, Any] | Node = resolver.resolve(ast)
+                asg: Node = resolver.resolve_to_ast(ast)
 
                 if hasattr(resolver, "warnings") and resolver.warnings:
                     for warn in resolver.warnings:
@@ -405,7 +417,7 @@ class BuildEngine:
                 _asg_modifiers: list[str] = []
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
                     try:
-                        result = _invoke_asg_hook(impl, asg, doc_path)
+                        result = _invoke_doc_hook(impl, "asg", asg, doc_path)
                     except Exception as e:
                         logging.warning(
                             "[Plugin] %s raised an exception in on_asg_created for %s: %s",
@@ -414,7 +426,7 @@ class BuildEngine:
                             e,
                         )
                         continue
-                    if isinstance(result, (dict, Node)) and result is not asg:
+                    if isinstance(result, Node) and result is not asg:
                         _asg_modifiers.append(impl.plugin_name or str(impl.function))
                         asg = result
                 if len(_asg_modifiers) > 1:
@@ -431,23 +443,34 @@ class BuildEngine:
                 # 3. Render body using Golem's ASG visitor
                 body_content = render_body(asg, search_paths=search_paths)
 
-                # Extract title for layout framing
+                # Extract title for layout framing from typed Document node
                 title_str = ""
-                if isinstance(asg, dict):
-                    title_str = asg.get("title", "")
-                    if not title_str and asg.get("header"):
-                        header = asg["header"]
-                        if isinstance(header, dict) and header.get("title"):
-                            title_nodes = header["title"]
-                            if isinstance(title_nodes, list) and len(title_nodes) > 0:
-                                title_str = title_nodes[0].get("value", "")
-                    if not title_str and asg.get("blocks"):
-                        first_block = asg["blocks"][0]
-                        if first_block.get("name") == "title":
-                            title_str = first_block.get("value", "")
-                else:
-                    title_str = getattr(asg, "title", "")
+                header = getattr(asg, "header", None)
+                if header and getattr(header, "title", None):
+                    t = header.title
+                    if hasattr(t, "inlines") and t.inlines:
+                        title_str = "".join(getattr(n, "value", "") if hasattr(n, "value") else str(n) for n in t.inlines)
+                    elif isinstance(t, list) and t:
+                        title_str = getattr(t[0], "value", "") if hasattr(t[0], "value") else str(t[0])
+                    elif isinstance(t, str):
+                        title_str = t
+                if not title_str and hasattr(asg, "blocks"):
+                    # Fall back to first section title
+                    for block in getattr(asg, "blocks", None) or []:
+                        if getattr(block, "name", None) in ("section", "title") and getattr(block, "title", None):
+                            t = block.title
+                            if hasattr(t, "inlines"):
+                                title_str = "".join(
+                                    getattr(n, "value", "") if hasattr(n, "value") else str(n) for n in t.inlines
+                                )
+                            elif isinstance(t, list) and t:
+                                title_str = getattr(t[0], "value", "") if hasattr(t[0], "value") else str(t[0])
+                            elif isinstance(t, str):
+                                title_str = t
+                            break
 
+                if not title_str:
+                    title_str = getattr(asg, "title", "") if not isinstance(getattr(asg, "title", None), (dict, list)) else ""
                 if not title_str:
                     title_str = "Golem Doc"
 
@@ -466,45 +489,68 @@ class BuildEngine:
                 content_class = doc_meta.get("content_class", "")
 
                 asg_attrs: dict[str, Any] = {}
-                if isinstance(asg, dict):
-                    asg_attrs = asg.get("attributes") or {}
-                    if not isinstance(asg_attrs, dict) and isinstance(asg.get("header"), dict):
-                        asg_attrs = asg["header"].get("attributes") or {}
-                elif hasattr(asg, "attributes"):
-                    asg_attrs = getattr(asg, "attributes") or {}
+                attributes = getattr(asg, "attributes", None)
+                if attributes and isinstance(attributes, dict):
+                    asg_attrs = attributes
+                else:
+                    header = getattr(asg, "header", None)
+                    header_attrs = getattr(header, "attributes", None) if header else None
+                    if header_attrs and isinstance(header_attrs, dict):
+                        asg_attrs = header_attrs
 
-                if isinstance(asg_attrs, dict):
-                    if not body_class:
-                        body_class = (
-                            asg_attrs.get("body_class") or asg_attrs.get("body-class") or asg_attrs.get("bodyclass") or ""
-                        )
-                    if not page_class:
-                        page_class = (
-                            asg_attrs.get("page_class") or asg_attrs.get("page-class") or asg_attrs.get("pageclass") or ""
-                        )
-                    if not content_class:
-                        content_class = (
-                            asg_attrs.get("content_class")
-                            or asg_attrs.get("content-class")
-                            or asg_attrs.get("contentclass")
-                            or ""
-                        )
+                if not body_class:
+                    body_class = asg_attrs.get("body_class") or asg_attrs.get("body-class") or asg_attrs.get("bodyclass") or ""
+                if not page_class:
+                    page_class = asg_attrs.get("page_class") or asg_attrs.get("page-class") or asg_attrs.get("pageclass") or ""
+                if not content_class:
+                    content_class = (
+                        asg_attrs.get("content_class") or asg_attrs.get("content-class") or asg_attrs.get("contentclass") or ""
+                    )
 
                 resolved_body_class = (body_class or page_class or "").strip()
                 resolved_content_class = (content_class or "").strip()
 
-                final_html = self.compiler.compile_page(
-                    title=title_str,
-                    body_html=body_content,
-                    toc_html=toc_html,
-                    nav_html=nav_html,
-                    nav_tree=_nav_tree,
-                    current_path=str(rel_path),
-                    prev_page=prev_page,
-                    next_page=next_page,
-                    body_class=resolved_body_class,
-                    content_class=resolved_content_class,
+                page_role = (
+                    asg_attrs.get("page-role")
+                    or asg_attrs.get("page_role")
+                    or asg_attrs.get("role")
+                    or (doc_meta.get("page_role") if doc_meta else None)
                 )
+
+                context_dict: dict[str, Any] = {
+                    "title": title_str,
+                    "body_html": body_content,
+                    "toc_html": toc_html,
+                    "nav_html": nav_html,
+                    "nav_tree": _nav_tree,
+                    "current_path": str(rel_path),
+                    "prev_page": prev_page,
+                    "next_page": next_page,
+                    "body_class": resolved_body_class,
+                    "content_class": resolved_content_class,
+                    "doc_attributes": asg_attrs,
+                }
+                if page_role:
+                    context_dict["page_role"] = page_role
+
+                # Trigger on_template_context hooks sequentially (chain modifications)
+                for impl in self.pm.hook.on_template_context.get_hookimpls():
+                    try:
+                        result = _invoke_doc_hook(impl, "context", context_dict, doc_path)
+                    except Exception as e:
+                        logging.warning(
+                            "[Plugin] %s raised an exception in on_template_context for %s: %s",
+                            impl.plugin_name,
+                            doc_path.name,
+                            e,
+                        )
+                        if getattr(self.config, "strict", False):
+                            raise
+                        continue
+                    if isinstance(result, dict):
+                        context_dict.update(result)
+
+                final_html = self.compiler.compile_page(**context_dict)
 
                 # Trigger post-render hooks sequentially (chain modifications)
                 _post_render_modifiers: list[str] = []
@@ -663,7 +709,7 @@ class BuildEngine:
             # 2. Resolve AST to ASG
             try:
                 resolver = ASGResolver(ast)
-                asg: dict[str, Any] | Node = resolver.resolve(ast)
+                asg: Node = resolver.resolve_to_ast(ast)
                 if hasattr(resolver, "warnings") and resolver.warnings:
                     for warn in resolver.warnings:
                         warn_diag = Diagnostic.from_resolver_warning(warn, file=str(doc_path), content=content)
@@ -677,8 +723,8 @@ class BuildEngine:
             if hasattr(self, "pm") and self.pm:
                 for impl in self.pm.hook.on_asg_created.get_hookimpls():
                     try:
-                        result = _invoke_asg_hook(impl, asg, doc_path)
-                        if isinstance(result, (dict, Node)):
+                        result = _invoke_doc_hook(impl, "asg", asg, doc_path)
+                        if isinstance(result, Node):
                             asg = result
                     except Exception as e:
                         logging.warning(

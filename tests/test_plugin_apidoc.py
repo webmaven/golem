@@ -16,25 +16,23 @@ def test_apidoc_plugin_registration():
     assert pm.is_registered(apidoc)
 
 
-def test_on_pre_parse_macro_replacement(tmp_path):
+def test_ast_level_apidoc_splicing_with_typed_nodes(tmp_path):
+    from asciidoctrine import parse_to_ast
+    from asciidoctrine.resolver import ASGResolver
+    from golem.model import Node
     from golem.plugins import apidoc
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
 
-    # Create a target package to document
-    pkg_dir = tmp_path / "calc_pkg"
+    pkg_dir = tmp_path / "typed_test_pkg"
     pkg_dir.mkdir()
     (pkg_dir / "__init__.py").write_text(
-        '''"""Calculator module."""
-def multiply(x: int, y: int) -> int:
-    """Multiply two numbers.
-
-    Args:
-        x: First factor.
-        y: Second factor.
-
-    Returns:
-        Product of x and y.
-    """
-    return x * y
+        '''"""Sample package for typed ASG splicing."""
+class Greeter:
+    """Greeter class."""
+    def greet(self, name: str) -> str:
+        """Return a greeting."""
+        return f"Hello, {name}!"
 ''',
         encoding="utf-8",
     )
@@ -43,103 +41,55 @@ def multiply(x: int, y: int) -> int:
 
     sys.path.insert(0, str(tmp_path))
     try:
-        raw_doc = """= Arithmetic Guide
+        # 1. Verify get_asg_nodes returns typed Node list
+        api = AsciiDocApi(search_paths=[tmp_path])
+        nodes = api.get_asg_nodes("typed_test_pkg.Greeter")
+        assert len(nodes) > 0
+        assert all(isinstance(n, Node) for n in nodes)
 
-Here is our multiply function:
+        # 2. Verify on_asg_created splices typed Nodes into ASG
+        raw_doc = """= Typed Splice Test
 
-golem:apidoc[target="calc_pkg.multiply"]
+Introductory text.
 
-And more content.
+golem.apidoc::typed_test_pkg.Greeter[depth=all]
+
+Concluding text.
 """
-        # Initialize plugin or call on_pre_parse directly
-        res = apidoc.on_pre_parse(raw_content=raw_doc)
-        assert "golem:apidoc" not in res
-        assert "def multiply(x: int, y: int) -> int:" in res
-        assert "Multiply two numbers." in res
-        assert "Arithmetic Guide" in res
+        ast = parse_to_ast(raw_doc)
+        asg = ASGResolver(ast).resolve_to_ast(ast)
+        transformed = apidoc.on_asg_created(asg=asg)
+        assert isinstance(transformed, Node)
+
+        # Verify no golem.apidoc block remains and section is spliced
+        block_names = [b.name for b in transformed.blocks]
+        assert "golem.apidoc" not in block_names
+        assert "section" in block_names
+
+        # Verify rendered output
+        html = render_body(transformed)
+        assert "Greeter" in html
+        assert "greet" in html
+        assert "Return a greeting." in html
+        assert "Introductory text." in html
+        assert "Concluding text." in html
     finally:
         sys.path.remove(str(tmp_path))
 
 
-def test_on_pre_parse_syntax_variants(tmp_path):
-    from golem.plugins import apidoc
+def test_get_asg_nodes_invalid_symbol_returns_typed_admonition():
+    from asciidoctrine.nodes import Admonition
+    from golem.model import Node
+    from golem.plugins.apidoc import AsciiDocApi
 
-    pkg_dir = tmp_path / "syn_pkg"
-    pkg_dir.mkdir()
-    (pkg_dir / "__init__.py").write_text(
-        '''"""Syntax test pkg."""
-def test_fn() -> None:
-    """A test function."""
-    pass
-''',
-        encoding="utf-8",
-    )
-
-    import sys
-
-    sys.path.insert(0, str(tmp_path))
-    try:
-        variants = [
-            'golem:apidoc[target="syn_pkg.test_fn"]',
-            "golem:apidoc[target='syn_pkg.test_fn']",
-            'golem:apidoc["syn_pkg.test_fn"]',
-            "golem:apidoc[syn_pkg.test_fn]",
-            'golem:apidoc[target="syn_pkg.test_fn", depth="summary"]',
-        ]
-        for v in variants:
-            raw = f"= Page\n\n{v}\n"
-            out = apidoc.on_pre_parse(raw_content=raw)
-            assert "golem:apidoc" not in out
-            assert "test_fn" in out
-    finally:
-        sys.path.remove(str(tmp_path))
-
-
-def test_on_pre_parse_missing_symbol_graceful():
-    from golem.plugins import apidoc
-
-    raw = '= Missing Page\n\ngolem:apidoc[target="nonexistent_pkg_123.fake_func"]\n'
-    out = apidoc.on_pre_parse(raw_content=raw)
-    assert "golem:apidoc" not in out
-    assert "nonexistent_pkg_123.fake_func" in out
-
-
-def test_on_pre_parse_verbatim_and_backtick_protection(caplog):
-    """Verify on_pre_parse does not expand macros in backticks or verbatim blocks, and does not warn."""
-    from golem.plugins import apidoc
-
-    raw = """= Guide
-
-Here is `golem:apidoc[...]` in an inline code span.
-
-[source,asciidoc]
-----
-= Code Listing
-golem:apidoc[target="some.pkg.Class", depth="all"]
-----
-
-....
-golem:apidoc[literal_block]
-....
-
-And \\golem:apidoc[target="escaped"] is escaped.
-"""
-    with caplog.at_level("WARNING", logger="golem.plugins.apidoc"):
-        processed = apidoc.on_pre_parse(raw)
-
-    # Inline backticks preserved
-    assert "`golem:apidoc[...]`" in processed
-
-    # Verbatim blocks preserved without expansion or warnings
-    assert 'golem:apidoc[target="some.pkg.Class", depth="all"]' in processed
-    assert "golem:apidoc[literal_block]" in processed
-
-    # Escaped macro unescaped
-    assert 'golem:apidoc[target="escaped"]' in processed
-    assert "\\golem:apidoc" not in processed
-
-    # No deprecation warning emitted when only inert/escaped/verbatim mentions exist
-    assert "on_pre_parse macro expansion in golem.plugins.apidoc is deprecated" not in caplog.text
+    api = AsciiDocApi()
+    nodes = api.get_asg_nodes("completely_nonexistent_module_999.Fake")
+    assert len(nodes) == 1
+    assert isinstance(nodes[0], Node)
+    assert isinstance(nodes[0], Admonition)
+    assert nodes[0].name == "admonition"
+    assert nodes[0].variant == "warning"
+    assert "Could not resolve target" in str(nodes[0].blocks[0].inlines[0].value)
 
 
 def test_on_asg_created_macro_replacement(tmp_path):
@@ -176,20 +126,20 @@ def multiply(x: int, y: int) -> int:
 
 Here is our multiply function:
 
-golem:apidoc[target="calc_pkg.multiply"]
+golem.apidoc::calc_pkg.multiply[]
 
 And more content.
 """
         ast = asciidoctrine.parse_to_ast(raw_doc)
         resolver = ASGResolver(ast)
-        asg = resolver.resolve(ast)
+        asg = resolver.resolve_to_ast(ast)
 
         # Apply on_asg_created hook
         asg = apidoc.on_asg_created(asg=asg)
 
         # Render HTML from modified ASG
         html = render_body(asg)
-        assert "golem:apidoc" not in html
+        assert "golem.apidoc" not in html
         assert "multiply" in html
         assert "Multiply two numbers." in html
         assert "Here is our multiply function:" in html
@@ -220,21 +170,20 @@ def test_fn() -> None:
     sys.path.insert(0, str(tmp_path))
     try:
         variants = [
-            'golem:apidoc[target="syn_pkg.test_fn"]',
-            "golem:apidoc[target='syn_pkg.test_fn']",
-            'golem:apidoc["syn_pkg.test_fn"]',
-            "golem:apidoc[syn_pkg.test_fn]",
-            'golem:apidoc[target="syn_pkg.test_fn", depth="summary"]',
+            "golem.apidoc::syn_pkg.test_fn[]",
+            'golem.apidoc::"syn_pkg.test_fn"[]',
+            "golem.apidoc::syn_pkg.test_fn[depth=summary]",
+            "golem.apidoc::syn_pkg.test_fn[style=auto]",
         ]
         for v in variants:
             raw = f"= Page\n\n{v}\n"
             ast = asciidoctrine.parse_to_ast(raw)
             resolver = ASGResolver(ast)
-            asg = resolver.resolve(ast)
+            asg = resolver.resolve_to_ast(ast)
 
             asg = apidoc.on_asg_created(asg=asg)
             html = render_body(asg)
-            assert "golem:apidoc" not in html
+            assert "golem.apidoc" not in html
             assert "test_fn" in html
     finally:
         sys.path.remove(str(tmp_path))
@@ -246,14 +195,14 @@ def test_on_asg_created_missing_symbol_graceful():
     from golem.plugins import apidoc
     from golem.renderer import render_body
 
-    raw = '= Missing Page\n\ngolem:apidoc[target="nonexistent_pkg_123.fake_func"]\n'
+    raw = "= Missing Page\n\ngolem.apidoc::nonexistent_pkg_123.fake_func[]\n"
     ast = asciidoctrine.parse_to_ast(raw)
     resolver = ASGResolver(ast)
-    asg = resolver.resolve(ast)
+    asg = resolver.resolve_to_ast(ast)
 
     asg = apidoc.on_asg_created(asg=asg)
     html = render_body(asg)
-    assert "golem:apidoc" not in html
+    assert "golem.apidoc" not in html
     assert "nonexistent_pkg_123.fake_func" in html
     assert "admonitionblock warning" in html
 
@@ -289,7 +238,7 @@ Initial overview text.
 
 Section one intro.
 
-golem:apidoc[target="sect_pkg.Worker"]
+golem.apidoc::sect_pkg.Worker[]
 
 Section one outro.
 
@@ -299,7 +248,7 @@ Section two text.
 """
         ast = asciidoctrine.parse_to_ast(raw_doc)
         resolver = ASGResolver(ast)
-        asg = resolver.resolve(ast)
+        asg = resolver.resolve_to_ast(ast)
 
         # Apply on_asg_created
         asg = apidoc.on_asg_created(asg=asg)
@@ -347,11 +296,11 @@ def helper() -> None:
     try:
         raw_doc = """= Offset Doc
 
-golem:apidoc[target="offset_pkg.helper", heading_level_offset=1]
+golem.apidoc::offset_pkg.helper[heading_level_offset=1]
 """
         ast = asciidoctrine.parse_to_ast(raw_doc)
         resolver = ASGResolver(ast)
-        asg = resolver.resolve(ast)
+        asg = resolver.resolve_to_ast(ast)
 
         asg = apidoc.on_asg_created(asg=asg)
         html = render_body(asg)
@@ -362,150 +311,84 @@ golem:apidoc[target="offset_pkg.helper", heading_level_offset=1]
         sys.path.remove(str(tmp_path))
 
 
-def test_on_asg_created_splices_paragraph_macro(monkeypatch):
+def test_on_asg_created_splices_block_macro(monkeypatch):
+    import asciidoctrine
+    from asciidoctrine.nodes import Paragraph, Section, Text
+    from asciidoctrine.resolver import ASGResolver
     from golem.plugins import apidoc
 
     fake_nodes = [
-        {
-            "name": "section",
-            "type": "block",
-            "title": [{"name": "text", "value": "Fake Module"}],
-        },
-        {
-            "name": "paragraph",
-            "type": "block",
-            "inlines": [{"name": "text", "value": "Doc content"}],
-        },
+        Section(level=2, title=[Text("Fake Module")]),
+        Paragraph(inlines=[Text("Doc content")]),
     ]
-    monkeypatch.setattr("golem.plugins.apidoc._expand_macro_target", lambda target: fake_nodes)
+    monkeypatch.setattr(
+        "golem.plugins.apidoc.AsciiDocApi.get_asg_nodes",
+        lambda self, target, **kwargs: fake_nodes,
+    )
 
-    asg = {
-        "name": "document",
-        "type": "block",
-        "blocks": [
-            {
-                "name": "paragraph",
-                "type": "block",
-                "inlines": [
-                    {
-                        "name": "text",
-                        "type": "string",
-                        "value": 'golem:apidoc[target="some.pkg"]',
-                    }
-                ],
-            }
-        ],
-    }
+    raw = "= Document\n\ngolem.apidoc::some.pkg[]\n"
+    ast = asciidoctrine.parse_to_ast(raw)
+    asg = ASGResolver(ast).resolve_to_ast(ast)
     result = apidoc.on_asg_created(asg)
-    assert result["blocks"] == fake_nodes
+    assert result.blocks == fake_nodes
 
 
 def test_on_asg_created_preserves_surrounding_blocks(monkeypatch):
+    import asciidoctrine
+    from asciidoctrine.nodes import Section, Text
+    from asciidoctrine.resolver import ASGResolver
     from golem.plugins import apidoc
 
-    fake_nodes = [{"name": "section", "type": "block", "title": "Injected Section"}]
-    monkeypatch.setattr("golem.plugins.apidoc._expand_macro_target", lambda target: fake_nodes)
+    fake_nodes = [Section(level=2, title=[Text("Injected Section")])]
+    monkeypatch.setattr(
+        "golem.plugins.apidoc.AsciiDocApi.get_asg_nodes",
+        lambda self, target, **kwargs: fake_nodes,
+    )
 
-    before_block = {
-        "name": "paragraph",
-        "type": "block",
-        "inlines": [{"name": "text", "value": "Before"}],
-    }
-    after_block = {
-        "name": "paragraph",
-        "type": "block",
-        "inlines": [{"name": "text", "value": "After"}],
-    }
-    asg = {
-        "name": "document",
-        "type": "block",
-        "blocks": [
-            before_block,
-            {
-                "name": "paragraph",
-                "type": "block",
-                "inlines": [{"name": "text", "value": 'golem:apidoc[target="some.pkg"]'}],
-            },
-            after_block,
-        ],
-    }
+    raw = "= Document\n\nBefore\n\ngolem.apidoc::some.pkg[]\n\nAfter\n"
+    ast = asciidoctrine.parse_to_ast(raw)
+    asg = ASGResolver(ast).resolve_to_ast(ast)
     result = apidoc.on_asg_created(asg)
-    assert len(result["blocks"]) == 3
-    assert result["blocks"][0] == before_block
-    assert result["blocks"][1] == fake_nodes[0]
-    assert result["blocks"][2] == after_block
+    assert len(result.blocks) == 3
+    assert result.blocks[0].inlines[0].value == "Before"
+    assert result.blocks[1] == fake_nodes[0]
+    assert result.blocks[2].inlines[0].value == "After"
 
 
 def test_on_asg_created_noop_without_macros():
-    import copy
+    import asciidoctrine
+    from asciidoctrine.resolver import ASGResolver
     from golem.plugins import apidoc
 
-    asg = {
-        "name": "document",
-        "type": "block",
-        "blocks": [
-            {
-                "name": "paragraph",
-                "type": "block",
-                "inlines": [{"name": "text", "value": "Hello world"}],
-            },
-            {
-                "name": "section",
-                "type": "block",
-                "blocks": [
-                    {
-                        "name": "paragraph",
-                        "type": "block",
-                        "inlines": [{"name": "text", "value": "Inner paragraph"}],
-                    }
-                ],
-            },
-        ],
-    }
-    orig = copy.deepcopy(asg)
+    raw = "= Document\n\nHello world\n\n== Section\n\nInner paragraph\n"
+    ast = asciidoctrine.parse_to_ast(raw)
+    asg = ASGResolver(ast).resolve_to_ast(ast)
+    orig_block_count = len(asg.blocks)
     result = apidoc.on_asg_created(asg)
-    assert result == orig
+    assert len(result.blocks) == orig_block_count
+    assert result.blocks[0].inlines[0].value == "Hello world"
 
 
 def test_on_asg_created_nested_section_splicing(monkeypatch):
+    import asciidoctrine
+    from asciidoctrine.nodes import Paragraph, Text
+    from asciidoctrine.resolver import ASGResolver
     from golem.plugins import apidoc
 
-    fake_nodes = [
-        {
-            "name": "paragraph",
-            "type": "block",
-            "inlines": [{"name": "text", "value": "Spliced in section"}],
-        }
-    ]
-    monkeypatch.setattr("golem.plugins.apidoc._expand_macro_target", lambda target: fake_nodes)
+    fake_nodes = [Paragraph(inlines=[Text("Spliced in section")])]
+    monkeypatch.setattr(
+        "golem.plugins.apidoc.AsciiDocApi.get_asg_nodes",
+        lambda self, target, **kwargs: fake_nodes,
+    )
 
-    asg = {
-        "name": "document",
-        "type": "block",
-        "blocks": [
-            {
-                "name": "section",
-                "type": "block",
-                "blocks": [
-                    {
-                        "name": "paragraph",
-                        "type": "block",
-                        "inlines": [{"name": "text", "value": "Section Header"}],
-                    },
-                    {
-                        "name": "paragraph",
-                        "type": "block",
-                        "inlines": [{"name": "text", "value": 'golem:apidoc[target="nested.pkg"]'}],
-                    },
-                ],
-            }
-        ],
-    }
+    raw = "= Document\n\n== Section Header\n\ngolem.apidoc::nested.pkg[]\n"
+    ast = asciidoctrine.parse_to_ast(raw)
+    asg = ASGResolver(ast).resolve_to_ast(ast)
     result = apidoc.on_asg_created(asg)
-    section_blocks = result["blocks"][0]["blocks"]
-    assert len(section_blocks) == 2
-    assert section_blocks[0]["inlines"][0]["value"] == "Section Header"
-    assert section_blocks[1] == fake_nodes[0]
+    section = result.blocks[0]
+    assert section.name == "section"
+    assert len(section.blocks) == 1
+    assert section.blocks[0] == fake_nodes[0]
 
 
 def test_apidoc_cli_subcommand(tmp_path):
@@ -553,7 +436,7 @@ def test_build_engine_integration_with_apidoc(tmp_path):
 
 Documentation for configuration:
 
-golem:apidoc[target="golem.config.GolemConfig"]
+golem.apidoc::golem.config.GolemConfig[]
 """
     (content_dir / "index.adoc").write_text(doc_text, encoding="utf-8")
 
@@ -649,41 +532,41 @@ def test_on_asg_created_verbatim_and_backtick_protection():
 
     raw = """= Guide
 
-Here is `golem:apidoc[...]` in an inline code span.
+Here is `golem.apidoc::inline[]` in an inline code span.
 
 [source,asciidoc]
 ----
 = Code Listing
-golem:apidoc[target="some.pkg.Class", depth="all"]
+golem.apidoc::some.pkg.Class[depth=all]
 ----
 
 ....
-golem:apidoc[literal_block]
+golem.apidoc::literal_block[]
 ....
 
-And \\golem:apidoc[target="escaped"] is escaped.
+And \\golem.apidoc::escaped[] is escaped.
 """
     ast = asciidoctrine.parse_to_ast(raw)
     resolver = ASGResolver(ast)
-    asg = resolver.resolve(ast)
+    asg = resolver.resolve_to_ast(ast)
 
     asg = apidoc.on_asg_created(asg=asg)
     html = render_body(asg)
 
     # Inline backticks preserved
-    assert "golem:apidoc[...]" in html
+    assert "golem.apidoc::inline[]" in html
 
     # Verbatim blocks preserved without expansion or warnings
-    assert 'golem:apidoc[target="some.pkg.Class", depth="all"]' in html
-    assert "golem:apidoc[literal_block]" in html
+    assert "golem.apidoc::some.pkg.Class[depth=all]" in html
+    assert "golem.apidoc::literal_block[]" in html
 
     # Escaped macro unescaped
-    assert 'golem:apidoc[target="escaped"]' in html
-    assert "\\golem:apidoc" not in html
+    assert "golem.apidoc::escaped[]" in html
+    assert "\\golem.apidoc" not in html
 
 
 def test_apidoc_format_composite_types(tmp_path):
-    from golem.plugins import apidoc
+    from golem.plugins.apidoc import AsciiDocApi
     import sys
 
     pkg_dir = tmp_path / "typed_pkg"
@@ -709,11 +592,8 @@ def process_data(data: Union[dict[str, int], list[str]], timeout: Optional[float
 
     sys.path.insert(0, str(tmp_path))
     try:
-        raw_doc = """= Typed Guide
-
-golem:apidoc[target="typed_pkg.process_data"]
-"""
-        res = apidoc.on_pre_parse(raw_content=raw_doc)
+        api = AsciiDocApi(search_paths=[tmp_path])
+        res = api.render_symbol("typed_pkg.process_data")
         assert "process_data" in res
         assert "data" in res
         assert "timeout" in res
@@ -792,10 +672,10 @@ def process_data(data: Union[dict[str, int], list[str]], timeout: Optional[float
     try:
         raw_doc = """= Typed Guide
 
-golem:apidoc[target="asg_typed_pkg.process_data"]
+golem.apidoc::asg_typed_pkg.process_data[]
 """
         ast = asciidoctrine.parse_to_ast(raw_doc)
-        asg = ASGResolver(ast).resolve(ast)
+        asg = ASGResolver(ast).resolve_to_ast(ast)
         spliced_asg = apidoc.on_asg_created(asg=asg)
         html = render_body(spliced_asg)
         assert "process_data" in html

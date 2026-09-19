@@ -80,6 +80,7 @@ class GolemConfig:
     api_output_dir: str = "api"
     api_docstring_style: str = "auto"
     config_path: str | None = None
+    plugin_configs: dict[str, Any] = field(default_factory=dict)
 
 
 def find_default_config_path() -> Path:
@@ -249,6 +250,67 @@ def _extract_config_values(section: dict[str, Any], root: dict[str, Any]) -> dic
     }
 
 
+def _extract_plugin_configs(
+    section: dict[str, Any],
+    root: dict[str, Any],
+) -> dict[str, Any]:
+    """Extract plugin-specific configurations and repository metadata.
+
+    [parameters]
+    `section` (dict[str, Any]):: Golem-specific configuration dictionary table.
+    `root` (dict[str, Any]):: Full raw TOML document dictionary.
+
+    [returns]
+    `dict[str, Any]`:: Resolved plugin_configs map.
+    """
+    site = section.get("site", {}) if isinstance(section.get("site"), dict) else {}
+    plugins_data = section.get("plugins")
+    plugin_configs: dict[str, Any] = {}
+
+    if isinstance(plugins_data, dict):
+        for key, val in plugins_data.items():
+            if isinstance(val, dict):
+                plugin_configs[key] = dict(val)
+
+    source_links = (
+        section.get("source_links")
+        or (plugins_data.get("source_links") if isinstance(plugins_data, dict) else {})
+        or (root.get("source_links") if isinstance(root, dict) else {})
+        or {}
+    )
+    if not isinstance(source_links, dict):
+        source_links = {}
+
+    project_data = root.get("project", {}) if isinstance(root, dict) and isinstance(root.get("project"), dict) else {}
+    project_urls = project_data.get("urls", {}) if isinstance(project_data.get("urls"), dict) else {}
+
+    resolved_repo_url = (
+        source_links.get("repo_url")
+        or section.get("repo_url")
+        or site.get("repo_url")
+        or project_urls.get("Repository")
+        or project_urls.get("repository")
+        or project_urls.get("Source")
+        or project_urls.get("source")
+    )
+    resolved_branch = source_links.get("branch") or section.get("branch")
+    resolved_docs_dir = source_links.get("docs_dir") or section.get("docs_dir")
+
+    sl_cfg = dict(plugin_configs.get("source_links", {}))
+    sl_cfg.update(source_links)
+    if resolved_repo_url:
+        sl_cfg["repo_url"] = resolved_repo_url
+    if resolved_branch:
+        sl_cfg["branch"] = resolved_branch
+    if resolved_docs_dir:
+        sl_cfg["docs_dir"] = resolved_docs_dir
+
+    if sl_cfg:
+        plugin_configs["source_links"] = sl_cfg
+
+    return plugin_configs
+
+
 def load_config(config_path: Path) -> GolemConfig:
     """Load, parse, and validate Golem site configuration from a TOML file.
 
@@ -306,7 +368,10 @@ def load_config(config_path: Path) -> GolemConfig:
             f"Configuration conflict: output_dir '{output_dir}' cannot be nested inside content_dir '{content_dir}' (they overlap)."
         )
 
+    plugin_configs = _extract_plugin_configs(section, data)
+
     return GolemConfig(
         **values,
         config_path=str(config_path.resolve()),
+        plugin_configs=plugin_configs,
     )

@@ -1,6 +1,7 @@
 import golem.plugins
 from golem.plugins import (
     HOOK_NAMESPACE,
+    GolemPlugin,
     GolemSpecs,
     get_plugin_manager,
     hookimpl,
@@ -24,6 +25,7 @@ def test_plugins_exports():
     assert hasattr(golem.plugins, "BuildResult")
     assert "GolemBuildAbortError" in golem.plugins.__all__
     assert "BuildResult" in golem.plugins.__all__
+    assert GolemPlugin is not None
 
 
 def test_golem_build_abort_error_is_importable():

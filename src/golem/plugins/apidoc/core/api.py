@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Sequence
 
 import asciidoctrine
+from asciidoctrine.nodes import Admonition, Node, Paragraph, Text
 from asciidoctrine.resolver import ASGResolver
 import griffe
 
@@ -158,7 +159,7 @@ class AsciiDocApi:
         symbol: str,
         depth: str | None = None,
         heading_level_offset: int = 0,
-    ) -> list[dict[str, Any]]:
+    ) -> list[Node]:
         """Resolve a Python symbol, render to AsciiDoc markup, and resolve into ASG block nodes.
 
         [parameters]
@@ -167,35 +168,26 @@ class AsciiDocApi:
         `heading_level_offset` (int, optional):: Additional heading level offset to apply to generated headings.
 
         [returns]
-        `list[dict[str, Any]]`:: Structured ASG block dictionaries suitable for splicing into a document ASG.
+        `list[Node]`:: Structured ASG block nodes suitable for splicing into a document ASG.
         """
         target_depth = depth if depth is not None else self.options.depth
         orig_offset = self.options.heading_level_offset
         try:
             if heading_level_offset != 0:
                 self.options.heading_level_offset = orig_offset + heading_level_offset
-            adoc_markup = self.render_symbol(symbol, depth=target_depth)
+            try:
+                adoc_markup = self.render_symbol(symbol, depth=target_depth)
+                if not adoc_markup.strip():
+                    return []
+                ast = asciidoctrine.parse_to_ast(adoc_markup)
+                doc = ASGResolver(ast).resolve_to_ast(ast)
+                return list(doc.blocks)
+            except Exception as e:
+                return [
+                    Admonition(
+                        variant="warning",
+                        blocks=[Paragraph(inlines=[Text(f"Golem ApiDoc: Could not resolve target '{symbol}': {e}")])],
+                    )
+                ]
         finally:
             self.options.heading_level_offset = orig_offset
-
-        if not adoc_markup.strip():
-            return []
-
-        ast = asciidoctrine.parse_to_ast(adoc_markup)
-        resolver = ASGResolver(ast)
-        asg = resolver.resolve(ast)
-
-        if hasattr(asg, "to_dict"):
-            asg_dict = asg.to_dict()
-        elif isinstance(asg, dict):
-            asg_dict = asg
-        else:
-            asg_dict = {}
-
-        if asg_dict.get("name") == "document":
-            return list(asg_dict.get("blocks", []))
-        elif "blocks" in asg_dict:
-            return list(asg_dict.get("blocks", []))
-        elif asg_dict:
-            return [asg_dict]
-        return []

@@ -16,10 +16,12 @@ Golem static site generator.
 
 from pathlib import Path
 from contextlib import contextmanager
+import datetime
 import importlib.metadata
 import json
 import os
 import shutil
+import sys
 import time
 from typing import Any, Iterator
 import click
@@ -28,9 +30,9 @@ from golem.diagnostics import format_diagnostic
 from golem.engine import BuildEngine, GolemEngine
 from golem.plugins import get_plugin_manager
 
-__all__ = ["check", "main", "report_engine_diagnostics"]
+__all__ = ["check", "main", "report_engine_diagnostics", "PROFILE_NAMES"]
 
-BUILTIN_PLUGINS: list[str] = ["golem.plugins.doctest", "golem.plugins.apidoc"]
+PROFILE_NAMES: frozenset[str] = frozenset({"library", "cli", "paper", "blog"})
 
 
 @contextmanager
@@ -135,8 +137,38 @@ def _get_git_author() -> str:
         return "Your Name"
 
 
+def _scaffold_profile(profile: str, target_dir: Path, variables: dict[str, str]) -> None:
+    """Copy a profile's template files into target_dir with {{var}} substitution."""
+    profiles_dir = Path(__file__).parent / "templates" / "profiles" / profile
+    if not profiles_dir.exists():
+        raise click.ClickException(f"Profile template not found: {profile!r}")
+
+    def _render(text: str) -> str:
+        for key, val in variables.items():
+            text = text.replace("{{" + key + "}}", val)
+        return text
+
+    for src in sorted(profiles_dir.rglob("*")):
+        if src.is_dir():
+            continue
+        rel = src.relative_to(profiles_dir)
+        parts = list(rel.parts)
+        # Substitute variables in all path parts (including filename)
+        rendered_parts = [_render(p) for p in parts]
+        # Strip .tmpl from the last path component
+        if rendered_parts[-1].endswith(".tmpl"):
+            rendered_parts[-1] = rendered_parts[-1][: -len(".tmpl")]
+        dest = target_dir / Path(*rendered_parts)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(_render(src.read_text(encoding="utf-8")), encoding="utf-8")
+
+
 @main.command()
-@click.option("--template", default="package", help="Project template type")
+@click.option(
+    "--profile",
+    default="package",
+    help="Project profile (library, cli, paper, blog, package, site, simple)",
+)
 @click.option("--output-dir", help="Override build output directory")
 @click.option(
     "-C",
@@ -144,7 +176,7 @@ def _get_git_author() -> str:
     type=click.Path(file_okay=False, dir_okay=True),
     help="Change working directory before executing",
 )
-def init(template, output_dir, directory=None):
+def init(profile, output_dir, directory=None):
     """
 
     Create a standard directory structure and basic `golem.toml` configuration.
@@ -153,8 +185,8 @@ def init(template, output_dir, directory=None):
     |===
     | Option | Description
 
-    | `--template`
-    | Project layout profile (e.g. `package` or `simple`).
+    | `--profile`
+    | Project profile (library, cli, paper, blog, package, site, simple).
 
     | `--output-dir`
     | Optional build override path.
@@ -179,11 +211,58 @@ def init(template, output_dir, directory=None):
     ----
     """
     with change_working_dir(directory):
+        # Default author for legacy profiles (package, site, simple, book).
+        # Profile-specific init overrides this via pyproject.toml extraction or click.prompt().
         author = _get_git_author()
-        click.echo(f"Initializing golem project using template '{template}'...")
+        click.echo(f"Initializing golem project using profile '{profile}'...")
+
+        if profile in PROFILE_NAMES:
+            # Determine project_name and author from pyproject.toml or interactive prompts
+            project_name = ""
+            author_from_pp = ""
+            _pyproject = Path("pyproject.toml")
+            if _pyproject.exists():
+                try:
+                    if sys.version_info >= (3, 11):
+                        import tomllib
+
+                        with open(_pyproject, "rb") as _f:
+                            _pp = tomllib.load(_f)
+                    else:
+                        import tomli as tomllib  # noqa: PLC0415
+
+                        with open(_pyproject, "rb") as _f:
+                            _pp = tomllib.load(_f)
+                    _proj = _pp.get("project", {})
+                    if isinstance(_proj, dict):
+                        project_name = _proj.get("name", "")
+                        _authors = _proj.get("authors", [])
+                        if _authors and isinstance(_authors[0], dict):
+                            author_from_pp = _authors[0].get("name", "")
+                except Exception:
+                    pass
+
+            if not project_name:
+                try:
+                    project_name = click.prompt("Project name", default=Path.cwd().name)
+                except (click.Abort, EOFError):
+                    project_name = Path.cwd().name
+            if not author_from_pp:
+                try:
+                    author = click.prompt("Author", default=_get_git_author())
+                except (click.Abort, EOFError):
+                    author = _get_git_author()
+            else:
+                author = author_from_pp
+
+            year = str(datetime.date.today().year)
+            variables = {"project_name": project_name, "author": author, "year": year}
+            _scaffold_profile(profile, Path("."), variables)
+            click.echo("Initialization complete! Project structure is ready.")
+            return
 
         pyproject_toml = Path("pyproject.toml")
-        is_site_layout = template in ("site", "book", "simple") or not pyproject_toml.exists()
+        is_site_layout = profile in ("site", "book", "simple") or not pyproject_toml.exists()
 
         if pyproject_toml.exists():
             click.echo("Found pyproject.toml! Configuring Golem under [tool.golem]...")
@@ -786,26 +865,12 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
         except Exception:
             config = GolemConfig()
 
-        builtin_plugin_names = BUILTIN_PLUGINS
         configured_plugins = list(config.plugins) if config.plugins else []
 
         plugins_list: list[dict[str, Any]] = []
         seen_names: set[str] = set()
 
-        # 1. Built-in plugins
-        for name in builtin_plugin_names:
-            is_enabled = name in configured_plugins
-            plugins_list.append(
-                {
-                    "name": name,
-                    "enabled": is_enabled,
-                    "source": "built-in",
-                    "description": "(built-in)",
-                }
-            )
-            seen_names.add(name)
-
-        # 2. Entry points
+        # 1. Entry points for golem.plugins (both built-in and third-party)
         eps: tuple[Any, ...] | list[Any]
         try:
             eps = list(importlib.metadata.entry_points(group="golem.plugins"))
@@ -816,26 +881,41 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
             ep_name = getattr(ep, "name", str(ep))
             if ep_name in seen_names:
                 continue
+
             dist = getattr(ep, "dist", None)
-            if dist:
-                dist_name = getattr(dist, "name", ep_name)
-                dist_version = getattr(dist, "version", "")
-                dist_desc = f"{dist_name} {dist_version}".strip() if dist_version else f"{dist_name}"
+            dist_name = getattr(dist, "name", "") if dist else ""
+            if dist_name in ("golem", "golem-docs"):
+                source = "built-in"
+                description = "(built-in)"
             else:
-                dist_desc = ep_name
+                dist_version = getattr(dist, "version", "") if dist else ""
+                dist_desc = f"{dist_name} {dist_version}".strip() if dist_version else f"{dist_name or ep_name}"
+                source = "entry_point"
+                description = f"(entry_point: {dist_desc})"
+
             ep_value = getattr(ep, "value", "")
-            is_enabled = ep_name in configured_plugins or (bool(ep_value) and ep_value in configured_plugins)
+            ep_module = ep_value.split(":")[0] if ep_value else ""
+            is_enabled = (
+                ep_name in configured_plugins
+                or (bool(ep_value) and ep_value in configured_plugins)
+                or (bool(ep_module) and ep_module in configured_plugins)
+            )
+
             plugins_list.append(
                 {
                     "name": ep_name,
                     "enabled": is_enabled,
-                    "source": "entry_point",
-                    "description": f"(entry_point: {dist_desc})",
+                    "source": source,
+                    "description": description,
                 }
             )
             seen_names.add(ep_name)
+            if ep_value:
+                seen_names.add(ep_value)
+            if ep_module:
+                seen_names.add(ep_module)
 
-        # 3. Local plugins in plugins_dir
+        # 2. Local plugins in plugins_dir
         plugins_dir_path = Path(config.plugins_dir) if getattr(config, "plugins_dir", None) else Path("plugins")
         if plugins_dir_path.exists() and plugins_dir_path.is_dir():
             for py_file in sorted(plugins_dir_path.glob("*.py")):
@@ -861,7 +941,7 @@ def plugins(json_format: bool = False, directory: str | None = None) -> None:
                 )
                 seen_names.add(stem)
 
-        # 4. Any other custom configured plugins
+        # 3. Any other custom configured plugins
         for cfg_plugin in configured_plugins:
             if cfg_plugin not in seen_names:
                 plugins_list.append(

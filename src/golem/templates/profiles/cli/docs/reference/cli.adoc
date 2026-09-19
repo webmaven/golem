@@ -1,0 +1,33 @@
+= {{project_name}}(1)
+{{author}}
+:doctype: manpage
+:manmanual: {{project_name}} Manual
+:mansource: {{project_name}}
+
+== NAME
+
+{{project_name}} - a command-line tool
+
+== SYNOPSIS
+
+*{{project_name}}* [_OPTIONS_] _COMMAND_
+
+== DESCRIPTION
+
+Describe what {{project_name}} does here.
+
+== OPTIONS
+
+*-h*, *--help*::
+  Show this help message and exit.
+
+== EXAMPLES
+
+[source,shell]
+----
+{{project_name}} --help
+----
+
+== SEE ALSO
+
+*{{project_name}}*(5)

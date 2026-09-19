@@ -32,11 +32,11 @@ docstring_style = "auto" # Options: "auto", "google", "numpy", "sphinx", "asciid
 
 During builds or CI/CD pipelines, Golem reads this configuration and generates hierarchical reference pages under `content_dir/api/` matching your package structure.
 
-== 2. Inline Block Macro: `golem:apidoc`
+== 2. Block Macro: `golem.apidoc::`
 
 In technical manuals, guides, or tutorials, you often want to splice live API documentation for a specific class or function directly into your narrative prose.
 
-Golem provides the `golem:apidoc[...]` inline block macro:
+Golem provides the `golem.apidoc::` block macro:
 
 .engine_guide.adoc
 [source,asciidoc]
@@ -45,7 +45,7 @@ Golem provides the `golem:apidoc[...]` inline block macro:
 
 Here is the specification for the primary BuildEngine class:
 
-golem:apidoc[target="golem.engine.BuildEngine", depth="all"]
+golem.apidoc::golem.engine.BuildEngine[depth=all]
 ----
 
 === Macro Parameters
@@ -56,7 +56,7 @@ golem:apidoc[target="golem.engine.BuildEngine", depth="all"]
 
 | `target`
 | *(Required)*
-| Full Python import path of the target module, class, method, or function (e.g. `"golem.config.GolemConfig"`). Can also be passed as the first positional argument.
+| Full Python import path of the target module, class, method, or function (e.g. `"golem.config.GolemConfig"`), specified as the macro target after `::`.
 
 | `depth`
 | `"all"`
@@ -65,25 +65,22 @@ golem:apidoc[target="golem.engine.BuildEngine", depth="all"]
 | `style`
 | `"auto"`
 | Docstring parsing format (`"auto"`, `"google"`, `"numpy"`, `"sphinx"`, `"asciidoc"`).
+
 | `heading_level_offset`
 | `0`
-| Integer offset applied to all headings in the generated API documentation. Useful when the macro appears inside a section (e.g. `offset=1` ensures generated `== Headings` become `=== Headings` to match the embedding depth).
+| Integer offset applied to all headings in the generated API documentation. Useful when the macro appears inside a section (e.g. `heading_level_offset=1` ensures generated `== Headings` become `=== Headings` to match the embedding depth).
 |===
 
-=== Macro Processing — ASG Splice (Primary Path)
+=== Macro Processing — AST-Level ASG Splice
 
-When Golem processes documents containing `golem:apidoc[...]` macros, the primary expansion path runs via the `on_asg_created` plugin hook after full semantic resolution of the document:
+When Golem processes documents containing `golem.apidoc::` block macros, macro expansion runs via the `on_asg_created` plugin hook using an AST `NodeTransformer`:
 
-1. The `on_asg_created` hook receives the fully resolved ASG dictionary for the document.
-2. `_splice_blocks()` recursively traverses the ASG block tree.
-3. For each block-macro node or paragraph whose text contains an unescaped `golem:apidoc[...]` call:
-   .. `AsciiDocApi.get_asg_nodes()` resolves the Python target on `sys.path`, renders it to AsciiDoc markup using `asciidocstring`, then parses and resolves the markup to return ASG block dictionaries.
-   .. The macro node is replaced in-place by the returned block list.
-4. Verbatim blocks (`listing`, `literal`, `verse`) and backtick-escaped inline code are never expanded.
-5. Backslash-escaped macros (`\golem:apidoc[...]`) are unescaped to literal text without triggering expansion.
-6. If the target cannot be resolved, a `[WARNING]` admonition block is inserted so the failure is visible in rendered output.
-
-[NOTE]
-====
-The `on_pre_parse` text-substitution hook is retained as a *deprecated fallback* for pipelines that do not reach `on_asg_created`. When triggered it emits a `logger.warning` message: _"on_pre_parse macro expansion is deprecated; use on_asg_created"_. It will be removed in a future release.
-====
+1. AsciiDoctrine parses `golem.apidoc::target[attrs]` into a `BlockNode` with `name == "golem.apidoc"`.
+2. The `on_asg_created` hook receives the typed `Node` document tree.
+3. `ApidocMacroTransformer(AsgTransformer)` traverses the AST.
+4. For each block macro node matching `name == "golem.apidoc"`:
+   .. `AsciiDocApi.get_asg_nodes()` resolves the Python target on `sys.path`, renders it to AsciiDoc markup, and resolves it into a list of typed AST `Node` objects.
+   .. The transformer replaces the macro node with the returned node list.
+5. Verbatim blocks (`listing`, `literal`, `verse`) and backtick-escaped inline code are protected from macro expansion.
+6. Backslash-escaped macros (`\golem.apidoc::[...]`) are unescaped to literal text without triggering expansion.
+7. If the target cannot be resolved, a `[WARNING]` admonition block is inserted with diagnostic details so the failure is visible in rendered output.

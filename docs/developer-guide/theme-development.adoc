@@ -59,11 +59,19 @@ When rendering `skeleton.pt`, Golem passes a comprehensive set of template varia
 | `content_class` | `str` | Class name string extracted from `:content_class:` header attribute.
 | `custom_css` | `list[str]` | List of custom stylesheet URLs or paths injected from configuration.
 | `custom_js` | `list[str]` | List of custom script URLs or paths injected from configuration.
+| `breadcrumbs` | `list[dict]` | Ordered breadcrumb trail from root to current page with `title`, `url`, and `is_current` (injected by `nav_helpers`).
+| `source_edit_url` | `str \| None` | Web URL to edit the source document on GitHub/GitLab (injected by `source_links`).
+| `source_repo_url` | `str \| None` | Web URL to the repository homepage (injected by `source_links`).
+| `source_view_url` | `str \| None` | Web URL to view the raw source document on GitHub/GitLab (injected by `source_links`).
+| `site_index` | `dict[str, dict]` | Alphabetized document index mapping letters to terms and locations (injected by `index` when page has `:page-role: index`).
+| `site_glossary` | `dict[str, list[dict]]` | Alphabetized glossary mapping letters to term definitions (injected by `glossary` when page has `:page-role: glossary`).
 |===
 
-== Chameleon TAL Syntax Reference
+== Chameleon TAL & METAL Syntax Reference
 
-Chameleon templates use standard TAL XML attributes to inject dynamic data without breaking standard HTML syntax:
+Chameleon templates use standard TAL (Template Attribute Language) and METAL (Macro Extension Template Attribute Language) XML attributes to inject dynamic data and construct modular layouts without breaking standard HTML syntax:
+
+=== TAL Attributes
 
 * `tal:content="variable"`: Replaces the element's text content with an HTML-escaped string value.
 * `tal:content="structure variable"`: Injects raw HTML markup without escaping (essential for `body_html`, `nav_html`, and `toc_html`).
@@ -72,6 +80,13 @@ Chameleon templates use standard TAL XML attributes to inject dynamic data witho
 * `tal:repeat="item collection"`: Loops through an iterable, repeating the element for each item.
 * `tal:attributes="attr expression"`: Dynamically sets HTML element attributes (e.g. `tal:attributes="href item.url"`).
 * `${expression}`: String interpolation syntax for inline variable substitution within text and attributes.
+
+=== METAL Attributes
+
+* `metal:define-macro="name"`: Defines a reusable layout macro that can be used or extended by other templates.
+* `metal:use-macro="expression"`: Replaces the element and its children with the body of the specified macro.
+* `metal:define-slot="slot_name"`: Designates an extension slot within a macro that child templates can override.
+* `metal:fill-slot="slot_name"`: Provides replacement markup for a designated macro slot when expanding a macro.
 
 == CSS Theme Custom Properties (`--golem-*`)
 
@@ -492,6 +507,80 @@ To create a fully customized theme or override Golem's default page structure:
         <script src="${js_file}"></script>
     </tal:block>
 </body>
+</html>
+----
+
+=== METAL Slot Contracts & Layout Inheritance
+
+Golem's built-in `skeleton.pt` template exposes the top-level macro `layout` and 6 specialized extension slots. Custom themes can either write an entirely custom template from scratch or inherit and selectively override individual slots using `metal:use-macro` and `metal:fill-slot`.
+
+.METAL Slot Specifications
+[cols="1,1,3"]
+|===
+| Slot Name | Target Element | Contract & Usage
+
+| `head`
+| `<head>`
+| Document `<head>` metadata, `<title>`, `<meta>` tags, canonical links, font imports, Pygments CSS rules, and external stylesheet links (`custom_css`).
+Themes overriding this slot can inject bespoke web fonts, custom metadata, or analytics scripts while preserving `<meta charset="UTF-8">` and viewport declarations.
+
+| `header`
+| `<header id="golem-header">`
+| Global site branding header bar containing the site title link (`site_title`), optional author attribution (`site_author`), and navigation toggles.
+Themes overriding this slot can introduce logos, search inputs, repository shortcut badges, or theme-mode switcher widgets.
+
+| `navigation`
+| `<aside id="golem-sidebar-left">`
+| Left sidebar navigation panel.
+The default implementation renders inside a collapsible `<details class="golem-nav-details">` disclosure widget, prioritizing pre-rendered semantic HTML (`nav_html`) and falling back to iterating `nav_tree`.
+Themes can override this slot to provide accordions, multi-column flyouts, or custom category filtering.
+
+| `content`
+| `<main id="golem-content">`
+| Main document article reading pane.
+Houses breadcrumb navigation (`breadcrumbs`), page heading (`title`), pre-rendered semantic article body (`body_html`), and sequential pagination cards (`prev_page`, `next_page`).
+Themes overriding this slot can inject reading-time estimates, author avatars, feedback prompts, or custom header banners.
+
+| `table-of-contents`
+| `<aside id="golem-sidebar-right">`
+| Right-hand on-page Table of Contents sidebar.
+Displays the "On This Page" heading and the rendered heading list (`toc_html`).
+Themes can override this slot to add sticky jump links, page metadata sidebars, or hide it on specific page layouts.
+
+| `footer`
+| `<footer id="golem-footer">`
+| Document footer bar.
+Renders git repository "Edit this page" links (`source_edit_url`), Golem generator version credits, and custom footer copy.
+Themes can add custom legal disclaimers, license badges, or secondary navigation links.
+|===
+
+=== Extending Default Slots with `metal:use-macro`
+
+To customize specific regions without duplicating the entire HTML5 structure, a theme template can use the default macro and fill only the desired slots:
+
+.themes/mytheme/skeleton.pt
+[source,html]
+----
+<!DOCTYPE html>
+<html lang="en" metal:use-macro="default_layout">
+    <!-- Customize header to include logo and repository link -->
+    <header id="golem-header" class="golem-header custom-header" metal:fill-slot="header">
+        <div class="brand">
+            <img src="/static/images/logo.svg" alt="Logo" class="logo" />
+            <a href="./" tal:attributes="href site_url or root_path">${site_title}</a>
+        </div>
+        <div class="header-actions" tal:condition="source_repo_url | nothing">
+            <a href="${source_repo_url}" class="repo-link" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </div>
+    </header>
+
+    <!-- Customize footer with copyright and custom links -->
+    <footer id="golem-footer" class="golem-footer" metal:fill-slot="footer">
+        <div tal:condition="source_edit_url | nothing" class="golem-source-links">
+            <a href="${source_edit_url}" target="_blank" rel="noopener noreferrer">Edit this page</a>
+        </div>
+        <p class="copyright">&copy; 2026 Acme Corp. All rights reserved. Powered by Golem ${generator_version}.</p>
+    </footer>
 </html>
 ----
 

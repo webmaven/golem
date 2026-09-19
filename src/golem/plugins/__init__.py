@@ -24,7 +24,9 @@ During site compilation and CLI initialization, hooks execute across discrete pi
    Executed after Lark parses AsciiDoc source into an Abstract Syntax Tree (AST). Plugins mutate or wrap syntax nodes prior to semantic resolution.
 5. ASG Transformation (`on_asg_created`)::
    Executed after the semantic resolver transforms the AST into an Abstract Semantic Graph (ASG) dictionary. Plugins mutate semantic nodes, table metadata, or document attributes.
-6. Layout Compilation & Post-Render (`on_post_render`)::
+6. Template Context Enrichment (`on_template_context`)::
+   Executed sequentially per document prior to Chameleon layout compilation. Plugins inject or mutate variables in the template context dictionary.
+7. Layout Compilation & Post-Render (`on_post_render`)::
    Executed after Chameleon template layout rendering. Plugins receive the compiled HTML page string and return modified HTML before it is written to disk.
 7. Build Finish (`on_build_finish`)::
    Executed once after all documents have been written to disk. Receives a BuildResult with compiled_files and output_dir.
@@ -50,8 +52,9 @@ import importlib.util
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
+from asciidoctrine.nodes import Node
 import click
 import pluggy
 
@@ -59,13 +62,14 @@ if TYPE_CHECKING:
     from golem.config import GolemConfig
 
 __all__ = [
-    "HOOK_NAMESPACE",
-    "hookspec",
-    "hookimpl",
-    "GolemSpecs",
-    "GolemBuildAbortError",
     "BuildResult",
+    "GolemBuildAbortError",
+    "GolemPlugin",
+    "GolemSpecs",
+    "HOOK_NAMESPACE",
     "get_plugin_manager",
+    "hookimpl",
+    "hookspec",
 ]
 
 HOOK_NAMESPACE = "golem"
@@ -109,6 +113,32 @@ class BuildResult:
     output_dir: Path
 
 
+class GolemPlugin:
+    """Base class for stateful Golem plugins."""
+
+    name: str = ""
+
+    def __init__(self, **config: Any) -> None:
+        self.config = config
+
+    @classmethod
+    def from_config(cls, config: GolemConfig | dict[str, Any] | None = None) -> Self:
+        """Construct plugin instance from GolemConfig or dictionary options."""
+        if config is None:
+            return cls()
+        if isinstance(config, dict):
+            plugin_configs = config.get("plugin_configs", config)
+        else:
+            plugin_configs = getattr(config, "plugin_configs", {}) or {}
+        cfg = plugin_configs.get(cls.name, {}) if isinstance(plugin_configs, dict) else {}
+        if not cfg and isinstance(plugin_configs, dict):
+            short_name = cls.name.split(".")[-1]
+            cfg = plugin_configs.get(short_name, {})
+        if not isinstance(cfg, dict):
+            cfg = {}
+        return cls(**cfg)
+
+
 class GolemSpecs:
     """Define Pluggy hook specifications for Golem extension points and build pipeline hooks.
 
@@ -133,7 +163,7 @@ class GolemSpecs:
         not activate a plugin. This ensures reproducible builds and explicit opt-in.
 
     Hook Execution Order::
-        Transform hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_post_render`)
+        Transform hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_template_context`, `on_post_render`)
         execute in the order plugins appear in `config.plugins`. The first listed plugin runs
         first; its output becomes the input to the second, and so on. A `logging.WARNING` is
         emitted at build time when multiple plugins modify the same value in a single hook,
@@ -205,32 +235,61 @@ class GolemSpecs:
         return ast
 
     @hookspec
-    def on_asg_created(self, asg: dict[str, Any], doc_path: Path | None = None) -> dict[str, Any]:
-        """Intercept and transform the Abstract Semantic Graph (ASG) dictionary after resolution.
+    def on_asg_created(self, asg: Node, doc_path: Path | None = None) -> Node:
+        """Intercept and transform the Abstract Semantic Graph (ASG) Node after resolution.
 
-        Executed after the semantic resolver converts the AST into a structured ASG dictionary.
+        Executed after the semantic resolver converts the AST into a structured Document node.
         Plugins can enrich document metadata, modify section and block hierarchies, inject
         synthetic blocks, or alter resolved attributes before HTML rendering.
 
         [parameters]
-        `asg` (dict[str, Any]):: Semantic graph representation of the document containing resolved blocks, metadata, and attributes.
+        `asg` (Node):: Semantic graph Node representing the document containing resolved blocks, metadata, and attributes.
         `doc_path` (Path | None, optional):: Optional Path to the document being compiled.
 
         [returns]
-        `dict[str, Any]`:: Enriched or modified ASG dictionary passed to the body renderer.
+        `Node`:: Enriched or modified ASG Node passed to the body renderer.
 
         [source,python]
         ----
-        from typing import Any
+        from asciidoctrine.nodes import Node
         from golem.plugins import hookimpl
 
         @hookimpl
-        def on_asg_created(asg: dict[str, Any]) -> dict[str, Any]:
-            asg["injected_metadata"] = {"status": "reviewed"}
+        def on_asg_created(asg: Node) -> Node:
+            # Modify ASG node in-place or return transformed Node
             return asg
         ----
         """
         return asg
+
+    @hookspec
+    def on_template_context(self, context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+        """Intercept and modify or enrich the template context dictionary before Chameleon page rendering.
+
+        Executed sequentially per document before Chameleon layout template compilation.
+        Plugins can inject new context variables (e.g. GitHub repository links, custom
+        navigation structures, timestamps, or author details) or modify existing context values.
+
+        [parameters]
+        `context` (dict[str, Any]):: Dictionary of context variables prepared for the template.
+        `doc_path` (Path):: Path to the AsciiDoc document being compiled.
+
+        [returns]
+        `dict[str, Any]`:: Updated context dictionary or new keys to merge into the template context.
+
+        [source,python]
+        ----
+        from pathlib import Path
+        from typing import Any
+        from golem.plugins import hookimpl
+
+        @hookimpl
+        def on_template_context(context: dict[str, Any], doc_path: Path) -> dict[str, Any]:
+            context["github_url"] = f"https://github.com/myorg/myrepo/edit/main/{doc_path.name}"
+            return context
+        ----
+        """
+        return context
 
     @hookspec
     def on_post_render(self, html_content: str) -> str:
@@ -390,6 +449,10 @@ def _get_entry_point_plugins(clear_cache: bool = False) -> dict[str, tuple[str, 
                     eps[ep_name] = ("entrypoint", ep)
                 if ep_value and ep_value not in eps:
                     eps[ep_value] = ("entrypoint", ep)
+                if ep_value and ":" in ep_value:
+                    ep_mod = ep_value.split(":", 1)[0]
+                    if ep_mod not in eps:
+                        eps[ep_mod] = ("entrypoint", ep)
         _CACHED_ENTRY_POINTS = eps
     return _CACHED_ENTRY_POINTS
 
@@ -455,25 +518,48 @@ def get_plugin_manager(
 
     for plugin_name in configured:
         try:
+            plugin: Any = None
             if plugin_name in available:
                 kind, source = available[plugin_name]
                 if kind == "entrypoint":
                     plugin = source.load()
-                    if not pm.is_registered(plugin):
-                        pm.register(plugin, name=plugin_name)
                 elif kind == "local_file":
                     spec = importlib.util.spec_from_file_location(source.stem, source)
                     if spec and spec.loader:
                         module = importlib.util.module_from_spec(spec)
                         sys.modules[source.stem] = module
                         spec.loader.exec_module(module)
-                        if not pm.is_registered(module):
-                            pm.register(module, name=plugin_name)
+                        plugin = module
             else:
-                # Fall back to importlib for fully-qualified module paths
-                mod = importlib.import_module(plugin_name)
-                if not pm.is_registered(mod):
-                    pm.register(mod)
+                # Fall back to importlib for fully-qualified module or class paths
+                if ":" in plugin_name:
+                    mod_name, attr = plugin_name.split(":", 1)
+                    mod = importlib.import_module(mod_name)
+                    plugin = getattr(mod, attr)
+                else:
+                    try:
+                        plugin = importlib.import_module(plugin_name)
+                    except ModuleNotFoundError:
+                        if "." in plugin_name:
+                            mod_name, attr = plugin_name.rsplit(".", 1)
+                            mod = importlib.import_module(mod_name)
+                            plugin = getattr(mod, attr)
+                        else:
+                            raise
+
+            if plugin is None:
+                continue
+
+            if isinstance(plugin, type):
+                if hasattr(plugin, "from_config") and callable(plugin.from_config) and config is not None:
+                    instance = plugin.from_config(config)
+                else:
+                    instance = plugin()
+                if not pm.is_registered(instance):
+                    pm.register(instance, name=plugin_name)
+            else:
+                if not pm.is_registered(plugin):
+                    pm.register(plugin, name=plugin_name)
         except Exception as e:
             logging.warning("Failed to load plugin %s: %s", plugin_name, e)
 

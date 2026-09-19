@@ -1,34 +1,14 @@
-# SDD Progress Ledger
+# SDD Progress Ledger - Wave 2 Technical Debt & Polish
 
-Plan: `/Users/michaelbernstein/.gemini/antigravity/brain/a8a03fb8-4c9d-44dc-9c6e-c0f9d769389b/implementation_plan.md`
-Initial Base: `bee285e8bcdeeee6e8da6735c3ff56f54c813f7a`
+Plan: `/Users/michaelbernstein/.gemini/antigravity/brain/2804b968-b270-45c1-914d-87873e724b99/implementation_plan.md`
+Initial Base: `cc73fa91a12668e2a2ce58431b31f21687f6f73c`
 
-- [x] Task 1: Doctest Runner Cleanups (`golem.plugins.doctest`) (commits bee285e..0e72c88, review clean)
-- [x] Task 2: Block Title & List Parsing Resilience (`golem.renderer`) (commits 0e72c88..a5e90e0, review clean)
-- [x] Task 3: Table Layout & Column Alignment Styling (`golem.templates`) (commits a5e90e0..a760a4a, review clean)
-- [x] Task 4: Issue #10 — AST-Level ASG Macro Splicing for `golem:apidoc[]` (commits a760a4a..81dcca6)
-Task 1: complete (commits ab45923..b411a44, review clean)
-  Minor: _listing_counter increments monotonically on cached singleton across renders (cosmetic; no functional breakage)
-  Minor: search_paths=[] bypasses renderer cache (no adverse effect)
-Task 2: complete (commits b411a44..9a34d5f, review clean)
-  Minor: search_paths bare str/Path coercion not guarded (caller-side concern; no breakage observed)
-  Minor: redundant local imports of render_body and parse_to_ast inside test_render_body_with_path_search_paths
-Task 3: complete (commits 9a34d5f..8d34c19, review clean)
-  Minor: runner.py:42 getattr(block, "attributes", {}) could raise if attributes=None; use `(getattr(..., None) or {}).get(...)` pattern
-  Minor: no explicit test asserting variable from Section 1 is absent in Section 2 globals (isolation verification)
-Task 4: complete (commits 8d34c19..6c98f6f, review clean)
-  Minor: format_attribute/format_function/format_class/format_module still annotate docstring_style as str not str|griffe.DocstringStyle|griffe.Parser
-  Minor: format_docstring fallback guard should use `not result.strip()` vs `not result` to catch whitespace-only output
-Task 5: complete (commits 6c98f6f..61a28bb, review clean after fix)
-
----
-
-## Post-Review Fixup & Alpha Simplification
-Plan: `/Users/michaelbernstein/.gemini/antigravity/brain/7f4a00ed-2539-4a6d-8e67-56bcf193e2c5/implementation_plan.md`
-
-- [x] Task 1: Doctest Plugin: Eliminate Compatibility Aliases & Fix Runner (`golem.plugins.doctest`) (commit `374dcc6`)
-- [x] Task 2: Renderer: Fix State Leakage, Guard Path Input & Remove Parser Workarounds (`golem.renderer`) (commit `22cdb6b`)
-- [x] Task 3: Templates: Eliminate Hardcoded Fallback & Argument Aliases (`golem.templates`) (commit `1219d79`)
-- [x] Task 4: Apidoc Formatter: Remove Broad Fallback & Align Type Annotations (`golem.plugins.apidoc`) (commit `edbef95`)
-- [x] Task 5: Diagnostics & Build Engine: Dataclass Refactor & Alias Removal (`golem.diagnostics`, `golem.engine`, `golem.cli`, `golem.server`) (commit `b39d534`)
-
+- [x] Task 1: Bundled Plugin Entry Points & Packaging Registration (`pyproject.toml`) — commits cc73fa9..0a96fc1, review clean
+  Minor: comment step numbering in `cli.py` (step 2 eliminated; renumber later)
+- [x] Task 2: Standardized Plugin Base Class (`GolemPlugin`), `GolemConfig` Cleanup, and Uniform `get_plugin_manager` — commits 0a96fc1..3cad233, review clean
+  Minor: in `tests/test_plugins.py`, rename `test_uniform_class_resolution_config_none` to `test_uniform_class_resolution_default_config`.
+- [x] Task 3: Bundled Plugin Refactoring (`source_links`, `nav_helpers`, `index_glossary`), AST Simplification, and `IndexGlossaryPlugin` Removal — commit 16d9481, review clean
+  Minor: in `IndexPlugin` and `GlossaryPlugin`, delegate `from_config` to `super().from_config(config)`.
+- [x] Task 4: Template Metal Slot Comments & Documentation (`skeleton.pt`, `theme-development.adoc`, `plugin-system.adoc`, `docs/plugins/*.adoc`) — commits 16d9481..b85c166, review clean
+- [x] Task 5: End-to-End Integration Verification, Test Suite Updates, and Quality Gates — commit 8b67ace, review clean
+  Minor: in `BuildEngine`, add fallback to `doc_meta.get("page_role")`.

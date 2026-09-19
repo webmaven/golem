@@ -101,14 +101,14 @@ def extract_metadata_from_doc(path: Path) -> dict[str, Any]:
 
     Reads the leading header section of an AsciiDoc file up to the first section break
     or block delimiter. Parses document title (`= ...`), `:nav_title:`, `:nav_order:`,
-    `:body_class:`, `:page_class:`, `:content_class:`, and `:toc:` attributes.
+    `:body_class:`, `:page_class:`, `:content_class:`, `:page-role:`, and `:toc:` attributes.
     Falls back to filename-derived titles if no header title is present.
 
     [parameters]
     `path` (Path):: Path to the target `.adoc` file on disk.
 
     [returns]
-    `dict[str, Any]`:: Dictionary containing `"title"`, `"nav_title"`, `"nav_order"`, `"has_toc"`, `"page_class"`, `"body_class"`, and `"content_class"` keys.
+    `dict[str, Any]`:: Dictionary containing `"title"`, `"nav_title"`, `"nav_order"`, `"has_toc"`, `"page_class"`, `"body_class"`, `"content_class"`, and `"page_role"` keys.
 
     === Examples
 
@@ -137,6 +137,7 @@ def extract_metadata_from_doc(path: Path) -> dict[str, Any]:
     page_class: str | None = None
     body_class: str | None = None
     content_class: str | None = None
+    page_role: str | None = None
     if path.exists() and path.is_file():
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -190,6 +191,12 @@ def extract_metadata_from_doc(path: Path) -> dict[str, Any]:
                         val = line_s.split(":", 2)[2].strip()
                         if val:
                             content_class = val
+                    elif (
+                        line_s.startswith(":page_role:") or line_s.startswith(":page-role:") or line_s.startswith(":role:")
+                    ) and page_role is None:
+                        val = line_s.split(":", 2)[2].strip()
+                        if val:
+                            page_role = val.lower()
                     elif line_s.startswith(":title:") and title is None:
                         val = line_s.split(":", 2)[2].strip()
                         if val:
@@ -218,6 +225,7 @@ def extract_metadata_from_doc(path: Path) -> dict[str, Any]:
         "page_class": resolved_page_class,
         "body_class": resolved_body_class,
         "content_class": resolved_content_class,
+        "page_role": page_role,
     }
 
 

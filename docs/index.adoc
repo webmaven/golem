@@ -37,6 +37,9 @@ Golem approaches static publishing with a similar ethos:
 | link:developer-guide/[Developer & Architecture Guide]
 | Deep dive into Golem's AST/ASG compilation pipeline, Pluggy plugin hook specifications, Chameleon ZPT theme authoring, and recipes.
 
+| link:plugins/[Plugins]
+| Documentation for bundled plugins: git source links, navigation breadcrumbs, back-of-the-book index and glossary, API doc generation, and doctest verification.
+
 | link:reference/[Reference]
 | Full CLI command dictionary and embedded doctest verification reference.
 

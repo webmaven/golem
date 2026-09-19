@@ -268,7 +268,7 @@ def test_cli_init_package_scaffolds_full_site_nested(tmp_path):
         pyproject = Path("pyproject.toml")
         pyproject.write_text("[tool.poetry]\nname='my-lib'\n", encoding="utf-8")
 
-        result = runner.invoke(main, ["init", "--template", "site"])
+        result = runner.invoke(main, ["init", "--profile", "site"])
         assert result.exit_code == 0
 
         # Verify docs/ folder and nested docs/index.adoc exist

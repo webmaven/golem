@@ -1,0 +1,125 @@
+= Navigation Helpers Plugin
+:nav_order: 20
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+The `nav_helpers` plugin computes structured navigation aids for Chameleon templates, including hierarchical breadcrumb trails and flattened, depth-indexed navigation trees.
+
+== Overview & Features
+
+* *Breadcrumb Hierarchy Resolution*: Automatically traverses the site navigation tree to compute an ordered trail of ancestors from the site root ("Home") down to the currently viewed page.
+* *Flattened Navigation Trees*: Transforms nested hierarchical trees into an ordered sequence with explicit `depth` attributes, facilitating mobile drawer menus, sitemaps, and custom nav loops.
+* *Current Page Awareness*: Tags each breadcrumb node with an `is_current` boolean flag, enabling accessible `aria-current="page"` markup.
+
+== Enabling the Plugin
+
+Add `"nav_helpers"` to the `plugins` list in `golem.toml`:
+
+.golem.toml
+[source,toml]
+----
+[plugins]
+plugins = [
+    "nav_helpers",
+]
+----
+
+Or in `pyproject.toml`:
+
+.pyproject.toml
+[source,toml]
+----
+[tool.golem.plugins]
+plugins = [
+    "nav_helpers",
+]
+----
+
+== Configuration Reference
+
+Options can be specified in the `[plugins.nav_helpers]` table in `golem.toml`:
+
+.golem.toml
+[source,toml]
+----
+[plugins.nav_helpers]
+home_title = "Documentation"
+home_url = "/"
+----
+
+.Configuration Options
+[cols="1,1,1,3"]
+|===
+| Option | Type | Default | Description
+
+| `home_title`
+| `str`
+| `"Home"`
+| Display label for the root breadcrumb ancestor.
+
+| `home_url`
+| `str \| None`
+| `root_path` or `"/"`
+| Link destination URL for the root breadcrumb entry.
+|===
+
+== Template Context Variables
+
+When active, `nav_helpers` enriches the template context with two variables:
+
+[cols="1,1,3"]
+|===
+| Variable | Type | Description
+
+| `breadcrumbs`
+| `list[dict]`
+| Ordered list of ancestor dictionaries from root to current page. Each dictionary contains: +
+- `title` (`str`): Page display title. +
+- `url` (`str`): Destination link URL. +
+- `is_current` (`bool`): `True` for the final (active) page item, `False` for ancestors.
+
+| `nav_tree_flat`
+| `list[dict]`
+| Ordered depth-first traversal of all navigation entries. Each dictionary contains: +
+- `title` (`str`): Page title. +
+- `url` (`str`): HTML link URL. +
+- `path` (`str`): Source document path. +
+- `depth` (`int`): Zero-based integer indicating nesting level in hierarchy.
+|===
+
+== Chameleon Template Integration
+
+=== Rendering Breadcrumbs
+
+The following pattern matches Golem's default `skeleton.pt` breadcrumb implementation with full ARIA accessibility:
+
+.themes/mytheme/skeleton.pt
+[source,html]
+----
+<tal:block tal:define="crumbs breadcrumbs | nothing">
+    <nav tal:condition="python: crumbs and len(crumbs) > 1" aria-label="Breadcrumb" class="breadcrumbs">
+        <ol>
+            <li tal:repeat="crumb crumbs" tal:attributes="aria-current python:'page' if (crumb.get('is_current') if isinstance(crumb, dict) else getattr(crumb, 'is_current', False)) else None">
+                <a tal:condition="python: not (crumb.get('is_current') if isinstance(crumb, dict) else getattr(crumb, 'is_current', False))" href="${crumb.url}">${crumb.title}</a>
+                <span tal:condition="python: (crumb.get('is_current') if isinstance(crumb, dict) else getattr(crumb, 'is_current', False))">${crumb.title}</span>
+            </li>
+        </ol>
+    </nav>
+</tal:block>
+----
+
+=== Rendering Flat Navigation Trees
+
+The flattened tree is ideal for rendering indented navigation links or mobile drawer menus without writing recursive TAL macros:
+
+.themes/mytheme/skeleton.pt
+[source,html]
+----
+<ul class="flat-nav-list" tal:condition="nav_tree_flat | nothing">
+    <li tal:repeat="item nav_tree_flat" class="nav-item depth-${item.depth}">
+        <a href="${item.url}" tal:attributes="href item.url">${item.title}</a>
+    </li>
+</ul>
+----
