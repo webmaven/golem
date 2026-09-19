@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+import asciidoctrine
 from asciidoctrine.nodes import DescriptionList, IndexTerm
 from golem.model import AsgVisitor, GlossaryEntry, Node, PageContext
 from golem.plugins import GolemPlugin, hookimpl
@@ -352,6 +353,104 @@ class AsgCollectorVisitor(AsgVisitor):
                 }
 
 
+def _find_aggregator_pages(
+    cache_metadata: dict[str, dict[str, Any]],
+    role_name: str,
+) -> list[Path]:
+    """Find all source document paths declaring the specified page role in cache metadata.
+
+    [parameters]
+    `cache_metadata` (dict[str, dict[str, Any]]):: Cached build metadata mapping file paths to node types and attributes.
+    `role_name` (str):: Expected page role string (e.g. `"index"` or `"glossary"`).
+
+    [returns]
+    `list[Path]`:: List of Path objects for documents matching the page role.
+    """
+    target = role_name.strip().lower()
+    pages: list[Path] = []
+    for path_str, meta in cache_metadata.items():
+        if not isinstance(meta, dict):
+            continue
+        role = meta.get("page_role") or meta.get("page-role") or meta.get("role")
+        if isinstance(role, str) and role.strip().lower() == target:
+            pages.append(Path(path_str))
+    return pages
+
+
+def _lookup_meta(
+    path: Path,
+    cache_metadata: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Retrieve metadata dictionary for a given path from cache_metadata.
+
+    [parameters]
+    `path` (Path):: Target file path to locate.
+    `cache_metadata` (dict[str, dict[str, Any]]):: Cached build metadata mapping file paths to metadata dictionaries.
+
+    [returns]
+    `dict[str, Any] | None`:: Matching metadata dictionary if found, otherwise None.
+    """
+    p_abs = str(path.resolve())
+    if p_abs in cache_metadata:
+        return cache_metadata[p_abs]
+    p_str = str(path)
+    if p_str in cache_metadata:
+        return cache_metadata[p_str]
+    for k, v in cache_metadata.items():
+        try:
+            if Path(k).resolve() == path.resolve():
+                return v
+        except Exception:
+            pass
+    return None
+
+
+def _file_has_index_terms(path: Path) -> bool:
+    """Check if a file on disk contains AsciiDoc index terms.
+
+    [parameters]
+    `path` (Path):: File path on disk to inspect.
+
+    [returns]
+    `bool`:: True if the file contains indexterm macros or syntax.
+    """
+    if not path.exists() or not path.is_file() or path.suffix != ".adoc":
+        return False
+    try:
+        content = path.read_text(encoding="utf-8", errors="replace")
+        if "indexterm:" not in content and "((" not in content:
+            return False
+        doc = asciidoctrine.loads(content)
+        visitor = AsgCollectorVisitor(index_entries={})
+        visitor.visit(doc)
+        return bool(visitor.index_entries)
+    except Exception:
+        return False
+
+
+def _file_has_glossary_definitions(path: Path) -> bool:
+    """Check if a file on disk contains AsciiDoc glossary definition lists.
+
+    [parameters]
+    `path` (Path):: File path on disk to inspect.
+
+    [returns]
+    `bool`:: True if the file contains glossary definition lists.
+    """
+    if not path.exists() or not path.is_file() or path.suffix != ".adoc":
+        return False
+    try:
+        content = path.read_text(encoding="utf-8", errors="replace")
+        if "[glossary]" not in content and "glossary" not in content.lower():
+            return False
+        doc = asciidoctrine.loads(content)
+        visitor = AsgCollectorVisitor(glossary_entries={})
+        visitor.visit(doc)
+        return bool(visitor.glossary_entries)
+    except Exception:
+        return False
+
+
 class IndexPlugin(GolemPlugin):
     """Collect and compile index terms across documentation pages.
 
@@ -455,6 +554,37 @@ class IndexPlugin(GolemPlugin):
             context.update({"site_index": self.compile_index()})
         return context
 
+    @hookimpl
+    def golem_mark_stale(
+        self,
+        changed_files: list[Path],
+        cache_metadata: dict[str, dict[str, Any]],
+    ) -> list[Path] | None:
+        """Register index aggregator pages for recompilation when documents with index terms change.
+
+        [parameters]
+        `changed_files` (list[Path]):: List of file paths directly modified or deleted in the current build cycle.
+        `cache_metadata` (dict[str, dict[str, Any]]):: Cached build metadata mapping file paths to node types and attributes.
+
+        [returns]
+        `list[Path] | None`:: List of index aggregator pages to recompile, or `None` if no invalidation is needed.
+        """
+        aggregator_pages = _find_aggregator_pages(cache_metadata, "index")
+        if not aggregator_pages:
+            return None
+
+        for f in changed_files:
+            meta = _lookup_meta(f, cache_metadata)
+            if meta and isinstance(meta, dict):
+                node_types = meta.get("node_types")
+                if isinstance(node_types, (list, tuple, set)):
+                    if any(str(nt).lower() in ("indexterm", "index_term", "index") for nt in node_types):
+                        return aggregator_pages
+            if _file_has_index_terms(f):
+                return aggregator_pages
+
+        return None
+
 
 class GlossaryPlugin(GolemPlugin):
     """Collect and compile glossary definitions across documentation pages.
@@ -547,3 +677,40 @@ class GlossaryPlugin(GolemPlugin):
         if _is_page_role(context, "glossary"):
             context.update({"site_glossary": self.compile_glossary()})
         return context
+
+    @hookimpl
+    def golem_mark_stale(
+        self,
+        changed_files: list[Path],
+        cache_metadata: dict[str, dict[str, Any]],
+    ) -> list[Path] | None:
+        """Register glossary aggregator pages for recompilation when documents with glossary definitions change.
+
+        [parameters]
+        `changed_files` (list[Path]):: List of file paths directly modified or deleted in the current build cycle.
+        `cache_metadata` (dict[str, dict[str, Any]]):: Cached build metadata mapping file paths to node types and attributes.
+
+        [returns]
+        `list[Path] | None`:: List of glossary aggregator pages to recompile, or `None` if no invalidation is needed.
+        """
+        aggregator_pages = _find_aggregator_pages(cache_metadata, "glossary")
+        if not aggregator_pages:
+            return None
+
+        for f in changed_files:
+            meta = _lookup_meta(f, cache_metadata)
+            if meta and isinstance(meta, dict):
+                node_types = meta.get("node_types")
+                if isinstance(node_types, (list, tuple, set)):
+                    if any(str(nt).lower() == "glossary" for nt in node_types):
+                        return aggregator_pages
+            if f.exists() and f.is_file():
+                if _file_has_glossary_definitions(f):
+                    return aggregator_pages
+            elif meta and isinstance(meta, dict):
+                node_types = meta.get("node_types")
+                if isinstance(node_types, (list, tuple, set)):
+                    if any(str(nt).lower() in ("descriptionlist", "dlist") for nt in node_types):
+                        return aggregator_pages
+
+        return None
