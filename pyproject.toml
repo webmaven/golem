@@ -41,6 +41,7 @@ Issues = "https://github.com/webmaven/golem/issues"
 dev = [
     "pytest",
     "pytest-cov",
+    "pytest-xdist",
     "coverage[toml]",
     "ruff",
     "mypy",
