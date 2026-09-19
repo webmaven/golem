@@ -101,14 +101,14 @@ def extract_metadata_from_doc(path: Path) -> dict[str, Any]:
 
     Reads the leading header section of an AsciiDoc file up to the first section break
     or block delimiter. Parses document title (`= ...`), `:nav_title:`, `:nav_order:`,
-    `:body_class:`, `:page_class:`, `:content_class:`, and `:toc:` attributes.
+    `:body_class:`, `:page_class:`, `:content_class:`, `:page-role:`, and `:toc:` attributes.
     Falls back to filename-derived titles if no header title is present.
 
     [parameters]
     `path` (Path):: Path to the target `.adoc` file on disk.
 
     [returns]
-    `dict[str, Any]`:: Dictionary containing `"title"`, `"nav_title"`, `"nav_order"`, `"has_toc"`, `"page_class"`, `"body_class"`, and `"content_class"` keys.
+    `dict[str, Any]`:: Dictionary containing `"title"`, `"nav_title"`, `"nav_order"`, `"has_toc"`, `"page_class"`, `"body_class"`, `"content_class"`, and `"page_role"` keys.
 
     === Examples
 
