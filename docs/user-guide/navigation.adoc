@@ -47,3 +47,12 @@ nav = [
     "guides/advanced.adoc",
 ]
 ----
+
+[glossary]
+nav_order::
+  A page-header attribute (`:nav_order: N`) that sets the integer sort key controlling where a page appears in the navigation tree. Lower values sort first.
+partial::
+  An AsciiDoc source file whose name begins with an underscore (e.g. `_shared.adoc`). Partials are excluded from standalone compilation and intended for use with `include::` directives only.
+page-role::
+  A page-header attribute (`:page-role: <role>`) that signals a page's special purpose to Golem plugins. Currently recognized roles: `index` (site-wide term index) and `glossary` (aggregated glossary).
+

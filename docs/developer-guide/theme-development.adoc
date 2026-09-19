@@ -596,3 +596,16 @@ mytheme = "my_theme_package"
 ----
 
 When installed, users can select your theme simply by setting `theme = "mytheme"` in their `golem.toml`.
+
+[glossary]
+TAL::
+  Template Attribute Language. An XML-attribute-based language used by Chameleon to declare conditional rendering, repetition, and content injection directly in HTML/XML markup.
+METAL::
+  Macro Expansion for TAL. The METAL namespace allows Chameleon templates to define reusable layout slots (`metal:define-slot`) and fill them from page templates (`metal:fill-slot`).
+ZPT (Zope Page Templates)::
+  The template format combining TAL and METAL, originating in the Zope web framework. Chameleon implements ZPT with significant performance improvements via compilation.
+Chameleon::
+  A fast, compiled Zope Page Templates engine. Golem uses Chameleon to render `skeleton.pt` and any custom theme templates.
+skeleton.pt::
+  The primary Chameleon template file (`skeleton.pt`) that defines the full HTML page layout for a Golem site, including head metadata, navigation, content area, and footer slots.
+

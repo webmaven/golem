@@ -70,7 +70,7 @@ This registers the term under `C` -> `caching` -> `disk cache` -> `TTL`.
 To register glossary terms, create standard AsciiDoc description lists annotated with the `[glossary]` attribute:
 
 .docs/concepts/architecture.adoc
-[source,asciidoc]
+[source,asciidoc,render="source,preview"]
 ----
 [glossary]
 Abstract Syntax Tree (AST)::
@@ -205,3 +205,13 @@ In your custom theme or page template:
     </div>
 </div>
 ----
+
+== API Reference
+
+=== IndexPlugin
+
+golem.apidoc::golem.plugins.index_glossary.IndexPlugin[depth=all,heading_level_offset=1]
+
+=== GlossaryPlugin
+
+golem.apidoc::golem.plugins.index_glossary.GlossaryPlugin[depth=all,heading_level_offset=1]

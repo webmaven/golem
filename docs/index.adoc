@@ -46,3 +46,10 @@ Golem approaches static publishing with a similar ethos:
 | link:about/[About & Colophon]
 | Project origin, publishing philosophy, colophon design notes, and governance documents.
 |===
+
+[glossary]
+AsciiDoc::
+  A lightweight markup language for writing technical documentation. Golem uses AsciiDoc as its primary source format, parsed via AsciiDoctrine.
+Golem::
+  A static-site documentation compiler built on AsciiDoctrine, Chameleon, and Pluggy. Golem transforms AsciiDoc source trees into HTML sites with a pluggable pipeline.
+

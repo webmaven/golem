@@ -175,3 +175,11 @@ plugins = ["analytics"]
 tracking_id = "UA-12345678-1"
 ----
 
+[glossary]
+Pluggy::
+  Python hook and plugin management library (the same engine that powers pytest). Golem's extension system is built on Pluggy.
+hookspec::
+  A function decorated with `@hookspec` that declares the contract (name, signature, and behaviour) of a Golem extension point.
+hookimpl::
+  A function decorated with `@hookimpl` that provides a concrete implementation of a hook declared by a `hookspec`.
+

@@ -123,3 +123,7 @@ The flattened tree is ideal for rendering indented navigation links or mobile dr
     </li>
 </ul>
 ----
+
+== API Reference
+
+golem.apidoc::golem.plugins.nav_helpers.NavigationHelpersPlugin[depth=all,heading_level_offset=1]

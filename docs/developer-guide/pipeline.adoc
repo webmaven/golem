@@ -75,3 +75,11 @@ Golem's pipeline is assembled from focused, independently testable Python librar
 | `click`
 | Composable command-line interface toolkit.
 |===
+
+[glossary]
+AST (Abstract Syntax Tree)::
+  The initial parse tree produced by Lark from raw AsciiDoc source, before semantic resolution.
+ASG (Abstract Semantic Graph)::
+  The resolved, typed graph of document nodes produced by AsciiDoctrine after the AST stage. Golem operates on the ASG rather than the raw AST.
+DAG (Directed Acyclic Graph)::
+  The dependency graph connecting document nodes. Golem's pipeline ensures the DAG has no cycles so nodes can be resolved in a deterministic topological order.
