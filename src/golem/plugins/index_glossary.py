@@ -405,6 +405,92 @@ def _lookup_meta(
     return None
 
 
+def _get_or_create_doc_meta(
+    path: Path,
+    cache_metadata: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Retrieve or initialize metadata dictionary for a given path in cache_metadata.
+
+    [parameters]
+    `path` (Path):: Target file path to locate or create.
+    `cache_metadata` (dict[str, dict[str, Any]]):: Cached build metadata mapping file paths to metadata dictionaries.
+
+    [returns]
+    `dict[str, Any]`:: Matching or newly initialized metadata dictionary.
+    """
+    existing = _lookup_meta(path, cache_metadata)
+    if existing is not None and isinstance(existing, dict):
+        return existing
+    p_abs = str(path.resolve())
+    new_meta: dict[str, Any] = {}
+    cache_metadata[p_abs] = new_meta
+    return new_meta
+
+
+def _merge_index_entries(
+    target: dict[str, dict[str, Any]],
+    source: dict[str, dict[str, Any]],
+) -> None:
+    """Merge source index entries into target index entries in-place.
+
+    [parameters]
+    `target` (dict[str, dict[str, Any]]):: Destination index entries mapping letters to terms.
+    `source` (dict[str, dict[str, Any]]):: Source index entries mapping letters to terms to merge.
+
+    [returns]
+    `None`:: Modifies target dictionary in place.
+    """
+    for letter, terms in source.items():
+        if not isinstance(terms, dict):
+            continue
+        if letter not in target:
+            target[letter] = {}
+
+        for term, entry_data in terms.items():
+            if not isinstance(entry_data, dict):
+                continue
+            if term not in target[letter]:
+                target[letter][term] = {
+                    "locations": list(entry_data.get("locations", [])),
+                    "secondary": {},
+                }
+            else:
+                for loc in entry_data.get("locations", []):
+                    if loc not in target[letter][term]["locations"]:
+                        target[letter][term]["locations"].append(loc)
+
+            target_sec = target[letter][term].setdefault("secondary", {})
+            source_sec = entry_data.get("secondary", {})
+            if isinstance(source_sec, dict):
+                for sec_term, sec_data in source_sec.items():
+                    if not isinstance(sec_data, dict):
+                        continue
+                    if sec_term not in target_sec:
+                        target_sec[sec_term] = {
+                            "locations": list(sec_data.get("locations", [])),
+                            "secondary": {},
+                        }
+                    else:
+                        for loc in sec_data.get("locations", []):
+                            if loc not in target_sec[sec_term]["locations"]:
+                                target_sec[sec_term]["locations"].append(loc)
+
+                    target_tert = target_sec[sec_term].setdefault("secondary", {})
+                    source_tert = sec_data.get("secondary", {})
+                    if isinstance(source_tert, dict):
+                        for tert_term, tert_data in source_tert.items():
+                            if not isinstance(tert_data, dict):
+                                continue
+                            if tert_term not in target_tert:
+                                target_tert[tert_term] = {
+                                    "locations": list(tert_data.get("locations", [])),
+                                }
+                            else:
+                                for loc in tert_data.get("locations", []):
+                                    if loc not in target_tert[tert_term]["locations"]:
+                                        target_tert[tert_term]["locations"].append(loc)
+
+
 def _file_has_index_terms(path: Path) -> bool:
     """Check if a file on disk contains AsciiDoc index terms.
 
@@ -461,9 +547,12 @@ class IndexPlugin(GolemPlugin):
 
     name = "index"
 
-    def __init__(self, **extra: Any) -> None:
+    def __init__(self, cache: Any = None, **extra: Any) -> None:
         super().__init__(**extra)
+        self.cache = cache
         self._entries: dict[str, dict[str, Any]] = {}
+        self._compiled_doc_paths: set[str] = set()
+        self._cache_metadata: dict[str, dict[str, Any]] | None = None
 
     @classmethod
     def from_config(cls, config: Any = None) -> IndexPlugin:
@@ -475,7 +564,15 @@ class IndexPlugin(GolemPlugin):
         [returns]
         `IndexPlugin`:: Configured index plugin instance.
         """
-        return super().from_config(config)
+        instance = super().from_config(config)
+        if config is not None and hasattr(config, "cache"):
+            instance.cache = getattr(config, "cache")
+        return instance
+
+    def _get_cache_metadata(self) -> dict[str, dict[str, Any]] | None:
+        if self.cache is not None and hasattr(self.cache, "data") and isinstance(self.cache.data, dict):
+            return self.cache.data.setdefault("metadata", {})
+        return self._cache_metadata
 
     @hookimpl
     def on_asg_created(self, asg: Node, doc_path: Path | None = None) -> Node:
@@ -489,9 +586,54 @@ class IndexPlugin(GolemPlugin):
         `Node`:: Unmodified ASG node.
         """
         doc_path_str = str(doc_path) if doc_path is not None else ""
-        visitor = AsgCollectorVisitor(index_entries=self._entries, doc_path_str=doc_path_str)
+        file_entries: dict[str, dict[str, Any]] = {}
+        visitor = AsgCollectorVisitor(index_entries=file_entries, doc_path_str=doc_path_str)
         visitor.visit(asg)
+
+        _merge_index_entries(self._entries, file_entries)
+
+        if doc_path is not None:
+            self._compiled_doc_paths.add(str(doc_path.resolve()))
+            self._compiled_doc_paths.add(doc_path_str)
+
+            metadata = self._get_cache_metadata()
+            if metadata is not None:
+                doc_meta = _get_or_create_doc_meta(doc_path, metadata)
+                doc_meta["index_entries"] = file_entries
+
         return asg
+
+    def _seed_from_cache(self) -> None:
+        """Merge cached index entries from unchanged files into self._entries."""
+        metadata = self._get_cache_metadata()
+        if not metadata:
+            return
+
+        to_evict: list[str] = []
+        for doc_path_str, meta in list(metadata.items()):
+            if not isinstance(meta, dict):
+                continue
+            p = Path(doc_path_str)
+            if not p.exists() and not p.resolve().exists():
+                to_evict.append(doc_path_str)
+                continue
+
+            resolved_str = str(p.resolve())
+            if resolved_str in self._compiled_doc_paths or doc_path_str in self._compiled_doc_paths:
+                continue
+
+            cached_entries = meta.get("index_entries")
+            if isinstance(cached_entries, dict):
+                _merge_index_entries(self._entries, cached_entries)
+
+        if to_evict:
+            for k in to_evict:
+                metadata.pop(k, None)
+            if self.cache is not None and hasattr(self.cache, "save_cache"):
+                try:
+                    self.cache.save_cache()
+                except Exception:
+                    pass
 
     def compile_index(self) -> dict[str, dict[str, Any]]:
         """Return alphabetized hierarchical index compiled from collected terms.
@@ -499,6 +641,7 @@ class IndexPlugin(GolemPlugin):
         [returns]
         `dict[str, dict[str, Any]]`:: Nested dictionary mapping first letters to term entries and subterms.
         """
+        self._seed_from_cache()
         result: dict[str, dict[str, Any]] = {}
         for letter in sorted(self._entries.keys()):
             result[letter] = {}
@@ -538,6 +681,19 @@ class IndexPlugin(GolemPlugin):
         `None`:: Clears state in place with no return value.
         """
         self._entries.clear()
+        self._compiled_doc_paths.clear()
+
+    @hookimpl
+    def on_build_start(self, config: Any = None) -> None:
+        """Reset state at the beginning of each build run.
+
+        [parameters]
+        `config` (Any, optional):: Site configuration object. Defaults to `None`.
+
+        [returns]
+        `None`:: Clears state in place.
+        """
+        self.reset()
 
     @hookimpl
     def on_template_context(self, context: PageContext, doc_path: Path) -> PageContext:
@@ -569,6 +725,7 @@ class IndexPlugin(GolemPlugin):
         [returns]
         `list[Path] | None`:: List of index aggregator pages to recompile, or `None` if no invalidation is needed.
         """
+        self._cache_metadata = cache_metadata
         aggregator_pages = _find_aggregator_pages(cache_metadata, "index")
         if not aggregator_pages:
             return None
@@ -596,9 +753,12 @@ class GlossaryPlugin(GolemPlugin):
 
     name = "glossary"
 
-    def __init__(self, **extra: Any) -> None:
+    def __init__(self, cache: Any = None, **extra: Any) -> None:
         super().__init__(**extra)
+        self.cache = cache
         self._entries: dict[str, dict[str, Any]] = {}
+        self._compiled_doc_paths: set[str] = set()
+        self._cache_metadata: dict[str, dict[str, Any]] | None = None
 
     @classmethod
     def from_config(cls, config: Any = None) -> GlossaryPlugin:
@@ -610,7 +770,15 @@ class GlossaryPlugin(GolemPlugin):
         [returns]
         `GlossaryPlugin`:: Configured glossary plugin instance.
         """
-        return super().from_config(config)
+        instance = super().from_config(config)
+        if config is not None and hasattr(config, "cache"):
+            instance.cache = getattr(config, "cache")
+        return instance
+
+    def _get_cache_metadata(self) -> dict[str, dict[str, Any]] | None:
+        if self.cache is not None and hasattr(self.cache, "data") and isinstance(self.cache.data, dict):
+            return self.cache.data.setdefault("metadata", {})
+        return self._cache_metadata
 
     @hookimpl
     def on_asg_created(self, asg: Node, doc_path: Path | None = None) -> Node:
@@ -624,9 +792,56 @@ class GlossaryPlugin(GolemPlugin):
         `Node`:: Unmodified ASG node.
         """
         doc_path_str = str(doc_path) if doc_path is not None else ""
-        visitor = AsgCollectorVisitor(glossary_entries=self._entries, doc_path_str=doc_path_str)
+        file_entries: dict[str, dict[str, Any]] = {}
+        visitor = AsgCollectorVisitor(glossary_entries=file_entries, doc_path_str=doc_path_str)
         visitor.visit(asg)
+
+        self._entries.update(file_entries)
+
+        if doc_path is not None:
+            self._compiled_doc_paths.add(str(doc_path.resolve()))
+            self._compiled_doc_paths.add(doc_path_str)
+
+            metadata = self._get_cache_metadata()
+            if metadata is not None:
+                doc_meta = _get_or_create_doc_meta(doc_path, metadata)
+                doc_meta["glossary_entries"] = file_entries
+
         return asg
+
+    def _seed_from_cache(self) -> None:
+        """Merge cached glossary entries from unchanged files into self._entries."""
+        metadata = self._get_cache_metadata()
+        if not metadata:
+            return
+
+        to_evict: list[str] = []
+        for doc_path_str, meta in list(metadata.items()):
+            if not isinstance(meta, dict):
+                continue
+            p = Path(doc_path_str)
+            if not p.exists() and not p.resolve().exists():
+                to_evict.append(doc_path_str)
+                continue
+
+            resolved_str = str(p.resolve())
+            if resolved_str in self._compiled_doc_paths or doc_path_str in self._compiled_doc_paths:
+                continue
+
+            cached_entries = meta.get("glossary_entries")
+            if isinstance(cached_entries, dict):
+                for term, entry in cached_entries.items():
+                    if term not in self._entries:
+                        self._entries[term] = entry
+
+        if to_evict:
+            for k in to_evict:
+                metadata.pop(k, None)
+            if self.cache is not None and hasattr(self.cache, "save_cache"):
+                try:
+                    self.cache.save_cache()
+                except Exception:
+                    pass
 
     def compile_glossary(self) -> dict[str, list[GlossaryEntry]]:
         """Return alphabetized glossary compiled from collected definition lists.
@@ -634,6 +849,7 @@ class GlossaryPlugin(GolemPlugin):
         [returns]
         `dict[str, list[GlossaryEntry]]`:: Grouped dictionary mapping first letters to term entries.
         """
+        self._seed_from_cache()
         grouped: dict[str, list[GlossaryEntry]] = {}
         for term, entry in self._entries.items():
             if not term:
@@ -662,6 +878,19 @@ class GlossaryPlugin(GolemPlugin):
         `None`:: Clears state in place with no return value.
         """
         self._entries.clear()
+        self._compiled_doc_paths.clear()
+
+    @hookimpl
+    def on_build_start(self, config: Any = None) -> None:
+        """Reset state at the beginning of each build run.
+
+        [parameters]
+        `config` (Any, optional):: Site configuration object. Defaults to `None`.
+
+        [returns]
+        `None`:: Clears state in place.
+        """
+        self.reset()
 
     @hookimpl
     def on_template_context(self, context: PageContext, doc_path: Path) -> PageContext:
@@ -693,6 +922,7 @@ class GlossaryPlugin(GolemPlugin):
         [returns]
         `list[Path] | None`:: List of glossary aggregator pages to recompile, or `None` if no invalidation is needed.
         """
+        self._cache_metadata = cache_metadata
         aggregator_pages = _find_aggregator_pages(cache_metadata, "glossary")
         if not aggregator_pages:
             return None

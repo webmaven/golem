@@ -319,3 +319,192 @@ def test_added_file_with_terms_marks_aggregators_stale(tmp_path: Path) -> None:
     assert new_index_doc.resolve() in outdated_resolved
     assert index_page.resolve() in outdated_resolved, "Index page must be stale when new file with index terms is added"
     assert glossary_page.resolve() not in outdated_resolved
+
+
+def test_glossary_retains_terms_on_incremental_build(tmp_path: Path) -> None:
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    out_dir = tmp_path / "dist"
+    cache_file = tmp_path / "cache.json"
+
+    glossary_page = content_dir / "glossary.adoc"
+    glossary_page.write_text("= Glossary\n:page-role: glossary\n\nSite Glossary.\n", encoding="utf-8")
+
+    doc1 = content_dir / "doc1.adoc"
+    doc1.write_text(
+        "= Doc One\n\n[glossary]\nAlpha:: First term definition\n",
+        encoding="utf-8",
+    )
+
+    doc2 = content_dir / "doc2.adoc"
+    doc2.write_text(
+        "= Doc Two\n\n[glossary]\nBeta:: Second term definition\n",
+        encoding="utf-8",
+    )
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(out_dir),
+        plugins=["index", "glossary"],
+        site_title="Test Site",
+    )
+    engine = BuildEngine(config, cache_file=cache_file)
+    compiled = engine.build_site()
+    assert len(compiled) == 3
+
+    glo_html = (out_dir / "glossary.html").read_text(encoding="utf-8")
+    assert "Alpha" in glo_html
+    assert "First term definition" in glo_html
+    assert "Beta" in glo_html
+    assert "Second term definition" in glo_html
+
+    # Incremental build: modify only doc1.adoc
+    doc1.write_text(
+        "= Doc One\n\n[glossary]\nAlpha:: Updated first term definition\n",
+        encoding="utf-8",
+    )
+
+    engine2 = BuildEngine(config, cache_file=cache_file)
+    compiled2 = engine2.build_site()
+    assert (out_dir / "glossary.html") in compiled2
+
+    glo_html2 = (out_dir / "glossary.html").read_text(encoding="utf-8")
+    assert "Alpha" in glo_html2
+    assert "Updated first term definition" in glo_html2
+    assert "Beta" in glo_html2, "Glossary must retain terms from unchanged doc2 during incremental build"
+    assert "Second term definition" in glo_html2
+
+
+def test_glossary_retains_terms_when_only_glossary_page_modified(tmp_path: Path) -> None:
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    out_dir = tmp_path / "dist"
+    cache_file = tmp_path / "cache.json"
+
+    glossary_page = content_dir / "glossary.adoc"
+    glossary_page.write_text("= Glossary\n:page-role: glossary\n\nSite Glossary.\n", encoding="utf-8")
+
+    doc1 = content_dir / "doc1.adoc"
+    doc1.write_text(
+        "= Doc One\n\n[glossary]\nAlpha:: First term definition\n",
+        encoding="utf-8",
+    )
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(out_dir),
+        plugins=["index", "glossary"],
+        site_title="Test Site",
+    )
+    engine = BuildEngine(config, cache_file=cache_file)
+    engine.build_site()
+
+    # Modify ONLY glossary.adoc
+    glossary_page.write_text("= Glossary\n:page-role: glossary\n\nUpdated header text.\n", encoding="utf-8")
+
+    engine2 = BuildEngine(config, cache_file=cache_file)
+    compiled2 = engine2.build_site()
+    assert (out_dir / "glossary.html") in compiled2
+
+    glo_html = (out_dir / "glossary.html").read_text(encoding="utf-8")
+    assert "Alpha" in glo_html, "Glossary must retain terms when only glossary page is modified"
+    assert "First term definition" in glo_html
+
+
+def test_index_retains_terms_on_incremental_build(tmp_path: Path) -> None:
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    out_dir = tmp_path / "dist"
+    cache_file = tmp_path / "cache.json"
+
+    index_page = content_dir / "site_index.adoc"
+    index_page.write_text("= Index\n:page-role: index\n\nIndex content.\n", encoding="utf-8")
+
+    doc1 = content_dir / "doc1.adoc"
+    doc1.write_text("= Doc One\n\n((Alpha))\n", encoding="utf-8")
+
+    doc2 = content_dir / "doc2.adoc"
+    doc2.write_text("= Doc Two\n\n((Beta))\n", encoding="utf-8")
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(out_dir),
+        plugins=["index", "glossary"],
+        site_title="Test Site",
+    )
+    engine = BuildEngine(config, cache_file=cache_file)
+    engine.build_site()
+
+    idx_html = (out_dir / "site_index.html").read_text(encoding="utf-8")
+    assert "Alpha" in idx_html
+    assert "Beta" in idx_html
+
+    # Modify ONLY doc1.adoc
+    doc1.write_text("= Doc One\n\n((Gamma))\n", encoding="utf-8")
+
+    engine2 = BuildEngine(config, cache_file=cache_file)
+    compiled2 = engine2.build_site()
+    assert (out_dir / "site_index.html") in compiled2
+
+    idx_html2 = (out_dir / "site_index.html").read_text(encoding="utf-8")
+    assert "Gamma" in idx_html2
+    assert "Beta" in idx_html2, "Index must retain terms from unchanged doc2 during incremental build"
+    assert "Alpha" not in idx_html2, "Old term removed from doc1 must not linger in index"
+
+
+def test_deleted_file_terms_evicted_from_aggregators(tmp_path: Path) -> None:
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    out_dir = tmp_path / "dist"
+    cache_file = tmp_path / "cache.json"
+
+    index_page = content_dir / "site_index.adoc"
+    index_page.write_text("= Index\n:page-role: index\n\nIndex content.\n", encoding="utf-8")
+
+    glossary_page = content_dir / "site_glossary.adoc"
+    glossary_page.write_text("= Glossary\n:page-role: glossary\n\nGlossary content.\n", encoding="utf-8")
+
+    doc1 = content_dir / "doc1.adoc"
+    doc1.write_text(
+        "= Doc One\n\n((TermOne))\n\n[glossary]\nTermOne:: Definition One\n",
+        encoding="utf-8",
+    )
+
+    doc2 = content_dir / "doc2.adoc"
+    doc2.write_text(
+        "= Doc Two\n\n((TermTwo))\n\n[glossary]\nTermTwo:: Definition Two\n",
+        encoding="utf-8",
+    )
+
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(out_dir),
+        plugins=["index", "glossary"],
+        site_title="Test Site",
+    )
+    engine = BuildEngine(config, cache_file=cache_file)
+    engine.build_site()
+
+    idx_html = (out_dir / "site_index.html").read_text(encoding="utf-8")
+    assert "TermOne" in idx_html
+    assert "TermTwo" in idx_html
+
+    glo_html = (out_dir / "site_glossary.html").read_text(encoding="utf-8")
+    assert "TermOne" in glo_html
+    assert "TermTwo" in glo_html
+
+    # Delete doc1.adoc
+    doc1.unlink()
+
+    engine2 = BuildEngine(config, cache_file=cache_file)
+    compiled2 = engine2.build_site()
+    assert (out_dir / "site_index.html") in compiled2
+    assert (out_dir / "site_glossary.html") in compiled2
+
+    idx_html2 = (out_dir / "site_index.html").read_text(encoding="utf-8")
+    assert "TermOne" not in idx_html2, "Deleted file index terms must be evicted"
+    assert "TermTwo" in idx_html2, "Remaining file index terms must be preserved"
+
+    glo_html2 = (out_dir / "site_glossary.html").read_text(encoding="utf-8")
+    assert "TermOne" not in glo_html2, "Deleted file glossary terms must be evicted"
+    assert "TermTwo" in glo_html2, "Remaining file glossary terms must be preserved"

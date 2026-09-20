@@ -169,6 +169,7 @@ class BuildEngine:
         asg_spec = getattr(getattr(self.pm.hook, "on_asg_created", None), "spec", None)
         if asg_spec and "doc_path" not in asg_spec.argnames:
             asg_spec.argnames = (*asg_spec.argnames, "doc_path")
+        self._inject_plugin_cache()
 
         self.staleness_tracker = StalenessTracker(
             config=self.config,
@@ -186,6 +187,13 @@ class BuildEngine:
         )
         self.diagnostics: list[Diagnostic] = []
         self._nav_tree_cache: list[dict[str, Any]] | None = None
+
+    def _inject_plugin_cache(self) -> None:
+        """Inject the BuildCache instance into registered plugins that accept it."""
+        if hasattr(self, "pm") and self.pm:
+            for plugin in self.pm.get_plugins():
+                if hasattr(plugin, "cache") and getattr(plugin, "cache", None) is None:
+                    plugin.cache = self.cache
 
     def get_file_metadata(self, path: Path) -> dict[str, Any]:
         """Retrieve cached or parsed document metadata for an AsciiDoc file.
@@ -209,6 +217,11 @@ class BuildEngine:
             return cached_meta
 
         meta = extract_metadata_from_doc(path)
+        existing_meta = self.cache.data.get("metadata", {}).get(p_abs)
+        if isinstance(existing_meta, dict):
+            for k, v in existing_meta.items():
+                if k not in meta:
+                    meta[k] = v
         self.cache.data.setdefault("metadata", {})[p_abs] = meta
         if current_hash:
             self.cache.data.setdefault("files", {})[p_abs] = current_hash
@@ -290,6 +303,7 @@ class BuildEngine:
         """
         self.diagnostics = []
         self._nav_tree_cache = None
+        self._inject_plugin_cache()
         compiled_files = []
 
         # Execute on_build_start lifecycle hooks with collect-all-errors pattern
@@ -648,6 +662,7 @@ class BuildEngine:
         ----
         """
         self.diagnostics = []
+        self._inject_plugin_cache()
         diagnostics: list[Diagnostic] = []
 
         if files is None:

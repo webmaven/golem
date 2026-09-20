@@ -398,6 +398,9 @@ class StalenessTracker:
                     changed_directly.add(f_path)
 
         if self.pm:
+            for plugin in self.pm.get_plugins():
+                if hasattr(plugin, "cache") and getattr(plugin, "cache", None) is None:
+                    plugin.cache = self.cache
             results = self.pm.hook.golem_mark_stale(
                 changed_files=list(changed_directly),
                 cache_metadata=self.cache.data.get("metadata", {}),
@@ -550,6 +553,10 @@ class StalenessTracker:
         self.cache.data.setdefault("files", {})[p_abs] = self.cache.get_sha256(path)
         meta = extract_metadata_from_doc(path)
         existing_meta = self.cache.data.get("metadata", {}).get(p_abs, {})
+        if isinstance(existing_meta, dict):
+            for k, v in existing_meta.items():
+                if k not in meta:
+                    meta[k] = v
         if node_types is not None:
             meta["node_types"] = node_types
         elif isinstance(existing_meta, dict) and "node_types" in existing_meta:
