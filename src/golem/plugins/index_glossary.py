@@ -346,6 +346,12 @@ class AsgCollectorVisitor(AsgVisitor):
             terms = _extract_definition_list_terms(item)
             definition = _extract_definition_list_blocks(item)
             for term in terms:
+                if term in self.glossary_entries:
+                    logger.warning(
+                        "Glossary term '%s' was redefined within '%s'; subsequent definition overwrites earlier ones",
+                        term,
+                        self.doc_path_str,
+                    )
                 self.glossary_entries[term] = {
                     "term": term,
                     "definition": definition,
@@ -796,7 +802,19 @@ class GlossaryPlugin(GolemPlugin):
         visitor = AsgCollectorVisitor(glossary_entries=file_entries, doc_path_str=doc_path_str)
         visitor.visit(asg)
 
-        self._entries.update(file_entries)
+        for term, entry in file_entries.items():
+            if term in self._entries:
+                old_doc_path = self._entries[term].get("doc_path", "")
+                new_doc_path = entry.get("doc_path", doc_path_str)
+                if old_doc_path != new_doc_path:
+                    logger.warning(
+                        "Glossary term '%s' defined in '%s' collides with existing definition from '%s'; '%s' definition takes precedence (last page wins)",
+                        term,
+                        new_doc_path,
+                        old_doc_path,
+                        new_doc_path,
+                    )
+            self._entries[term] = entry
 
         if doc_path is not None:
             self._compiled_doc_paths.add(str(doc_path.resolve()))
@@ -831,8 +849,23 @@ class GlossaryPlugin(GolemPlugin):
             cached_entries = meta.get("glossary_entries")
             if isinstance(cached_entries, dict):
                 for term, entry in cached_entries.items():
-                    if term not in self._entries:
+                    if term in self._entries:
+                        old_doc_path = self._entries[term].get("doc_path", "")
+                        new_doc_path = entry.get("doc_path", doc_path_str)
+                        if old_doc_path != new_doc_path:
+                            logger.warning(
+                                "Glossary term '%s' defined in '%s' collides with existing definition from '%s'; '%s' definition takes precedence (last page wins)",
+                                term,
+                                new_doc_path,
+                                old_doc_path,
+                                new_doc_path,
+                            )
+                            self._entries[term] = entry
+                    else:
                         self._entries[term] = entry
+
+            self._compiled_doc_paths.add(resolved_str)
+            self._compiled_doc_paths.add(doc_path_str)
 
         if to_evict:
             for k in to_evict:

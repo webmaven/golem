@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 import asciidoctrine
 from asciidoctrine.nodes import (
@@ -596,3 +599,112 @@ def test_glossary_template_context_conditional_injection():
     ctx_wrong_role: dict[str, Any] = {"doc_attributes": {"page-role": "index"}}
     res_wrong_role = plugin.on_template_context(ctx_wrong_role, Path("docs/index.adoc"))
     assert "site_glossary" not in res_wrong_role
+
+
+def test_glossary_duplicate_definitions_same_page(caplog: pytest.LogCaptureFixture) -> None:
+    plugin = GlossaryPlugin()
+    item1 = DescriptionListItem(
+        terms=[DescriptionListTerm([Text("API")])],
+        blocks=[Paragraph([Text("First definition")])],
+    )
+    item2 = DescriptionListItem(
+        terms=[DescriptionListTerm([Text("API")])],
+        blocks=[Paragraph([Text("Second definition")])],
+    )
+    dlist = DescriptionList([item1, item2])
+    dlist.attributes["role"] = "glossary"
+    doc = Document([dlist])
+
+    with caplog.at_level(logging.WARNING):
+        plugin.on_asg_created(doc, doc_path=Path("docs/glossary.adoc"))
+
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "API" in warnings[0].message
+    assert "redefined within 'docs/glossary.adoc'" in warnings[0].message
+    assert "subsequent definition overwrites earlier ones" in warnings[0].message
+
+    glossary = plugin.compile_glossary()
+    assert len(glossary["A"]) == 1
+    assert glossary["A"][0]["term"] == "API"
+    assert glossary["A"][0]["definition"] == "Second definition"
+
+
+def test_glossary_duplicate_definitions_different_pages(caplog: pytest.LogCaptureFixture) -> None:
+    plugin = GlossaryPlugin()
+    item1 = DescriptionListItem(
+        terms=[DescriptionListTerm([Text("API")])],
+        blocks=[Paragraph([Text("API from doc1")])],
+    )
+    dlist1 = DescriptionList([item1])
+    dlist1.attributes["role"] = "glossary"
+    doc1 = Document([dlist1])
+
+    item2 = DescriptionListItem(
+        terms=[DescriptionListTerm([Text("API")])],
+        blocks=[Paragraph([Text("API from doc2")])],
+    )
+    dlist2 = DescriptionList([item2])
+    dlist2.attributes["role"] = "glossary"
+    doc2 = Document([dlist2])
+
+    with caplog.at_level(logging.WARNING):
+        plugin.on_asg_created(doc1, doc_path=Path("docs/doc1.adoc"))
+        assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 0
+
+        plugin.on_asg_created(doc2, doc_path=Path("docs/doc2.adoc"))
+
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "API" in warnings[0].message
+    assert "defined in 'docs/doc2.adoc' collides with existing definition from 'docs/doc1.adoc'" in warnings[0].message
+    assert "docs/doc2.adoc' definition takes precedence (last page wins)" in warnings[0].message
+
+    glossary = plugin.compile_glossary()
+    assert len(glossary["A"]) == 1
+    assert glossary["A"][0]["term"] == "API"
+    assert glossary["A"][0]["definition"] == "API from doc2"
+    assert glossary["A"][0]["doc_path"] == "docs/doc2.adoc"
+
+
+def test_glossary_duplicate_definitions_cached_pages(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
+    plugin = GlossaryPlugin()
+    p1 = tmp_path / "page1.adoc"
+    p1.touch()
+    p2 = tmp_path / "page2.adoc"
+    p2.touch()
+
+    plugin._cache_metadata = {
+        str(p1): {
+            "glossary_entries": {
+                "API": {
+                    "term": "API",
+                    "definition": "Definition from page 1",
+                    "doc_path": str(p1),
+                }
+            }
+        },
+        str(p2): {
+            "glossary_entries": {
+                "API": {
+                    "term": "API",
+                    "definition": "Definition from page 2",
+                    "doc_path": str(p2),
+                }
+            }
+        },
+    }
+
+    with caplog.at_level(logging.WARNING):
+        glossary = plugin.compile_glossary()
+
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "API" in warnings[0].message
+    assert f"defined in '{p2}' collides with existing definition from '{p1}'" in warnings[0].message
+    assert f"'{p2}' definition takes precedence (last page wins)" in warnings[0].message
+
+    assert len(glossary["A"]) == 1
+    assert glossary["A"][0]["term"] == "API"
+    assert glossary["A"][0]["definition"] == "Definition from page 2"
+    assert glossary["A"][0]["doc_path"] == str(p2)
