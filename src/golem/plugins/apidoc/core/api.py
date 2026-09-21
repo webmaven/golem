@@ -154,6 +154,31 @@ class AsciiDocApi:
         _walk(root_module)
         return docs
 
+    @staticmethod
+    def ensure_absolute_levels(nodes: Sequence[Node], base_level: int = 2) -> None:
+        """Ensure all Section and DiscreteHeading nodes have absolute_level set.
+
+        Recursively traverses `nodes`. If a `Section` or `DiscreteHeading` node does not
+        have `absolute_level` set, assigns `base_level` (clamped to 1..6). Child section/heading
+        nodes inside have their level set to `min(6, base_level + 1)` and so forth.
+        """
+        for node in nodes:
+            name = getattr(node, "name", None)
+            is_heading_node = name in ("section", "heading") or hasattr(node, "absolute_level")
+            if is_heading_node:
+                curr_abs = getattr(node, "absolute_level", None)
+                if curr_abs is None:
+                    if hasattr(node, "set_absolute_level"):
+                        node.set_absolute_level(min(6, max(1, base_level)))
+                    elif hasattr(node, "absolute_level"):
+                        node.absolute_level = min(6, max(1, base_level))
+
+            child_blocks = getattr(node, "blocks", None)
+            if isinstance(child_blocks, list) and child_blocks:
+                effective_level = getattr(node, "absolute_level", None) or base_level
+                next_level = min(6, effective_level + 1) if is_heading_node else base_level
+                AsciiDocApi.ensure_absolute_levels(child_blocks, base_level=next_level)
+
     def get_asg_nodes(
         self,
         symbol: str,
@@ -181,7 +206,9 @@ class AsciiDocApi:
                     return []
                 ast = asciidoctrine.parse_to_ast(adoc_markup)
                 doc = ASGResolver(ast).resolve_to_ast(ast)
-                return list(doc.blocks)
+                blocks = list(doc.blocks)
+                self.ensure_absolute_levels(blocks, base_level=2 + self.options.heading_level_offset)
+                return blocks
             except Exception as e:
                 return [
                     Admonition(

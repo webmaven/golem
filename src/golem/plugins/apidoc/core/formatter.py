@@ -37,6 +37,9 @@ def _offset_headings(text: str, offset: int) -> str:
     second root-level heading when it is embedded inside a document that
     already has a root heading.
 
+    Also sets `[absolute-level=N]` on each shifted heading to enforce predictable
+    hierarchy (e.g. h3 for function subsections, h4 for method subsections).
+
     Only leading ``=`` sequences on their own line are affected; ``==+``
     inside code blocks or description list markers are left alone because
     this is a simple line-start replacement — code blocks are delimited by
@@ -45,8 +48,18 @@ def _offset_headings(text: str, offset: int) -> str:
     if offset <= 0:
         return text
 
+    matches = list(re.finditer(r"^(=+)( )", text, flags=re.MULTILINE))
+    if not matches:
+        return text
+
+    min_eq = min(len(m.group(1)) for m in matches)
+
     def _bump(m: re.Match) -> str:
-        return "=" * (len(m.group(1)) + offset) + m.group(2)
+        eq_count = len(m.group(1))
+        rel_depth = eq_count - min_eq
+        abs_level = min(6, max(1, offset + 1 + rel_depth))
+        new_equals = "=" * (eq_count + offset)
+        return f"[absolute-level={abs_level}]\n{new_equals}{m.group(2)}"
 
     return re.sub(r"^(=+)( )", _bump, text, flags=re.MULTILINE)
 
@@ -189,6 +202,7 @@ def format_attribute(
     """Render an Attribute object to AsciiDoc."""
     heading = "=" * max(1, heading_level)
     lines: list[str] = [
+        f"[absolute-level={heading_level}]",
         f"{heading} {attr.name}",
         "",
         "[source,python]",
@@ -213,6 +227,7 @@ def format_function(
     """Render a Function (or method) object to AsciiDoc."""
     heading = "=" * max(1, heading_level)
     lines: list[str] = [
+        f"[absolute-level={heading_level}]",
         f"{heading} {func.name}",
         "",
         "[source,python]",
@@ -240,6 +255,7 @@ def format_class(
     """Render a Class object to AsciiDoc."""
     heading = "=" * max(1, heading_level)
     lines: list[str] = [
+        f"[absolute-level={heading_level}]",
         f"{heading} class {cls.name}",
         "",
         "[source,python]",
@@ -263,6 +279,7 @@ def format_class(
     if members["attributes"] and depth != "summary":
         attr_heading = "=" * (heading_level + 1)
         lines.append("")
+        lines.append(f"[absolute-level={heading_level + 1}]")
         lines.append(f"{attr_heading} Attributes")
         lines.append("")
         for attr in members["attributes"]:
@@ -310,9 +327,10 @@ def format_module(
     """Render a Module object to AsciiDoc."""
     title_name = module.path if module.path else module.name
     heading = "=" * max(1, heading_level)
-    lines: list[str] = [
-        f"{heading} {title_name}",
-    ]
+    lines: list[str] = []
+    if heading_level > 1:
+        lines.append(f"[absolute-level={heading_level}]")
+    lines.append(f"{heading} {title_name}")
 
     doc_text = format_docstring(module.docstring, style=docstring_style, heading_offset=heading_level)
     if doc_text:
@@ -329,6 +347,7 @@ def format_module(
     if members["attributes"] and depth != "summary":
         attr_heading = "=" * (heading_level + 1)
         lines.append("")
+        lines.append(f"[absolute-level={heading_level + 1}]")
         lines.append(f"{attr_heading} Module Attributes")
         lines.append("")
         for attr in members["attributes"]:
@@ -385,6 +404,7 @@ def format_module(
     if members["submodules"] and depth == "all":
         sub_heading = "=" * (heading_level + 1)
         lines.append("")
+        lines.append(f"[absolute-level={heading_level + 1}]")
         lines.append(f"{sub_heading} Submodules")
         lines.append("")
         for submod in members["submodules"]:

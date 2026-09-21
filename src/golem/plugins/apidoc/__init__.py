@@ -76,7 +76,9 @@ class ApidocMacroTransformer(AsgTransformer):
         options = ApiGenOptions(docstring_style=style, depth=depth)
         api = AsciiDocApi(search_paths=self.search_paths, options=options)
         try:
-            return api.get_asg_nodes(target, depth=depth, heading_level_offset=heading_offset)
+            nodes = api.get_asg_nodes(target, depth=depth, heading_level_offset=heading_offset)
+            AsciiDocApi.ensure_absolute_levels(nodes, base_level=2 + heading_offset)
+            return nodes
         except Exception as e:
             logger.warning("Golem ApiDoc macro error for target '%s': %s", target, e)
             return [
