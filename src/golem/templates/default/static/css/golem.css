@@ -1,55 +1,472 @@
+/* ==========================================================================
+   Golem Design Token System
+   Three-Layer Token Architecture (Issue #16):
+     Layer 1: Primitives (raw values, color palettes, typography, spacing)
+     Layer 2: Semantics  (purpose aliases: surfaces, text, brand, borders)
+     Layer 3: Components (component-specific: symbols, left-rail, code blocks)
+   ========================================================================== */
+
 :root {
-    /* Light Mode Default (Fired Clay / Workbench) */
-    --golem-bg: #faf9f5;
-    --golem-surface: #f3f0e8;
-    --golem-code-bg: #ede8df;
-    --golem-text: #1e1a16;
-    --golem-text-muted: #6b5d52;
-    --golem-primary: #8b3a12;
-    --golem-primary-hover: #6b2a08;
-    --golem-border: #dfdbd2;
-    --golem-link: #8b3a12;
-    --golem-link-visited: #3e2518;
-    --golem-link-hover: #6b2a08;
+    /* ----------------------------------------------------------------------
+       1. PRIMITIVES
+       ---------------------------------------------------------------------- */
+
+    /* Palette: Fired Clay Brand (Warm Terracotta / Fired Clay) */
+    --palette-clay-50:  #fdf8f5;
+    --palette-clay-100: #fbeee6;
+    --palette-clay-200: #f6d8c7;
+    --palette-clay-300: #eeb79b;
+    --palette-clay-400: #e28a65;
+    --palette-clay-500: #d4692a;
+    --palette-clay-600: #b45309;
+    --palette-clay-700: #8b3a12;
+    --palette-clay-800: #6b2a08;
+    --palette-clay-900: #3e2518;
+
+    /* Palette: Neutral Workbench (Warm Paper / Stone / Charcoal) */
+    --palette-neutral-50:  #faf9f5;
+    --palette-neutral-100: #f3f0e8;
+    --palette-neutral-200: #ede8df;
+    --palette-neutral-300: #dfdbd2;
+    --palette-neutral-400: #cbd5e1;
+    --palette-neutral-500: #9a7a68;
+    --palette-neutral-600: #6b5d52;
+    --palette-neutral-700: #475569;
+    --palette-neutral-800: #1e1a16;
+    --palette-neutral-900: #170f0b;
+    --palette-neutral-950: #090d16;
+
+    /* Base Absolutes */
+    --palette-white: #ffffff;
+    --palette-black: #000000;
+
+    /* Symbol Primitives (WCAG AA Compliant Palettes) */
+    --palette-blue-50:  #eff6ff;
+    --palette-blue-600: #2563eb;
+    --palette-blue-700: #1d4ed8;
+
+    --palette-purple-50:  #f5f3ff;
+    --palette-purple-600: #7c3aed;
+    --palette-purple-700: #6d28d9;
+
+    --palette-amber-50:  #fffbeb;
+    --palette-amber-600: #d97706;
+    --palette-amber-700: #b45309;
+    --palette-amber-800: #92400e;
+
+    --palette-emerald-50:  #ecfdf5;
+    --palette-emerald-600: #059669;
+    --palette-emerald-700: #047857;
+
+    --palette-cyan-50:  #ecfeff;
+    --palette-cyan-600: #0891b2;
+    --palette-cyan-700: #0e7490;
+
+    --palette-red-50:  #fef2f2;
+    --palette-red-600: #dc2626;
+    --palette-red-700: #b91c1c;
+
+    --palette-slate-50:  #f8fafc;
+    --palette-slate-100: #f1f5f9;
+    --palette-slate-600: #475569;
+    --palette-slate-700: #334155;
+
+    /* Admonition Primitives */
+    --palette-teal-700:    #2d6a5a;
+    --palette-olive-700:   #6e7818;
+    --palette-yellow-700:  #b58a00;
+    --palette-crimson-700: #a31818;
+
+    /* Spacing Scale */
+    --space-2xs: 0.125rem;  /* 2px */
+    --space-xs:  0.25rem;   /* 4px */
+    --space-sm:  0.5rem;    /* 8px */
+    --space-md:  1rem;      /* 16px */
+    --space-lg:  1.5rem;    /* 24px */
+    --space-xl:  2rem;      /* 32px */
+    --space-2xl: 3rem;      /* 48px */
+    --space-3xl: 4rem;      /* 64px */
+
+    /* Typography Families */
+    --font-serif:   'Source Serif 4', Georgia, serif;
+    --font-display: var(--font-serif);
+    --font-body:    var(--font-serif);
+    --font-sans:    'Source Sans 3', system-ui, -apple-system, sans-serif;
+    --font-ui:      var(--font-sans);
+    --font-mono:    'Source Code Pro', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+    /* Typography Sizes */
+    --font-size-2xs:   0.6875rem; /* 11px */
+    --font-size-xs:    0.75rem;   /* 12px */
+    --font-size-sm:    0.875rem;  /* 14px */
+    --font-size-base:  1rem;      /* 16px */
+    --font-size-md:    1.0625rem; /* 17px */
+    --font-size-lg:    1.25rem;   /* 20px */
+    --font-size-xl:    1.55rem;   /* 24.8px */
+    --font-size-2xl:   2.1rem;    /* 33.6px */
+    --font-size-sig:   0.875rem;  /* Monospace signature */
+    --font-size-param: 0.8125rem; /* Monospace parameter */
+
+    /* Geometry & Shadows */
+    --radius-xs: 2px;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-full: 9999px;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+
+    /* Textures */
+    --texture-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+
+    /* ----------------------------------------------------------------------
+       2. SEMANTIC TOKENS (Light Theme Default)
+       ---------------------------------------------------------------------- */
+
+    /* Surfaces */
+    --bg-canvas:          var(--palette-neutral-50);
+    --bg-surface:         var(--palette-neutral-100);
+    --bg-surface-subtle:  var(--palette-neutral-50);
+    --bg-surface-muted:   var(--palette-neutral-200);
+    --bg-surface-elevated:var(--palette-white);
+    --bg-card:            var(--palette-neutral-100);
+    --bg-code:            var(--palette-neutral-200);
+
+    /* Text */
+    --color-text:           var(--palette-neutral-800);
+    --color-text-primary:   var(--color-text);
+    --color-text-secondary: var(--palette-neutral-700);
+    --color-text-muted:     var(--palette-neutral-600);
+    --color-text-inverse:   var(--palette-white);
+    --color-text-code:      var(--palette-neutral-800);
+
+    /* Brand & Actions */
+    --color-primary:        var(--palette-clay-700);
+    --color-primary-hover:  var(--palette-clay-800);
+    --color-primary-subtle: var(--palette-clay-100);
+    --color-link:           var(--palette-clay-700);
+    --color-link-hover:     var(--palette-clay-800);
+    --color-link-visited:   var(--palette-clay-900);
+
+    /* Borders */
+    --border-color:   var(--palette-neutral-300);
+    --border-subtle:  var(--palette-neutral-200);
+    --border-focus:   var(--palette-clay-700);
 
     /* Admonitions */
-    --golem-note: #2d6a5a;
-    --golem-tip: #6e7818;
-    --golem-important: #8b3a12;
-    --golem-warning: #b58a00;
-    --golem-caution: #a31818;
+    --color-note:      var(--palette-teal-700);
+    --color-tip:       var(--palette-olive-700);
+    --color-important: var(--palette-clay-700);
+    --color-warning:   var(--palette-yellow-700);
+    --color-caution:   var(--palette-crimson-700);
 
-    /* Typography */
-    --golem-font-display: 'Source Serif 4', Georgia, serif;
-    --golem-font-body: 'Source Serif 4', Georgia, serif;
-    --golem-font-ui: 'Source Sans 3', system-ui, -apple-system, sans-serif;
-    --golem-font-mono: 'Source Code Pro', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    /* Left-Rail Hierarchy (Principle 3: Structural Containment) */
+    --border-rail:        var(--border-color);
+    --border-rail-active: var(--color-primary);
+    --rail-indent:        1.25rem;
 
-    /* Sub-perceptible paper grain texture */
-    --golem-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+    /* ----------------------------------------------------------------------
+       3. COMPONENT TOKENS
+       ---------------------------------------------------------------------- */
+
+    /* Principle 2: Dual Coding - Symbol Kind Color Pairs (Light Theme) */
+    /* C: Class / Struct (Blue) */
+    --color-symbol-c:         var(--palette-blue-600);
+    --bg-symbol-c:            var(--palette-blue-50);
+    --color-symbol-class:     var(--color-symbol-c);
+    --bg-symbol-class:        var(--bg-symbol-c);
+    --color-symbol-class-bg:  var(--bg-symbol-c);
+
+    /* M: Method / Member Function (Purple) */
+    --color-symbol-m:          var(--palette-purple-600);
+    --bg-symbol-m:             var(--palette-purple-50);
+    --color-symbol-method:     var(--color-symbol-m);
+    --bg-symbol-method:        var(--bg-symbol-m);
+    --color-symbol-method-bg:  var(--bg-symbol-m);
+
+    /* F: Function / Free Function (Amber) */
+    --color-symbol-f:            var(--palette-amber-800);
+    --bg-symbol-f:               var(--palette-amber-50);
+    --color-symbol-function:     var(--color-symbol-f);
+    --bg-symbol-function:        var(--bg-symbol-f);
+    --color-symbol-function-bg:  var(--bg-symbol-f);
+
+    /* I: Interface / Trait (Emerald) */
+    --color-symbol-i:             var(--palette-emerald-700);
+    --bg-symbol-i:                var(--palette-emerald-50);
+    --color-symbol-interface:     var(--color-symbol-i);
+    --bg-symbol-interface:        var(--bg-symbol-i);
+    --color-symbol-interface-bg:  var(--bg-symbol-i);
+
+    /* T: Type / TypeAlias / Enum (Cyan) */
+    --color-symbol-t:        var(--palette-cyan-700);
+    --bg-symbol-t:           var(--palette-cyan-50);
+    --color-symbol-type:     var(--color-symbol-t);
+    --bg-symbol-type:        var(--bg-symbol-t);
+    --color-symbol-type-bg:  var(--bg-symbol-t);
+
+    /* X: Exception (Red) */
+    --color-symbol-x:             var(--palette-red-700);
+    --bg-symbol-x:                var(--palette-red-50);
+    --color-symbol-exception:     var(--color-symbol-x);
+    --bg-symbol-exception:        var(--bg-symbol-x);
+    --color-symbol-exception-bg:  var(--bg-symbol-x);
+
+    /* V: Variable / Constant / Attribute (Slate) */
+    --color-symbol-v:            var(--palette-slate-600);
+    --bg-symbol-v:               var(--palette-slate-100);
+    --color-symbol-variable:     var(--color-symbol-v);
+    --bg-symbol-variable:        var(--bg-symbol-v);
+    --color-symbol-variable-bg:  var(--bg-symbol-v);
+    --color-symbol-constant:     var(--color-symbol-v);
+    --bg-symbol-constant:        var(--bg-symbol-v);
+    --color-symbol-constant-bg:  var(--bg-symbol-v);
+
+    /* Legacy Golem Token Aliases (Complete Backward Compatibility) */
+    --golem-bg:           var(--bg-canvas);
+    --golem-surface:      var(--bg-surface);
+    --golem-code-bg:      var(--bg-code);
+    --golem-text:         var(--color-text);
+    --golem-text-muted:   var(--color-text-muted);
+    --golem-primary:      var(--color-primary);
+    --golem-primary-hover:var(--color-primary-hover);
+    --golem-border:       var(--border-color);
+    --golem-link:         var(--color-link);
+    --golem-link-visited: var(--color-link-visited);
+    --golem-link-hover:   var(--color-link-hover);
+
+    --golem-note:      var(--color-note);
+    --golem-tip:       var(--color-tip);
+    --golem-important: var(--color-important);
+    --golem-warning:   var(--color-warning);
+    --golem-caution:   var(--color-caution);
+
+    --golem-font-display: var(--font-display);
+    --golem-font-body:    var(--font-body);
+    --golem-font-ui:      var(--font-ui);
+    --golem-font-mono:    var(--font-mono);
+
+    --golem-texture: var(--texture-paper);
+}
+
+/* Explicit Light Theme Switch (matches when data-theme="light" is set on html or root) */
+[data-theme="light"] {
+    --bg-canvas:          var(--palette-neutral-50);
+    --bg-surface:         var(--palette-neutral-100);
+    --bg-surface-subtle:  var(--palette-neutral-50);
+    --bg-surface-muted:   var(--palette-neutral-200);
+    --bg-surface-elevated:var(--palette-white);
+    --bg-card:            var(--palette-neutral-100);
+    --bg-code:            var(--palette-neutral-200);
+
+    --color-text:         var(--palette-neutral-800);
+    --color-text-primary: var(--palette-neutral-800);
+    --color-text-secondary:var(--palette-neutral-700);
+    --color-text-muted:   var(--palette-neutral-600);
+    --color-text-inverse: var(--palette-white);
+    --color-text-code:    var(--palette-neutral-800);
+
+    --color-primary:      var(--palette-clay-700);
+    --color-primary-hover:var(--palette-clay-800);
+    --color-primary-subtle:var(--palette-clay-100);
+    --color-link:         var(--palette-clay-700);
+    --color-link-hover:   var(--palette-clay-800);
+    --color-link-visited: var(--palette-clay-900);
+
+    --border-color:       var(--palette-neutral-300);
+    --border-subtle:      var(--palette-neutral-200);
+    --border-focus:       var(--palette-clay-700);
+
+    --border-rail:        var(--border-color);
+    --border-rail-active: var(--color-primary);
+
+    --color-note:      var(--palette-teal-700);
+    --color-tip:       var(--palette-olive-700);
+    --color-important: var(--palette-clay-700);
+    --color-warning:   var(--palette-yellow-700);
+    --color-caution:   var(--palette-crimson-700);
+
+    --texture-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+    --golem-texture: var(--texture-paper);
+}
+
+/* ==========================================================================
+   Dark Theme Rules (Explicit [data-theme="dark"] & System Media Query)
+   ========================================================================== */
+
+[data-theme="dark"] {
+    --bg-canvas:          #170f0b;
+    --bg-surface:         #1e1410;
+    --bg-surface-subtle:  #170f0b;
+    --bg-surface-muted:   #2a1e17;
+    --bg-surface-elevated:#2a1e17;
+    --bg-card:            #1e1410;
+    --bg-code:            #2a1e17;
+
+    --color-text:         #f0e4d8;
+    --color-text-primary: #f0e4d8;
+    --color-text-secondary:#cbd5e1;
+    --color-text-muted:   #9a7a68;
+    --color-text-inverse: #1e1a16;
+    --color-text-code:    #f1f5f9;
+
+    --color-primary:        #d4692a;
+    --color-primary-hover:  #e07a3a;
+    --color-primary-subtle: #451a03;
+    --color-link:           #d4692a;
+    --color-link-hover:     #e07a3a;
+    --color-link-visited:   #8a4c32;
+
+    --border-color:   #3d2a20;
+    --border-subtle:  #2a1e17;
+    --border-focus:   #d4692a;
+
+    --border-rail:        #3d2a20;
+    --border-rail-active: #d4692a;
+
+    --color-note:      #4a9a8a;
+    --color-tip:       #7aaa3a;
+    --color-important: #d4692a;
+    --color-warning:   #d4a020;
+    --color-caution:   #c04040;
+
+    /* Symbol Kind Badges (Dark Mode: Translucent bg + Vibrant tint) */
+    --color-symbol-c:         #60a5fa;
+    --bg-symbol-c:            #1e3a8a44;
+    --color-symbol-class:     var(--color-symbol-c);
+    --bg-symbol-class:        var(--bg-symbol-c);
+    --color-symbol-class-bg:  var(--bg-symbol-c);
+
+    --color-symbol-m:          #a78bfa;
+    --bg-symbol-m:             #4c1d9544;
+    --color-symbol-method:     var(--color-symbol-m);
+    --bg-symbol-method:        var(--bg-symbol-m);
+    --color-symbol-method-bg:  var(--bg-symbol-m);
+
+    --color-symbol-f:            #fbbf24;
+    --bg-symbol-f:               #78350f44;
+    --color-symbol-function:     var(--color-symbol-f);
+    --bg-symbol-function:        var(--bg-symbol-f);
+    --color-symbol-function-bg:  var(--bg-symbol-f);
+
+    --color-symbol-i:             #34d399;
+    --bg-symbol-i:                #064e3b44;
+    --color-symbol-interface:     var(--color-symbol-i);
+    --bg-symbol-interface:        var(--bg-symbol-i);
+    --color-symbol-interface-bg:  var(--bg-symbol-i);
+
+    --color-symbol-t:        #22d3ee;
+    --bg-symbol-t:           #164e6344;
+    --color-symbol-type:     var(--color-symbol-t);
+    --bg-symbol-type:        var(--bg-symbol-t);
+    --color-symbol-type-bg:  var(--bg-symbol-t);
+
+    --color-symbol-x:             #f87171;
+    --bg-symbol-x:                #7f1d1d44;
+    --color-symbol-exception:     var(--color-symbol-x);
+    --bg-symbol-exception:        var(--bg-symbol-x);
+    --color-symbol-exception-bg:  var(--bg-symbol-x);
+
+    --color-symbol-v:            #94a3b8;
+    --bg-symbol-v:               #33415544;
+    --color-symbol-variable:     var(--color-symbol-v);
+    --bg-symbol-variable:        var(--bg-symbol-v);
+    --color-symbol-variable-bg:  var(--bg-symbol-v);
+    --color-symbol-constant:     var(--color-symbol-v);
+    --bg-symbol-constant:        var(--bg-symbol-v);
+    --color-symbol-constant-bg:  var(--bg-symbol-v);
+
+    --texture-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+    --golem-texture: var(--texture-paper);
 }
 
 @media (prefers-color-scheme: dark) {
-    :root {
-        --golem-bg: #170f0b;
-        --golem-surface: #1e1410;
-        --golem-code-bg: #2a1e17;
-        --golem-text: #f0e4d8;
-        --golem-text-muted: #9a7a68;
-        --golem-primary: #d4692a;
-        --golem-primary-hover: #e07a3a;
-        --golem-border: #3d2a20;
-        --golem-link: #d4692a;
-        --golem-link-visited: #8a4c32;
-        --golem-link-hover: #e07a3a;
+    :root:not([data-theme="light"]) {
+        --bg-canvas:          #170f0b;
+        --bg-surface:         #1e1410;
+        --bg-surface-subtle:  #170f0b;
+        --bg-surface-muted:   #2a1e17;
+        --bg-surface-elevated:#2a1e17;
+        --bg-card:            #1e1410;
+        --bg-code:            #2a1e17;
 
-        --golem-note: #4a9a8a;
-        --golem-tip: #7aaa3a;
-        --golem-important: #d4692a;
-        --golem-warning: #d4a020;
-        --golem-caution: #c04040;
+        --color-text:         #f0e4d8;
+        --color-text-primary: #f0e4d8;
+        --color-text-secondary:#cbd5e1;
+        --color-text-muted:   #9a7a68;
+        --color-text-inverse: #1e1a16;
+        --color-text-code:    #f1f5f9;
 
-        --golem-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+        --color-primary:        #d4692a;
+        --color-primary-hover:  #e07a3a;
+        --color-primary-subtle: #451a03;
+        --color-link:           #d4692a;
+        --color-link-hover:     #e07a3a;
+        --color-link-visited:   #8a4c32;
+
+        --border-color:   #3d2a20;
+        --border-subtle:  #2a1e17;
+        --border-focus:   #d4692a;
+
+        --border-rail:        #3d2a20;
+        --border-rail-active: #d4692a;
+
+        --color-note:      #4a9a8a;
+        --color-tip:       #7aaa3a;
+        --color-important: #d4692a;
+        --color-warning:   #d4a020;
+        --color-caution:   #c04040;
+
+        /* Symbol Kind Badges (Dark Mode: Translucent bg + Vibrant tint) */
+        --color-symbol-c:         #60a5fa;
+        --bg-symbol-c:            #1e3a8a44;
+        --color-symbol-class:     var(--color-symbol-c);
+        --bg-symbol-class:        var(--bg-symbol-c);
+        --color-symbol-class-bg:  var(--bg-symbol-c);
+
+        --color-symbol-m:          #a78bfa;
+        --bg-symbol-m:             #4c1d9544;
+        --color-symbol-method:     var(--color-symbol-m);
+        --bg-symbol-method:        var(--bg-symbol-m);
+        --color-symbol-method-bg:  var(--bg-symbol-m);
+
+        --color-symbol-f:            #fbbf24;
+        --bg-symbol-f:               #78350f44;
+        --color-symbol-function:     var(--color-symbol-f);
+        --bg-symbol-function:        var(--bg-symbol-f);
+        --color-symbol-function-bg:  var(--bg-symbol-f);
+
+        --color-symbol-i:             #34d399;
+        --bg-symbol-i:                #064e3b44;
+        --color-symbol-interface:     var(--color-symbol-i);
+        --bg-symbol-interface:        var(--bg-symbol-i);
+        --color-symbol-interface-bg:  var(--bg-symbol-i);
+
+        --color-symbol-t:        #22d3ee;
+        --bg-symbol-t:           #164e6344;
+        --color-symbol-type:     var(--color-symbol-t);
+        --bg-symbol-type:        var(--bg-symbol-t);
+        --color-symbol-type-bg:  var(--bg-symbol-t);
+
+        --color-symbol-x:             #f87171;
+        --bg-symbol-x:                #7f1d1d44;
+        --color-symbol-exception:     var(--color-symbol-x);
+        --bg-symbol-exception:        var(--bg-symbol-x);
+        --color-symbol-exception-bg:  var(--bg-symbol-x);
+
+        --color-symbol-v:            #94a3b8;
+        --bg-symbol-v:               #33415544;
+        --color-symbol-variable:     var(--color-symbol-v);
+        --bg-symbol-variable:        var(--bg-symbol-v);
+        --color-symbol-variable-bg:  var(--bg-symbol-v);
+        --color-symbol-constant:     var(--color-symbol-v);
+        --bg-symbol-constant:        var(--bg-symbol-v);
+        --color-symbol-constant-bg:  var(--bg-symbol-v);
+
+        --texture-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+        --golem-texture: var(--texture-paper);
     }
 }
 
@@ -114,14 +531,14 @@ body {
     left: 1rem;
     z-index: 1000;
     padding: 0.5rem 1rem;
-    background: var(--golem-primary);
-    color: #ffffff;
-    font-family: var(--golem-font-ui);
+    background: var(--color-primary);
+    color: var(--color-text-inverse);
+    font-family: var(--font-sans);
     font-size: 0.875rem;
     font-weight: 600;
-    border-radius: 0 0 4px 4px;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
     text-decoration: none;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--shadow-md);
 }
 .golem-skip-link:focus {
     top: 0;
@@ -642,10 +1059,10 @@ i.conum {
     justify-content: center;
     width: 1.25em;
     height: 1.25em;
-    border-radius: 50%;
-    background: var(--golem-primary);
-    color: #ffffff;
-    font-family: var(--golem-font-mono);
+    border-radius: var(--radius-full);
+    background: var(--color-primary);
+    color: var(--color-text-inverse);
+    font-family: var(--font-mono);
     font-style: normal;
     font-size: 0.75em;
     font-weight: bold;
@@ -666,6 +1083,44 @@ i.conum b {
     height: 0;
     overflow: hidden;
 }
+
+/* ── Principle 3: Structural Containment (Left-Rail Hierarchy) ── */
+.doc-member {
+    border-left: 2px solid var(--border-rail);
+    padding-left: var(--rail-indent);
+    margin-left: var(--space-xs);
+    transition: border-color 0.15s ease;
+}
+.doc-member:hover, .doc-member:focus-within {
+    border-left-color: var(--border-rail-active);
+}
+
+/* ── Principle 2: Dual Coding (Symbol Kind Badges) ──────── */
+.symbol-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35em;
+    height: 1.35em;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.72em;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    vertical-align: middle;
+    margin-right: var(--space-xs);
+    border: 1px solid currentColor;
+    box-shadow: var(--shadow-sm);
+    user-select: none;
+}
+.glyph-c, .glyph-class     { color: var(--color-symbol-c); background-color: var(--bg-symbol-c); }
+.glyph-m, .glyph-method    { color: var(--color-symbol-m); background-color: var(--bg-symbol-m); }
+.glyph-f, .glyph-function  { color: var(--color-symbol-f); background-color: var(--bg-symbol-f); }
+.glyph-i, .glyph-interface { color: var(--color-symbol-i); background-color: var(--bg-symbol-i); }
+.glyph-t, .glyph-type      { color: var(--color-symbol-t); background-color: var(--bg-symbol-t); }
+.glyph-x, .glyph-exception { color: var(--color-symbol-x); background-color: var(--bg-symbol-x); }
+.glyph-v, .glyph-variable  { color: var(--color-symbol-v); background-color: var(--bg-symbol-v); }
 .colist, ol.colist {
     margin: 1rem 0;
     font-size: 0.95rem;
@@ -937,30 +1392,30 @@ details summary:focus-visible,
 
 /* ── Footer ────────────────────────────────────────── */
 #golem-footer {
-    background: var(--golem-surface);
-    padding: 1.25rem 1.75rem;
-    border-top: 1px solid var(--golem-border);
+    background: var(--bg-surface);
+    padding: var(--space-md) var(--space-lg);
+    border-top: 1px solid var(--border-color);
     text-align: center;
-    font-family: var(--golem-font-ui);
-    font-size: 0.825rem;
-    color: var(--golem-text-muted);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-param);
+    color: var(--color-text-muted);
 }
 #golem-footer p {
     margin: 0;
 }
 .golem-source-links {
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-xs);
 }
 .golem-edit-link {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    color: var(--golem-link);
+    gap: var(--space-xs);
+    color: var(--color-link);
     text-decoration: none;
     font-weight: 500;
 }
 .golem-edit-link:hover {
-    color: var(--golem-link-hover);
+    color: var(--color-link-hover);
     text-decoration: underline;
 }
 .golem-edit-link svg {
@@ -1071,6 +1526,8 @@ details summary:focus-visible,
     *, *::before, *::after {
         transition-duration: 0.01ms !important;
         animation-duration: 0.01ms !important;
+        transition-delay: 0ms !important;
+        animation-iteration-count: 1 !important;
     }
 }
 
