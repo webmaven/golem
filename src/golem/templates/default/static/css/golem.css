@@ -1345,6 +1345,28 @@ details.source-drawer > pre {
     white-space: pre;
     tab-size: 4;
 }
+details.source-drawer .listingblock,
+details.source-drawer .listing-content {
+    background: transparent;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    font-size: 0; /* eliminates whitespace text node height inflation */
+}
+details.source-drawer pre {
+    font-size: var(--font-size-sm);
+    margin: 0;
+    border: none;
+    border-left: none;
+    border-radius: 0;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-code);
+    padding: var(--space-md) 1.25rem;
+}
+details.source-drawer .listingblock pre {
+    border-top: none;
+}
 
 /* ── Code Highlighting Semantic Token Mappings ───── */
 .highlight .k, .highlight .kc, .highlight .kd, .highlight .kn, .highlight .kp, .highlight .kr { color: var(--code-keyword); font-weight: bold; }

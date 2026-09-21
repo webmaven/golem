@@ -89,15 +89,11 @@ According to Principle 3, member methods, attributes, and inner types are groupe
 
   <details class="source-drawer">
     <summary>View Source</summary>
-    <div class="listingblock">
-      <div class="listing-content">
-        <pre class="highlight python"><code class="language-python"><span class="k">class</span><span class="w"> </span><span class="nc">BuildEngine</span><span class="p">:</span>
+    <pre class="highlight python"><code class="language-python"><span class="k">class</span><span class="w"> </span><span class="nc">BuildEngine</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Orchestrates AsciiDoc parsing, template composition, and artifact writing.&quot;&quot;&quot;</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">GolemConfig</span><span class="p">,</span> <span class="n">staleness_tracker</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">StalenessTracker</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">staleness_tracker</span> <span class="o">=</span> <span class="n">staleness_tracker</span> <span class="ow">or</span> <span class="n">StalenessTracker</span><span class="p">(</span><span class="n">config</span><span class="p">)</span></code></pre>
-      </div>
-    </div>
+<span class="k">    def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">GolemConfig</span><span class="p">,</span> <span class="n">staleness_tracker</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">StalenessTracker</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="bp">        self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
+<span class="bp">        self</span><span class="o">.</span><span class="n">staleness_tracker</span> <span class="o">=</span> <span class="n">staleness_tracker</span> <span class="ow">or</span> <span class="n">StalenessTracker</span><span class="p">(</span><span class="n">config</span><span class="p">)</span></code></pre>
   </details>
 
   <!-- Nested Method Member 1 -->
@@ -114,13 +110,9 @@ According to Principle 3, member methods, attributes, and inner types are groupe
 
     <details class="source-drawer">
       <summary>View Source</summary>
-      <div class="listingblock">
-        <div class="listing-content">
-          <pre class="highlight python"><code class="language-python"><span class="k">def</span><span class="w"> </span><span class="nf">compile_all</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+      <pre class="highlight python"><code class="language-python"><span class="k">def</span><span class="w"> </span><span class="nf">compile_all</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
     <span class="n">stale_files</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">staleness_tracker</span><span class="o">.</span><span class="n">get_outdated_files</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">force</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">all_files</span>
     <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">compile_page</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">stale_files</span><span class="p">]</span></code></pre>
-        </div>
-      </div>
     </details>
   </div>
 
@@ -149,9 +141,7 @@ Autodoc signature containers (`.signature-container`) provide monospace, token-h
 
 <details class="source-drawer">
   <summary>View Source Implementation</summary>
-  <div class="listingblock">
-    <div class="listing-content">
-      <pre class="highlight python"><code class="language-python"><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">stream_diagnostics</span><span class="p">(</span>
+  <pre class="highlight python"><code class="language-python"><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">stream_diagnostics</span><span class="p">(</span>
     <span class="n">engine</span><span class="p">:</span> <span class="n">BuildEngine</span><span class="p">,</span>
     <span class="n">channel</span><span class="p">:</span> <span class="n">AsyncIterator</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">30.0</span><span class="p">,</span>
@@ -159,8 +149,6 @@ Autodoc signature containers (`.signature-container`) provide monospace, token-h
     <span class="k">async</span> <span class="k">with</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">timeout</span><span class="p">(</span><span class="n">timeout</span><span class="p">):</span>
         <span class="k">async</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">channel</span><span class="p">:</span>
             <span class="k">yield</span> <span class="n">parse_diagnostic</span><span class="p">(</span><span class="n">line</span><span class="p">)</span></code></pre>
-    </div>
-  </div>
 </details>
 ++++
 
