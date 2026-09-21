@@ -1,0 +1,412 @@
+= Autodocumentation Systems: Cross-Case Comparative Matrix
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[lead]
+This document provides a systematic, cross-case comparative synthesis of the eight studied documentation systems across six core analytical axes, structural layout mechanics, CSS token architectures, and accessibility criteria.
+
+== Systems Under Evaluation
+
+[cols="1,2,2,3", options="header"]
+|===
+| ID | System / Target | Paradigm / Engine | Key Themes / Environments
+| `CASE-01` | *Sphinx + autodoc2* | Python AST static analyzer / Jinja2 / Docutils | Furo theme, definition list stream, Intersphinx.
+| `CASE-02` | *MkDocstrings* | Griffe AST parser / Python-Markdown / MkDocs | Material for MkDocs, left rail hierarchy, CSS pills.
+| `CASE-03` | *Fumadocs* | TypeScript Compiler API / Next.js RSC / MDX | Tailwind CSS, Radix UI popovers, Shiki dual themes.
+| `CASE-04` | *Quartodoc* | Griffe AST parser / Pandoc / Quarto CLI | Page-per-symbol, computational document embedding.
+| `CASE-05` | *TypeDoc* | TypeScript Compiler API AST reflection / HTML emitter | Default dark/light theme, member card containers, symbol color tokens.
+| `CASE-06` | *Rustdoc* | Rust AST / `rustc` compiler / Cargo doc | Docs.rs, Source Serif 4 typography, trait folding toggles.
+| `CASE-07` | *Stripe SDK Docs* | Markdoc AST compiler / React hydration | Synchronized 2-column split (prose vs sticky code).
+| `CASE-08` | *MDN Web Docs* | Yari content engine / WebIDL AST / Markdown | BCD compatibility tables, specification breadcrumbs, instance `<dl>`.
+|===
+
+'''
+
+== Analytical Axis 1: Granularity
+
+How information is chunked into discrete addressable pages, URLs, and DOM anchors.
+
+[cols="1,2,2,2,3", options="header"]
+|===
+| System | Primary URL Unit | Permapermalink Fragment Depth | Page Footprint / Density | Architectural Tradeoffs
+| *Sphinx + autodoc2*
+| Module (`module.html`) or Class
+| Parameter & method level (`#pkg.Mod.fn.param`)
+| High density; entire module in single document
+| *Pro*: Low page hop latency, global browser search (`Ctrl+F`). +
+*Con*: Vertical scrolling fatigue, DOM bloat on large packages.
+
+| *MkDocstrings*
+| Module (`api/module/`)
+| Function, argument, return level (`#pkg.mod.func--arg`)
+| Medium-high density; collapsible inner elements
+| *Pro*: Clean hierarchical hash syntax (`--`). +
+*Con*: Deep hash fragments can become fragile across minor renames.
+
+| *Fumadocs*
+| Hand-authored Page or Component section
+| Heading / Property row level (`#prop-name`)
+| Variable density; embedded components
+| *Pro*: Embeddable anywhere in guides via `<AutoTypeTable />`. +
+*Con*: Lacks automated out-of-the-box whole-package directory mirroring without custom routing.
+
+| *Quartodoc*
+| Symbol (`reference/symbol.html`)
+| Section level within symbol (`#parameters`)
+| Low density; isolated single-function canvas
+| *Pro*: Laser-focused SEO, clutter-free parameter exploration. +
+*Con*: High navigational friction; losing module-level bird's-eye context.
+
+| *TypeDoc*
+| Class / Interface / Module (`classes/Foo.html`)
+| Property & Method level (`#method_name`)
+| Medium density; member index upfront, details below
+| *Pro*: Aligns with OOP mental models. +
+*Con*: Monolithic class pages if class has >50 methods.
+
+| *Rustdoc*
+| Module (`module/index.html`) or Struct (`struct.Foo.html`)
+| Method, variant, trait impl (`#method.run`)
+| Medium-high density; collapsed by default
+| *Pro*: Perfect semantic correspondence with Rust crate namespaces. +
+*Con*: Deep directory trees for complex crate hierarchies.
+
+| *Stripe SDK*
+| Resource (`api/resource?lang=python`)
+| Method endpoint level (`#create_customer`)
+| High density; multi-method scroll rail
+| *Pro*: Complete customer lifecycle visible in one scrolling pane. +
+*Con*: Enormous initial payload and heavy DOM subtree.
+
+| *MDN Web Docs*
+| Interface (`Web/API/Interface`) or Method (`Web/API/Interface/method`)
+| Heading & parameter level (`#syntax`, `#parameters`)
+| Medium density; dedicated sub-pages for complex methods
+| *Pro*: Unrivaled depth per method, precise search index ranking. +
+*Con*: High click-rate to traverse across related interface methods.
+|===
+
+'''
+
+== Analytical Axis 2: Hierarchy Expression
+
+The visual and spatial grammar used to communicate parent-child relationships across namespaces, classes, methods, and parameters.
+
+[cols="1,2,2,3", options="header"]
+|===
+| System | Primary Visual Paradigm | Depth Indicator Mechanics | Structural Weaknesses
+| *Sphinx + autodoc2*
+| Stream of Indented Definition Lists (`<dl>`, `<dt>`, `<dd>`)
+| `margin-left: 1.5rem` on nested `<dd>` elements
+| Deep nesting collapses into unreadable rightward indentation channels on narrow screens.
+
+| *MkDocstrings*
+| Left Rail Container Hierarchy
+| Continuous 25px left border (`border-left: 2px solid var(--md-default-fg-color--lightest)`)
+| Very deep nesting (e.g. Class -> Method -> Parameter -> Typed Dict) crowds out horizontal prose space.
+
+| *Fumadocs*
+| Modular Card / Table Surfaces
+| Self-contained `<div class="rounded-lg border bg-card">` panels
+| Visual relationship between parent class and child method is semantic rather than physical/spatial.
+
+| *Quartodoc*
+| Section Heading Stream (`h2`, `h3`, `h4`)
+| Traditional typographical scale and horizontal divider rules (`<hr>`)
+| Loss of physical encapsulation; boundary between one parameter and another relies purely on typographic hierarchy.
+
+| *TypeDoc*
+| Discrete Member Card Panels (`<section class="tsd-panel">`)
+| Encapsulated container borders with inner collapsible `<details>` blocks
+| Cards can feel disjointed; relationship between overloaded signatures is spread out.
+
+| *Rustdoc*
+| Definition Headers with Inline Collapsible Accordions
+| Indented `.docblock` containers flanked by `[-]` / `[+]` toggle buttons
+| Visual distinction between trait implementations and inherent methods requires careful inspection of divider banners.
+
+| *Stripe SDK*
+| Sticky Multi-Section Sticky Layout
+| Two-column vertical synchrony (`.ApiSection-MainContent` vs `.ApiSection-Aside`)
+| Complete failure on viewports < 1024px; falls back to stacked linear view losing context.
+
+| *MDN Web Docs*
+| Typographic Outlines & Definition Lists
+| Standard `h2` -> `h3` hierarchy combined with `<dl>` description tables
+| Parameters within methods rely on standard bullet lists or `<dl>`, occasionally blurring type signatures with narrative prose.
+|===
+
+'''
+
+== Analytical Axis 3: Within-Level Differentiation
+
+How peer entities at the same hierarchical tier (e.g., classes vs functions vs constants in a module, or properties vs methods in an interface) are distinguished.
+
+[cols="1,2,2,2,1", options="header"]
+|===
+| System | Primary Mechanism | Visual Badges / Glyphs | Color Variable System | Differentiation Efficacy
+| *Sphinx + autodoc2*
+| Plain keyword prefix in signature (`class`, `def`)
+| None (plain text keyword in `dt`)
+| Monochromatic code styling
+| *Low*
+
+| *MkDocstrings*
+| Semantic Pill Badges (`.doc-label`)
+| Text pills (`class`, `module`, `classmethod`, `attribute`)
+| Accent pill tokens (`--md-accent-fg-color`)
+| *High*
+
+| *Fumadocs*
+| Popover badges & parameter tables
+| Monospace pill tags (`string`, `boolean`, `optional`)
+| Radix UI theme tokens (`--badge-secondary`)
+| *Medium-High*
+
+| *Quartodoc*
+| Table classification headers
+| Function table badges
+| Bootstrap / Quarto theme variables
+| *Medium*
+
+| *TypeDoc*
+| Explicit SVG Glyphs + Dedicated Kind Colors
+| 16+ distinct symbol icons (`C`, `I`, `M`, `F`, `T`, `V`)
+| `--color-ts-class`, `--color-ts-interface`, `--color-ts-method`, etc.
+| *Superior*
+
+| *Rustdoc*
+| Crate Index Table Sections
+| Category labels (`Structs`, `Enums`, `Traits`, `Functions`)
+| Red/Yellow/Blue syntax highlights in code blocks
+| *High*
+
+| *Stripe SDK*
+| Method pills and HTTP/SDK verbs
+| Visual badges (`POST`, `GET`, `MUTATION`)
+| `--color-badge-rest`, `--color-accent-stripe`
+| *High*
+
+| *MDN Web Docs*
+| Status icons & baseline badges
+| FontAwesome/SVG glyphs for Experimental, Deprecated, Non-standard
+| MDN category tokens (`--color-status-*`)
+| *Superior*
+|===
+
+'''
+
+== Analytical Axis 4: Detailed Information Layout
+
+The micro-layout of individual symbol descriptions, signatures, parameter tables, and implementation source code.
+
+[cols="1,2,2,2,2", options="header"]
+|===
+| System | Signature Rendering | Parameter Anatomy | Return / Throws Anatomy | Source Code Integration
+| *Sphinx + autodoc2*
+| Single-line `<dt>` codeblock, wraps on overflow
+| Definition list `<dl class="field-list">`
+| Sub-items in field list (`Return type:`, `Raises:`)
+| External link to `_modules/` file or hidden toggle.
+
+| *MkDocstrings*
+| Multi-line highlighted Python signature with AST tokens
+| Grid-aligned parameter lists with name, type, default, doc
+| Dedicated `Returns:` / `Raises:` callout blocks
+| In-situ collapsible drawer (`<details class="mkdocstrings-source">`).
+
+| *Fumadocs*
+| Code block or `<AutoTypeTable />` schema row
+| Tabular grid: Field name, Type badge, Default, Description
+| Collapsible sub-property drawer
+| GitHub permalink badge or source code tab.
+
+| *Quartodoc*
+| Formal signature with AST parameter anchors
+| Parameter list with bold identifier, code type, and doc
+| Structured `Returns` section with live table previews
+| External GitHub source link.
+
+| *TypeDoc*
+| Signature banner with type parameters and generics
+| Hierarchical list: Type parameters, Parameters table, Flags
+| Dedicated `Returns: <type>` block with description
+| Direct GitHub commit permalink line numbers.
+
+| *Rustdoc*
+| Raw Rust syntax block with interactive generic bounds
+| Argument list in signature, doc comments in `.docblock`
+| Explicit `-> ReturnType` with clickable token hyperlinks
+| In-situ expandable `[source]` toggle inline.
+
+| *Stripe SDK*
+| Synced dual-pane (SDK call left, JSON response right)
+| Tiered parameter disclosure ("Child attributes", "More parameters")
+| Complete response schema with expand/collapse JSON tree
+| Hidden; consumer uses published package.
+
+| *MDN Web Docs*
+| Formal WebIDL syntax block followed by JS syntax
+| Parameter list with sub-parameters in nested lists
+| Separate `Return value` and `Exceptions` H2 sections
+| Normative specification links (W3C / WHATWG).
+|===
+
+'''
+
+== Analytical Axis 5: Interlinking & Navigation
+
+Cross-referencing mechanisms between types, base classes, return values, third-party libraries, and external documentation.
+
+[cols="1,2,2,3", options="header"]
+|===
+| System | AST Token Linking | Cross-Library Linking | Navigational Aids (TOC & Rails)
+| *Sphinx + autodoc2*
+| *Atomic*: Every type identifier in `Union[A, B]` is an individual `<a>` tag.
+| Intersphinx (`objects.inv` mapping to Python stdlib & external packages).
+| Right sidebar local page TOC; left sidebar global navigation tree.
+
+| *MkDocstrings*
+| *Atomic*: Griffe AST links all resolved symbols directly to their anchor.
+| Autorefs plugin links across markdown pages and external inv files.
+| Material right-hand TOC rail with active scrollspy highlights.
+
+| *Fumadocs*
+| *Compound*: Types rendered as popovers or linked badges.
+| Manual or project-scoped type routing; TypeScript project references.
+| Sticky Table of Contents, breadcrumbs, search modal (Kbar / Orama).
+
+| *Quartodoc*
+| *Atomic*: Griffe-powered links across package symbols.
+| Inter-package linking via Quarto inventory references.
+| Left-hand sidebar categories; right-hand symbol section navigation.
+
+| *TypeDoc*
+| *Atomic*: Every generic, interface, and property type is an active link.
+| Optional external links via type declaration resolution.
+| Upfront "Index" accordion linking to every member anchor on the page.
+
+| *Rustdoc*
+| *Super-Atomic*: Structs, Traits, Enums, Primitives, Lifetimes hyperlinked.
+| Docs.rs cross-crate links across the entire Cargo ecosystem.
+| Left sidebar listing all Structs/Traits in module; in-page category jumps.
+
+| *Stripe SDK*
+| *Entity-based*: Links to nested resource models and webhook events.
+| SDK links to guides and dashboard settings.
+| Sticky table of contents tracking horizontal/vertical scroll state.
+
+| *MDN Web Docs*
+| *Deep Reference*: Every WebIDL type, dictionary, and interface hyperlinked.
+| Normative spec links directly to WHATWG/W3C anchor lines.
+| Breadcrumb bar, "Related Topics" sidebar, active on-page TOC.
+|===
+
+'''
+
+== Analytical Axis 6: Accessibility (A11y)
+
+Compliance with accessibility standards (WCAG 2.1 AA/AAA), keyboard operability, ARIA attributes, semantic markup, and contrast.
+
+[cols="1,1,2,2,2", options="header"]
+|===
+| System | Semantic Landmarks | Keyboard Operability | ARIA & Screen Readers | Contrast & Motion
+| *Sphinx + autodoc2* (Furo)
+| High (`header`, `nav`, `main`, `aside`)
+| Excellent focus ring styles; skip to content links
+| Proper heading ranks (`h1` -> `h4`); definition lists well-supported
+| WCAG AA compliant light/dark palette; respects `prefers-reduced-motion`.
+
+| *MkDocstrings* (Material)
+| Superior (`header`, `nav`, `main`, `aside`, `footer`)
+| Global keyboard shortcuts (`s` for search, `p`/`n` for pages)
+| Accessible disclosure widgets (`<details>`, `aria-expanded`)
+| High contrast tokens; automated color-contrast checks in CI.
+
+| *Fumadocs*
+| Superior (Radix UI primitives)
+| Full keyboard trap handling in modals, popovers, and tabs
+| Complete ARIA compliance via Radix headless components
+| Tailwind automated contrast; fluid animations with reduced-motion fallbacks.
+
+| *Quartodoc*
+| High (Pandoc/Bootstrap)
+| Standard browser tab navigation; skip link support
+| Semantic table markup (`th`, `td`, `scope="col"`)
+| Bootstrap standard contrast; customizable Sass themes.
+
+| *TypeDoc*
+| Medium-High
+| Keyboard shortcut search (`Ctrl+K`); tab traversal through members
+| Uses `<details>` and `role="region"`; accessible member accordions
+| Crisp dark/light themes meeting WCAG AA ratio (4.5:1 minimum).
+
+| *Rustdoc*
+| High
+| Extensive native single-key shortcuts (`S` focus search, `?` help modal, `+`/`-` expand all)
+| Pure semantic HTML (`nav`, `section`, `details`, `summary`)
+| High contrast Ayush, Light, and Dark themes; zero motion dependency.
+
+| *Stripe SDK*
+| Medium
+| Complex focus management between split left/right panes
+| Heavy `aria-live` regions for code tab switching and copy buttons
+| Stripe high-contrast branding; subtle hover transitions.
+
+| *MDN Web Docs*
+| Superior
+| Full keyboard navigation; skip links; accessible baseline tables
+| Fully audited ARIA landmark roles; screen-reader tested BCD tables
+| Strict WCAG AAA compliance on core text; high-contrast borders.
+|===
+
+'''
+
+== Synthesis Matrix: Design System Architectural Profiles
+
+[cols="2,2,2,2,2", options="header"]
+|===
+| System | Generation Pipeline | Layout Philosophy | Signature UX | Primary A11y Strength
+| *Sphinx + autodoc2*
+| Python AST -> Jinja2 -> Markdown/RST -> HTML
+| Monolithic Stream
+| Monochromatic Text
+| Robust `<dl>` semantics
+| *MkDocstrings*
+| Python AST (Griffe) -> Markdown -> HTML
+| Nested Border Rail
+| Multi-line Tokenized AST
+| Accessible `<details>` drawers
+| *Fumadocs*
+| TS AST -> React Server Components -> DOM
+| Modular Component Cards
+| Interactive Type Popovers
+| Radix UI Headless A11y
+| *Quartodoc*
+| Python AST (Griffe) -> Pandoc AST -> HTML
+| Page-Per-Symbol Canvas
+| Clean Computational Table
+| Tabular Data Semantics
+| *TypeDoc*
+| TS AST -> Custom Reflection -> HTML
+| OOP Member Card Grid
+| Upfront Member Index + Glyphs
+| Color + Shape Dual Coding
+| *Rustdoc*
+| Rust AST (rustc) -> In-tree Emitter -> HTML
+| Collapsible Trait Stream
+| In-situ `[-]` / `[+]` Folding
+| Native Keyboard Shortcuts
+| *Stripe SDK*
+| Markdoc -> React Hydration -> DOM
+| 2-Column Split Synchrony
+| Synchronized Aside Playground
+| Dynamic State Announcements
+| *MDN Web Docs*
+| WebIDL + Yari -> React/SSR -> HTML
+| Reference Specification
+| Baseline Engine Support Matrix
+| WCAG AAA High Contrast
+|===

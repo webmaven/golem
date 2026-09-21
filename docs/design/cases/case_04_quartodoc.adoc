@@ -1,0 +1,190 @@
+= System Deconstruction: Quartodoc
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: highlight.js
+
+== Metadata
+
+[horizontal]
+System Name:: Quartodoc (Quarto Python / R Autodoc Generator)
+Category:: Computational Document Autodoc Pipeline (Static QMD -> Pandoc / Bootstrap)
+Target Ecosystem:: Python / R (Griffe AST + Quarto Markdown `.qmd` engine)
+Underlying Engine:: `Griffe` (AST docstring parser) + Quarto CLI + Pandoc + Bootstrap 5
+Evaluation Date:: 2026-09-06
+
+.Representative Target URLs Evaluated
+* *Reference Index Page*: `https://posit-dev.github.io/great-tables/reference/`
+* *Class Specification Page*: `https://posit-dev.github.io/great-tables/reference/GT.html`
+* *Sub-component Helper Specification*: `https://posit-dev.github.io/great-tables/reference/style.text.html`
+
+---
+
+== Design Tokens & Visual Grammar
+
+=== Typography Scale & Pairing
+[horizontal]
+Body Font Stack:: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif` (`font-sans`)
+Code Font Stack:: `SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`
+Base Font Size & Line Height:: `1rem` (16px) with `1.5` body line-height; headings use Bootstrap 5 modular scales (`h1` at `2.25rem`, `h2` at `1.5rem`, `h3` at `1.25rem`).
+Parameter Annotations:: Monospace parameter names with muted color colon separators (`.doc-parameter-annotation-sep`).
+
+=== Color Palette & Semantic Assignment (Bootstrap 5 + Quarto Light)
+[cols="1,2,2,3", options="header"]
+|===
+| Role | Token / Variable | Hex / HSL | Usage Context
+| Background Canvas | `$body-bg` | `#ffffff` | Viewport and main prose background
+| Surface / Code Container | `.sourceCode` | `#f8f9fa` | Preformatted Python signature box
+| Border Rules | `$border-color` | `#dee2e6` | Sidebar borders, definition separators
+| Text Primary | `$body-color` | `#212529` | Headings, parameter names, body text
+| Muted Foreground | `$text-muted` | `#6c757d` | Secondary notes, default value tags, parameter annotations
+| Brand / Interactive | `$link-color` | `#0d6efd` / `#224b8f` (Posit blue) | Breadcrumbs, parameter type hyperlinks
+| Badge (Class / Kind) | `.doc-label-class` | `#212529` (dark title) | Heading label distinguishing Class from Function
+|===
+
+=== Spacing & Layout Rhythm
+[horizontal]
+Content Container Max Width:: Fluid with Bootstrap container (`max-width: 1320px`), centered layout.
+Sidebar Width:: Left hierarchical nav: `280px` (`.quarto-sidebar`); sticky right TOC: `220px`.
+Vertical Spacing:: Generous academic publishing rhythm (`margin-bottom: 1.5rem` between sections).
+
+---
+
+== 1. Granularity
+
+=== Smallest Unit of Documentation
+Quartodoc takes an **opinionated page-per-symbol approach**:
+* **Page-per-Function / Page-per-Class**: Every public class and method typically receives its own dedicated `.html` file (e.g. `GT.html`, `GT.tab_header.html`, `GT.fmt_number.html`).
+* **Deep Permalinking**: Within a symbol's page, every parameter row receives an anchor tag (`#parameters`, `#returns`, `#examples`).
+* **Executable Output**: Unlike purely textual autodocs, Quartodoc compiles live code cells, displaying both Python source input and rendered HTML/SVG table outputs.
+
+=== Granularity Analysis
+[horizontal]
+URL Scheme:: Clean REST-like slug paths (`/reference/GT.html`, `/reference/GT.tab_header.html`).
+Overload Handling:: Groups overloads into sequential signature blocks before parameter definitions.
+Docstring Grammar:: Optimized for **numpydoc** and **Google docstring** standards; parses `Parameters`, `Returns`, `Raises`, and `Examples` into structured semantic HTML sections.
+Inline vs Linked Types:: Complex Python union types (`str | None`, `bool = True`) parse into structured spans (`.doc-parameter-annotation`, `.doc-parameter-default`).
+
+---
+
+== 2. Hierarchy Expression
+
+=== Multi-Tier Structural Mapping
+Quartodoc balances **granular individual pages** with a **curated multi-level sidebar tree**:
+
+[cols="1,2,2", options="header"]
+|===
+| Level Transition | Visual Mechanism | Design Tokens Involved
+| Package -> Topical Section | Sidebar accordion sections (`Table Creation`, `Major structural table parts`, `Formatting column data`). | `.sidebar-item-section`, `show`
+| Section -> Symbol Page | Dedicated page entry in the sidebar; active page highlighted with bold font and accent bar. | `.sidebar-link.active`, `$link-color`
+| Page -> Parameters List | Dedicated `<section id="parameters">` with semantic `<dl>` description list. | `.doc-parameters`, `.doc-definition-items`
+| Parameter -> Description | Monospace parameter name + type annotation separator + indented `<dd>` definition prose. | `span.doc-parameter-name`, `span.doc-parameter-annotation`
+|===
+
+=== Spatial & Navigational Encodings
+* *Sidebar Navigation*: Organized not strictly by raw AST folder structure, but by **curated functional domain** (e.g. "Table Creation", "Formatting", "Styling").
+* *Secondary Nav Breadcrumbs*: A dedicated mobile/tablet sub-header (`<nav class="quarto-secondary-nav">`) shows `API / GT` with a toggle button for the sidebar drawer.
+* *In-Page Anchors*: Floating right TOC (`#parameters`, `#returns`, `#examples`) provides one-click scrolling.
+
+---
+
+== 3. Within-Level Differentiation
+
+=== Sibling Entity Disambiguation
+On index and overview pages where multiple symbol kinds coexist:
+
+[horizontal]
+Grouping Strategy:: **Sectional Curation**: Symbols are not dumped alphabetically into a single list; they are arranged into thematic categories with descriptive section subheadings.
+Kind Identifiers::
+* `.doc-signature.doc-Kind.CLASS` vs `.doc-signature.doc-Kind.FUNCTION` CSS markers.
+* Signature styling differences: Class signatures emphasize the constructor `GT(...)` while functions emphasize method invocation.
+Typographic Treatment::
+* Parameter names in `.doc-parameter-name` use bold monospace.
+* Types in `.doc-parameter-annotation` use syntax-colored typography.
+* Default values use an explicit `.doc-parameter-default` wrapper.
+
+[cols="1,1,2,2", options="header"]
+|===
+| Symbol Kind | Icon / Glyph | Badge Style / Color | Visual Distinction Mechanism
+| Class | None | `.doc-label-class` | Dedicated constructor signature + method list in sidebar
+| Method / Function | None | None (implicit by parens) | Function signature with parameters + return annotation
+| Helper Function | None | Grouped under sub-category | Separate reference entry under styling/formatting
+| Constant / Data | Dataset icon | Table output preview | Renders interactive preview table in Examples section
+|===
+
+---
+
+== 4. Detail Layout (Symbol Anatomy)
+
+=== Single Symbol Information Architecture
+Order of elements within a Quartodoc symbol page:
+1. **Title Header**: Symbol name (`GT`) with `.doc-object-name.doc-class` styling.
+2. **Subject Summary**: A one-line introductory summary ("Create a Great Tables object.").
+3. **Usage / Source Link**: "Usage" label with a direct GitHub commit/line link (`Source` -> `gt.py#L227-L618`).
+4. **Signature Code Container**: Full multi-line Python signature formatted inside syntax-highlighted code block.
+5. **Detailed Overview Prose**: Extended narrative paragraphs explaining conceptual usage and workflow.
+6. **Parameters Section**: Semantic `<dl>` list detailing every parameter name, type annotation, default value, and description.
+7. **Returns Section**: Return type specification with linked class reference (`Returns: GT`).
+8. **Executable Examples Section**: Real Python code executed during documentation build, displaying both input code and actual rendered interactive output.
+
+=== Layout Mechanics
+[horizontal]
+Parameter Representation:: Structured description list (`<dl>`, `<dt>`, `<dd>`) with distinct CSS spans for parameter name, separator, type annotation, and default value.
+Collapsible Elements:: Non-essential details (like source code or large data frames) can use Quarto code-folding tabs.
+Signature Wrapping & Formatting:: Clean multi-line indentation matching Python PEP 8 formatting.
+Source Code Integration:: Direct hyperlink to exact GitHub line range (`gt.py#L227-L618`) opening in new tab.
+
+---
+
+== 5. Interlinking & Navigation
+
+=== Cross-Reference Anatomy
+[horizontal]
+Type Linking Precision:: Interlinks related functions and classes within prose and return blocks (e.g. `<a href="GT.html" class="gdls-link gdls-code">GT</a>`).
+Cross-Page Navigation:: Previous / Next pagination links at page footer guiding users through sequential API topics.
+In-Page TOC:: High-precision right floating sidebar with active scroll-spy.
+Global Search:: Quarto search bar supporting modal overlay with keyboard shortcuts (`/`, `f`, `s`).
+
+---
+
+== 6. Accessibility (A11y) Audit
+
+=== Semantic Landmarks & Document Structure
+[horizontal]
+HTML5 Landmark Roles:: Uses `<header id="quarto-header">`, `<nav id="quarto-sidebar">`, `<main class="content" id="quarto-document-content">`.
+Heading Hierarchy Integrity:: Strict compliance: `<h1>` (Symbol Title) -> `<h2>` (Parameters, Returns, Examples). Anchor IDs correspond directly to heading text.
+Interactive Accessibility:: Lightbox annotations and table scrollbars include keyboard accessibility attributes.
+
+=== Keyboard & Focus Management
+[horizontal]
+Visible Focus Rings:: Default Bootstrap 5 focus outlines with blue ring on active controls.
+Keyboard Navigation:: Search shortcut bound to `/`, `f`, and `s`. Sidebar collapsible items support keyboard enter/space toggling.
+Screen Reader Cleanliness:: Clean HTML structure without nested div soup; screen readers announce sections and parameter lists predictably.
+
+=== Visual & Contrast Compliance
+[cols="1,2,2", options="header"]
+|===
+| Element | Measured Contrast Ratio | WCAG AA Status
+| Body Text on Canvas (`#212529` on `#ffffff`) | 15.6:1 | PASS (AAA)
+| Muted Text (`#6c757d` on `#ffffff`) | 4.68:1 | PASS (AA)
+| Parameter Name Identifier | 15.6:1 (Bold) | PASS (AAA)
+| Primary Link Accent (`#0d6efd`) | 4.56:1 | PASS (AA)
+|===
+
+---
+
+== Unique Innovations & Failure Modes
+
+=== Standout Design Innovations
+* **Computational Autodocumentation**: Because Quartodoc compiles via Quarto, example blocks are not dead static code snippets; they are live, executed computations displaying rich visual outputs (HTML tables, plots, widgets).
+* **Thematic Curation over Raw AST**: Breaks free from the mechanical folder dump common in Python autodocs by organizing reference docs into logical cognitive domains (`Table Creation`, `Formatting`, `Styling`).
+* **Granular Deep Linking**: Dedicating individual pages to major methods and classes makes URLs clean, shareable, and indexable for search engines.
+
+=== Critical Anti-Patterns / Friction Points
+* **Navigation Fragmentation**: Splitting every method into its own page means users cannot easily scan all methods of a class on a single page without jumping across 15 separate URLs.
+* **Build Overhead**: Executing live Python code blocks during documentation generation increases CI/CD documentation build times significantly compared to pure AST parsers.
+
+=== Transferable Principles for Future Autodoc Systems
+1. *The Live Execution Principle*: Documentation for libraries that produce visual artifacts (dataframes, tables, charts, UI) must embed live rendered results, not just code text.
+2. *Domain Curation Principle*: Organize API references by user workflow stages rather than strict underlying file system module hierarchies.
+3. *Structured Parameter Spans*: Separate parameter names, annotations, and defaults into discrete CSS classes to enable granular styling and responsive wrapping.

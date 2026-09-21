@@ -1,0 +1,5 @@
+{
+  "summary": "Analysis of the frontier gaps between hand-curated documentation systems (Stripe SDK, MDN Web Docs) and static autodoc engines (Sphinx, MkDocstrings, Fumadocs, Quartodoc, TypeDoc, Rustdoc).",
+  "updatedAt": "2026-09-07T00:16:21.539522Z",
+  "userFacing": true
+}

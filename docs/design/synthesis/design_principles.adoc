@@ -1,0 +1,189 @@
+= Design Principles for Next-Generation Autodocumentation Systems
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[lead]
+This document distills the empirical findings from our eight case studies into seven core design principles and actionable implementation rules for building or configuring state-of-the-art automated code documentation systems.
+
+== Principle 1: Progressive Disclosure Over Exhaustive Flattening
+
+[quote]
+"Show what is essential to invoke the symbol correctly; fold what is required only for edge-case configuration."
+
+=== The Rule
+Never dump unweighted parameter lists in flat alphabetical or declaration order. API references must distinguish between *Primary (Essential)* parameters and *Secondary (Advanced / Edge-case)* parameters.
+
+=== Design Specifications
+1. **Tier 1 (Always Visible)**:
+   * Positional arguments without default values.
+   * Required keyword arguments (e.g. `kwarg: type = ...`).
+   * Core execution callbacks.
+2. **Tier 2 (Folded Under Disclosure Widget)**:
+   * Keyword arguments with defaults.
+   * Universal runtime options (e.g. `timeout`, `retry_policy`, `headers`, `context`).
+   * Internal telemetry or debug flags.
+3. **Markup & Mechanics**:
+   * Use native semantic HTML `<details>` or Radix UI Accordion components with accessible `aria-expanded` and `aria-controls` bindings.
+   * Label the drawer clearly: `"Show 12 optional parameters..."` with count indicators.
+
+'''
+
+== Principle 2: Multi-Dimensional Visual Differentiation (Dual Coding)
+
+[quote]
+"Never force the reader to read words when a color, badge, or glyph can convey the symbol kind pre-attentively."
+
+=== The Rule
+Distinguish symbol categories within the same hierarchy tier (classes, methods, functions, types, constants) using *dual coding*: combining recognizable iconography/glyphs with standardized hue categories and textual badges.
+
+=== Design Specifications
+1. **The TypeDoc + MkDocstrings Hybrid Model**:
+   * *Icon / Glyph*: Distinct geometric badge containing a single bold capital character:
+     - `C` (Class / Struct): Blue/Indigo (`--color-symbol-class`)
+     - `I` (Interface / Trait): Green/Emerald (`--color-symbol-interface`)
+     - `M` (Method / Member Function): Purple/Violet (`--color-symbol-method`)
+     - `F` (Function / Free Function): Amber/Orange (`--color-symbol-function`)
+     - `T` (Type Alias / Enum): Cyan/Teal (`--color-symbol-type`)
+     - `V` (Variable / Constant): Slate/Gray (`--color-symbol-variable`)
+   * *Semantic Modifier Pills*:
+     - Provide pill badges for runtime attributes: `static`, `async`, `abstract`, `deprecated`, `experimental`, `classmethod`.
+     - Use muted neutral borders with distinct text colors (minimum 4.5:1 contrast against background).
+
+'''
+
+== Principle 3: Structural Containment Over Margin Drift
+
+[quote]
+"Indentation alone is an unstable visual anchor. Bounded containers and vertical rails preserve context across all viewports."
+
+=== The Rule
+Abandon deep indentation cascades (like classic Sphinx `<dd>` margin-left stacking). Replace them with bounded container cards or a persistent left rail that guides the reader's eye vertically.
+
+=== Design Specifications
+1. **The Left Rail Paradigm (MkDocstrings Pattern)**:
+   * Establish a continuous 2px to 3px left border on child symbol blocks:
++
+[source,css]
+----
+.doc-member {
+  border-left: 2px solid var(--border-subtle);
+  padding-left: 1.25rem;
+  margin-left: 0.5rem;
+  transition: border-color 0.15s ease;
+}
+.doc-member:hover, .doc-member:focus-within {
+  border-left-color: var(--color-accent-primary);
+}
+----
+2. **The Encapsulated Card Paradigm (TypeDoc / Fumadocs Pattern)**:
+   * For top-level exported symbols, enclose each method or constructor in a standalone card container with a subtle border and surface background (`border: 1px solid var(--border); border-radius: 8px;`).
+
+'''
+
+== Principle 4: Atomic AST Token Interlinking
+
+[quote]
+"Every semantic identifier in a rendered type signature must be an individually navigable hyperlink."
+
+=== The Rule
+Signatures should not be rendered as monolithic strings of syntax-highlighted code. The AST reflection pipeline must output discrete hyperlink nodes for every resolvable type identifier.
+
+=== Design Specifications
+1. **Composite Type Disassembly**:
+   * In a complex signature such as:
++
+[source,python]
+----
+async def fetch_records(
+    query: QueryBuilder[UserModel],
+    timeout: Optional[Union[int, float]] = None
+) -> ResultStream[Record]:
+----
+   * The tokens `QueryBuilder`, `UserModel`, `Optional`, `Union`, `int`, `float`, `ResultStream`, and `Record` must each be wrapped in independent `<a>` anchors pointing directly to their canonical definitions.
+2. **External & Cross-Package Resolution**:
+   * Support an inventory interchange format (like Intersphinx `objects.inv` or TypeScript declaration maps) to link built-in primitive types to language documentation and third-party types to their upstream docs.
+
+'''
+
+== Principle 5: In-Situ Inspection Over Disorienting Navigation
+
+[quote]
+"Keep the developer in their reading context. Don't force a full page navigation for an auxiliary type definition."
+
+=== The Rule
+Provide in-situ inspection mechanisms—collapsible code drawers and type popovers—so developers can inspect implementation details and type definitions without losing their scroll position.
+
+=== Design Specifications
+1. **Collapsible Source Drawers (Rustdoc & MkDocstrings Pattern)**:
+   * Place an accessible `[source]` or `[view source]` disclosure toggle immediately adjacent to every method header.
+   * Expand the formatted, syntax-highlighted implementation directly below the docstring inside a styled codeblock drawer.
+2. **Type Definition Popovers (Fumadocs Pattern)**:
+   * On hover or keyboard focus of a complex parameter type, render an accessible popover containing:
+     - The type's kind (interface, enum, type alias).
+     - Its defined properties and short docstrings.
+     - A link to the full canonical documentation page if more details are needed.
+
+'''
+
+== Principle 6: Adaptive Split-Screen Layout for Wide Viewports
+
+[quote]
+"On modern wide monitors, vertical single-column prose is a waste of screen real estate and causes severe eye strain."
+
+=== The Rule
+API references must implement a responsive two-column layout on screens $\ge 1200\text{px}$ (following the Stripe model), pairing prose documentation on the left with sticky, context-synchronized code snippets on the right.
+
+=== Design Specifications
+1. **Grid Architecture**:
++
+[source,css]
+----
+@media (min-width: 1200px) {
+  .api-reference-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 480px);
+    gap: 3rem;
+  }
+  .api-aside {
+    position: sticky;
+    top: 5rem;
+    height: fit-content;
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+  }
+}
+----
+2. **Synchronized Language Tabs**:
+   * The aside pane must host tabbed code examples (curl, Python, TypeScript, Go).
+   * Selecting a language in one block must synchronize across all code blocks throughout the entire documentation site via shared browser state (`localStorage`).
+
+'''
+
+== Principle 7: Universal Accessibility as an Architectural Invariant
+
+[quote]
+"An API reference that is unusable by keyboard or screen reader fails its core mission of universal developer enablement."
+
+=== The Rule
+Accessibility cannot be an afterthought retrofitted via CSS. It must be built into the core AST rendering templates and design tokens.
+
+=== Design Specifications
+1. **Semantic Landmark Roles**:
+   * Wrap the primary layout in proper semantic HTML5 landmarks: `<header>`, `<nav aria-label="Global Navigation">`, `<main id="main-content">`, `<aside aria-label="Table of Contents">`, and `<footer>`.
+   * Provide a visible, keyboard-accessible skip link (`<a href="#main-content" class="skip-link">Skip to main content</a>`).
+2. **Predictable Heading Depth**:
+   * Ensure strict heading hierarchy without skipping levels:
+     - `h1`: Document / Module title.
+     - `h2`: Primary exported symbols (Classes, Functions, Interfaces).
+     - `h3`: Member methods, properties, parameter categories.
+     - `h4`: Nested type attributes or exception variants.
+3. **Keyboard Navigation Shortcuts**:
+   * Implement standard developer shortcuts:
+     - `/` or `s`: Focus global API search input.
+     - `?`: Open keyboard shortcuts reference modal.
+     - `+` / `-` (or `e` / `c`): Expand / collapse all method detail drawers.
+4. **Contrast & Reduced Motion**:
+   * Maintain minimum WCAG 2.1 AA contrast ratio of 4.5:1 for all text and 3:1 for graphical UI elements and badges.
+   * Respect `@media (prefers-reduced-motion: reduce)` by disabling smooth-scrolling animations and accordion transitions.

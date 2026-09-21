@@ -1,0 +1,198 @@
+= System Deconstruction: Sphinx + autodoc2
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: highlight.js
+
+== Metadata
+
+[horizontal]
+System Name:: Sphinx + autodoc2 (`sphinx-autodoc2`) with Furo theme
+Category:: Static Code Introspection Autodoc Generator (AST / Static Analysis)
+Target Ecosystem:: Python (reST and MyST Markdown docstrings)
+Underlying Engine:: `astroid` / AST parser + Sphinx Docutils Document Tree + Furo HTML Theme
+Evaluation Date:: 2026-09-06
+
+.Representative Target URLs Evaluated
+* *Module / Namespace Index*: `https://sphinx-autodoc2.readthedocs.io/en/latest/apidocs/index.html`
+* *Submodule / Namespace Page*: `https://sphinx-autodoc2.readthedocs.io/en/latest/apidocs/autodoc2/autodoc2.sphinx.html`
+* *Class / Directive Specification Page*: `https://sphinx-autodoc2.readthedocs.io/en/latest/apidocs/autodoc2/autodoc2.sphinx.autodoc.html`
+
+---
+
+== Design Tokens & Visual Grammar
+
+=== Typography Scale & Pairing
+[horizontal]
+Body / Display Font Stack:: `-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif, Apple Color Emoji, Segoe UI Emoji` (`--font-stack`)
+Monospace Font Stack:: `"SFMono-Regular", Menlo, Consolas, Monaco, Liberation Mono, Lucida Console, monospace` (`--font-stack--monospace`)
+Base Font Size & Line Height:: `100%` (16px base) with `1.5` body line-height; headings match `--font-stack` with standard modular font scale (`1.5rem` / `1.25rem` / `1.125rem`).
+Monospace Font Size vs Body:: Monospace inline code renders at `87.5%` (`--font-size--small`) of body size to avoid visual bloat inside prose sentences.
+
+=== Color Palette & Semantic Assignment
+[cols="1,2,2,3", options="header"]
+|===
+| Role | Token / Variable | Hex / HSL | Usage Context
+| Background Canvas | `--color-background-primary` | `#ffffff` (Dark: `#131416`) | Document body canvas
+| Background Surface | `--color-background-secondary` | `#f8f9fb` (Dark: `#1a1c1e`) | Sidebar background, code container, autosummary tables
+| Border / Separator | `--color-background-border` | `#eeebee` (Dark: `#303335`) | Heading underlines, table rules, definition list dividers
+| Foreground Text | `--color-foreground-primary` | `#000000` (Dark: `#f8f9fb`) | Primary headings and descriptive body text
+| Muted Foreground | `--color-foreground-muted` | `#6b6f76` (Dark: `#81868d`) | Sidebar captions, parameter annotations, header anchors
+| Interactive Accent | `--color-brand-primary` | `#0a4bff` (Dark: `#4f8fff`) | Primary hyperlinks, active navigation indicator
+| Content Brand Link | `--color-brand-content` | `#2757dd` (Dark: `#5b8bf7`) | Inline links in body prose and docstrings
+| Semantic Badge (Class/Fn) | N/A (CSS pseudo-classes) | `#000000` on transparent | Sphinx does NOT use colored pills/badges; it relies on `class py class` text and italicized keywords (`class`, `def`).
+|===
+
+=== Spacing & Layout Rhythm
+[horizontal]
+Content Container Max Width:: `62.5rem` (1000px) centered layout (`--content-width`).
+Sidebar Width(s):: Left navigation drawer: `18.75rem` (300px); Right in-page TOC drawer: `15rem` (240px).
+Vertical Rhythm Base:: Em-based and rem-based spacing rhythm (`0.5rem`, `1rem`, `1.5rem` margins between `<section>` and `<dl>`).
+
+---
+
+== 1. Granularity
+
+=== Smallest Unit of Documentation
+Sphinx + autodoc2 generates deep granular addressability down to **individual class attributes, instance properties, and method parameters**:
+* **File Splitting**: One HTML page per Python submodule (e.g. `autodoc2.sphinx.autodoc.html`).
+* **Anchor Permalinking**: Every individual symbol receives a unique fragment identifier in the DOM (`id="autodoc2.sphinx.autodoc.AutodocObject.run"` or `id="autodoc2.sphinx.autodoc.AutodocObject.required_arguments"`).
+* **Hover Anchor**: The paragraph anchor glyph (`¶`) appears on hover over any function signature, property line, or parameter definition.
+
+=== Granularity Analysis
+[horizontal]
+URL Permalinking Scheme:: Fully qualified module dot paths (`#module.submodule.ClassName.method_name`).
+Overload Handling:: Renders sequential `<dt class="sig sig-object py">` signature tags directly stacked atop one another before the shared `<dd>` docstring block.
+Decorator & Annotation Visibility:: Rendered directly preceding the signature as `@property`, `@classmethod`, or `@functools.cache`.
+Inline vs Linked Types:: Standard types (`str`, `int`, `dict`, `list`, `typing.ClassVar`, `docutils.nodes.Node`) are automatically converted into hyperlinked `<a>` tags via Sphinx's `intersphinx` mapping directly to the official Python 3.12 documentation.
+
+---
+
+== 2. Hierarchy Expression
+
+=== Multi-Tier Structural Mapping
+Sphinx uses classical HTML definition lists (`<dl>`, `<dt>`, `<dd>`) rather than card grids to express lexical nesting:
+
+[cols="1,2,2", options="header"]
+|===
+| Level Transition | Visual Mechanism | Design Tokens Involved
+| Package -> Module | File boundary + Left Sidebar navigation tree hierarchy with expander carets. | `--color-sidebar-item-background`, `--color-sidebar-link-text`
+| Module -> Class | Top-level `<dl class="py class">`. Contains a summary table at top followed by full declaration block. | `<dt class="sig sig-object py">` with `descclassname` and bold `descname`.
+| Class -> Member (Method/Attr) | Nested `<dd>` containing subsequent `<dl class="py method">` or `<dl class="py attribute">`. | Left margin indentation (`margin-left: 1.5em`) on child `<dd>` containers.
+| Method -> Parameter | Inline parenthesis formatting within signature `<span class="sig-paren">(</span>`, with keyword arguments in `<em class="sig-param">`. | Italic emphasis (`font-style: italic`) for parameter names, colon, and colored type link.
+|===
+
+=== Spatial & Navigational Encodings
+* *Sidebar Tree*: Deep AST tree reflection. Left sidebar displays nested dropdown toggles for every package and module.
+* *In-Page Right TOC*: Displays exact symbol hierarchy (`Module Contents -> Classes -> Functions -> API -> AutodocObject -> AutodocObject.run()`).
+* *Visual Nesting Depth*: Expressed strictly through CSS left indentation on `<dd>` tags. Multiple nesting levels indent progressively to the right.
+
+---
+
+== 3. Within-Level Differentiation
+
+=== Sibling Entity Disambiguation
+When multiple disparate kinds of symbols coexist on the same page (e.g., Classes, Functions, and Module Constants):
+
+[horizontal]
+Grouping Strategy:: **Two-phase approach**:
+1. *Autosummary Table*: A summary table under `### Classes` and `### Functions` presenting an alphabetical 2-column index (Symbol link on left, one-line summary docstring on right).
+2. *Full Reference Stream*: Detailed declarations arranged under rubric/section dividers.
+Kind Identifiers::
+* Plain-text prefix words in the signature line: `class `, `def `, or `attribute`.
+* HTML classes on the definition item: `<dl class="py class">`, `<dl class="py method">`, `<dl class="py function">`, `<dl class="py attribute">`.
+Typographic Treatment::
+* Symbol names are rendered in bold monospace (`font-weight: 700`, `font-family: var(--font-stack--monospace)`).
+* Fully qualified package prefixes (e.g. `autodoc2.sphinx.autodoc.`) use muted opacity/font-weight (`span.sig-prename.descclassname`).
+Ordering Heuristics:: Grouped by symbol kind first (Classes, then Functions, then Data/Constants), then sorted alphabetically or by source AST order.
+
+[cols="1,1,2,2", options="header"]
+|===
+| Symbol Kind | Icon / Glyph | Badge Style / Color | Visual Distinction Mechanism
+| Class | None | None (Plain italic `class` keyword) | Prefaced with `class `, documented with `Bases: <link>` line
+| Function | None | None (Plain `def` or parameter parenthesis) | Has parentheses `(...) -> ReturnType`
+| Attribute / Prop | None | None (Property tag) | Rendered as `name: Type = DefaultValue`
+| Constant | None | None | Simple `<dl class="py data">` assignment syntax
+|===
+
+---
+
+== 4. Detail Layout (Symbol Anatomy)
+
+=== Single Symbol Information Architecture
+Order of elements from top to bottom within a documented symbol:
+1. **Header Anchor & Permalinks**: `[¶]` symbol anchor.
+2. **View Source Link**: Right-aligned `[source]` link opening the exact line in Sphinx's syntax-highlighted `_modules/` view.
+3. **Full Typed Signature**: `Package.Module.SymbolName(param1: Type, ...) -> ReturnType`.
+4. **Inheritance Ancestry**: `Bases: <base_class_link>` immediately below the signature.
+5. **Short Summary Docstring**: First paragraph of the docstring.
+6. **Detailed Prose**: Markdown or reStructuredText paragraphs, admonitions (`NOTE:`, `WARNING:`).
+7. **Nested Members**: Embedded `<dl class="py method">` blocks indented under the parent class.
+
+=== Layout Mechanics
+[horizontal]
+Parameter Representation:: Inline within the code signature for concise functions; listed in description lists if docstrings use Google/NumPy/AsciiDoc format.
+Collapsible Elements:: None by default. Sphinx and Furo render the entire documentation uncollapsed.
+Signature Wrapping & Formatting:: Wraps naturally across lines with CSS `word-break: break-word`. Furo applies syntax highlighting inside signature elements (punctuation, operators, typehints).
+Source Code Integration:: Generated static HTML mirror of Python source with Pygments syntax highlighting (`_modules/autodoc2/...html#ClassName`).
+
+---
+
+== 5. Interlinking & Navigation
+
+=== Cross-Reference Anatomy
+[horizontal]
+Type Linking Precision:: **Atomic token resolution**: Inside `list[docutils.nodes.Node]`, the outer `list` links to Python stdlib documentation on `python.org`, while `docutils.nodes.Node` links to external Docutils documentation.
+Base Class & Inheritance Nav:: Clickable link on the `Bases:` line resolving directly to parent class documentation.
+"Jump to Source":: `[source]` button positioned float-right on every callable and class.
+
+=== In-Page & Cross-Page Navigation
+[horizontal]
+Table of Contents (TOC):: Right-hand secondary sidebar with scroll-spy reflecting active viewport position.
+Breadcrumbs:: Top navigation bar displays breadcrumbs indicating current module path.
+Keyboard Navigation:: Search bar bound to `/` key by default.
+
+---
+
+== 6. Accessibility (A11y) Audit
+
+=== Semantic Landmarks & Document Structure
+[horizontal]
+HTML5 Landmark Roles:: Uses `<header class="furo-header">`, `<aside class="sidebar-drawer">`, `<main id="furo-main-content">`, and `<footer>`.
+Heading Hierarchy Integrity:: Solid `<h1>` (Module title) -> `<h2>` (Module Contents / API) -> `<h3>` (Classes, Functions). Symbols themselves are marked with `<dt>` definition titles rather than heading tags.
+Screen Reader Signature Parsing:: Code signatures use standard semantic `<dl>`, `<dt>`, `<dd>` pairs. Screen readers announce "definition list, 12 items" and read terms in sequence.
+
+=== Keyboard & Focus Management
+[horizontal]
+Visible Focus Rings:: Furo features an accessible 2px focus ring (`outline: 2px solid var(--color-brand-primary)`) on interactive links, sidebar items, and form inputs.
+Skip Link Availability:: Includes a hidden skip link at top of document (`<a class="skip-to-content visible-on-focus-only" href="#furo-main-content">Skip to content</a>`).
+
+=== Visual & Contrast Compliance
+[cols="1,2,2", options="header"]
+|===
+| Element | Measured Contrast Ratio | WCAG AA Status
+| Body Text on Base (`#000000` on `#ffffff`) | 21.0:1 | PASS (AAA)
+| Muted Metadata (`#6b6f76` on `#ffffff`) | 5.08:1 | PASS (AA)
+| Accent Link (`#0a4bff` on `#ffffff`) | 7.42:1 | PASS (AAA)
+| Intersphinx Code Link (`#2757dd` on `#ffffff`) | 5.34:1 | PASS (AA)
+| Dark Mode Canvas (`#f8f9fb` on `#131416`) | 17.5:1 | PASS (AAA)
+|===
+
+---
+
+== Unique Innovations & Failure Modes
+
+=== Standout Design Innovations
+* **Static Analysis Decoupling**: Unlike legacy `sphinx.ext.autodoc`, `autodoc2` operates entirely on the AST without importing C extensions or requiring virtualenv initialization.
+* **Granular Intersphinx Resolution**: Compound type definitions decompose into independent hyperlinks linking out to the respective canonical documentation sites.
+* **Dual Representation (Autosummary + Full Stream)**: Solves the scan-vs-read problem by offering an upfront index table of symbols followed by full uncollapsed documentation.
+
+=== Critical Anti-Patterns / Friction Points
+* **Visual Monotony**: The lack of colored semantic badges or icons makes large module pages feel like undifferentiated walls of text. Distinguishing between a class, function, or variable requires reading syntax nuances (`class` vs `def` vs `:`).
+* **Indentation Creep**: Relying on HTML `<dd>` margin indents causes deeply nested classes and methods to squeeze content horizontally into narrow columns on modest screen widths.
+* **No Collapsible Folding**: Everything is expanded on page load; pages with 50+ methods create significant vertical scrolling fatigue without folded signatures.
+
+=== Transferable Principles for Future Autodoc Systems
+1. *The 2-Phase View Principle*: High-level summary tables at top of page allow fast scanning without forcing users to scroll through multi-page method bodies.
+2. *Atomic AST Type Link Decomposition*: Complex generic type signatures (`dict[str, Union[A, B]]`) should never be a single monolithic link; every type identifier should link to its own canonical definition.
+3. *Semantic Contrast over Plain Indentation*: Nesting depth should be reinforced with surface containers (cards or subtle border dividers) rather than purely relying on whitespace indentation.

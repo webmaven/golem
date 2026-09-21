@@ -583,3 +583,109 @@ def test_extract_listing_views_uses_declared_language():
     assert views[0]["id"] == "source"
     assert views[0]["language"] == "json"
     assert "json" in called_languages
+
+
+def test_semantic_code_tokens_defined_in_root_and_dark():
+    """Verify semantic code tokens (--code-*) are defined across :root and dark mode themes."""
+    css = _read_css()
+    root_tokens = _extract_root_tokens(css)
+    dark_tokens = _extract_dark_tokens(css)
+    media_dark_tokens = _extract_media_dark_tokens(css)
+
+    expected_code_tokens = [
+        "--code-keyword",
+        "--code-function",
+        "--code-type",
+        "--code-class",
+        "--code-string",
+        "--code-number",
+        "--code-comment",
+        "--code-builtin",
+        "--code-operator",
+    ]
+
+    for token in expected_code_tokens:
+        assert token in root_tokens, f":root missing code token: {token}"
+        assert token in dark_tokens, f"[data-theme='dark'] missing code token: {token}"
+        assert token in media_dark_tokens, f"@media (prefers-color-scheme: dark) missing code token: {token}"
+
+    # Verify light theme primitive mappings
+    assert root_tokens["--code-keyword"] == "var(--palette-clay-700)"
+    assert root_tokens["--code-function"] == "var(--palette-clay-700)"
+    assert root_tokens["--code-type"] == "var(--color-symbol-t)"
+    assert root_tokens["--code-class"] == "var(--color-symbol-c)"
+    assert root_tokens["--code-string"] == "var(--color-note)"
+    assert root_tokens["--code-number"] == "var(--color-tip)"
+    assert root_tokens["--code-comment"] == "var(--color-text-muted)"
+    assert root_tokens["--code-builtin"] == "var(--palette-clay-800)"
+    assert root_tokens["--code-operator"] == "var(--palette-clay-700)"
+
+    # Verify dark theme hex and token overrides
+    assert dark_tokens["--code-keyword"] == "#e07a3a"
+    assert dark_tokens["--code-function"] == "#d4692a"
+    assert dark_tokens["--code-type"] == "var(--color-symbol-t)"
+    assert dark_tokens["--code-class"] == "var(--color-symbol-c)"
+    assert dark_tokens["--code-string"] == "#4a9a8a"
+    assert dark_tokens["--code-number"] == "#7aaa3a"
+    assert dark_tokens["--code-comment"] == "#7a5a48"
+    assert dark_tokens["--code-builtin"] == "#c8a882"
+    assert dark_tokens["--code-operator"] == "#e07a3a"
+
+
+def test_signature_container_uses_semantic_code_tokens():
+    """Verify .signature-container token classes adopt unified --code-* tokens."""
+    css = _read_css()
+    rules = _extract_css_rules(css)
+    rules_by_selector = {sel: body for sel, body in rules}
+
+    assert ".signature-container .sig-keyword" in rules_by_selector
+    assert "var(--code-keyword)" in rules_by_selector[".signature-container .sig-keyword"]
+
+    assert ".signature-container .sig-name" in rules_by_selector
+    assert "var(--code-function)" in rules_by_selector[".signature-container .sig-name"]
+
+    assert ".signature-container .sig-type" in rules_by_selector
+    assert "var(--code-type)" in rules_by_selector[".signature-container .sig-type"]
+
+    assert ".signature-container .sig-return" in rules_by_selector
+    assert "var(--code-type)" in rules_by_selector[".signature-container .sig-return"]
+
+    assert ".signature-container .sig-default" in rules_by_selector
+    assert "var(--code-number)" in rules_by_selector[".signature-container .sig-default"]
+
+    assert ".signature-container .sig-param" in rules_by_selector
+    assert "var(--color-text)" in rules_by_selector[".signature-container .sig-param"]
+
+
+def test_pygments_css_uses_semantic_code_tokens():
+    """Verify Pygments highlighting CSS rules reference unified --code-* tokens."""
+    from golem.highlighting import get_pygments_css
+
+    pygments_css = get_pygments_css()
+    golem_css = _read_css()
+
+    for css_src in (pygments_css, golem_css):
+        assert "var(--code-keyword)" in css_src
+        assert "var(--code-function)" in css_src
+        assert "var(--code-class)" in css_src
+        assert "var(--code-type)" in css_src
+        assert "var(--code-string)" in css_src
+        assert "var(--code-number)" in css_src
+        assert "var(--code-comment)" in css_src
+        assert "var(--code-builtin)" in css_src
+        assert "var(--code-operator)" in css_src
+
+
+def test_code_blocks_preserve_indentation():
+    """Verify pre and code rules preserve whitespace and indentation with tab-size 4."""
+    css = _read_css()
+    rules = _extract_css_rules(css)
+    rules_by_selector = {sel: body for sel, body in rules}
+
+    assert "pre" in rules_by_selector
+    assert "white-space: pre" in rules_by_selector["pre"]
+    assert "tab-size: 4" in rules_by_selector["pre"]
+
+    assert "pre code" in rules_by_selector
+    assert "white-space: pre" in rules_by_selector["pre code"]
+    assert "tab-size: 4" in rules_by_selector["pre code"]

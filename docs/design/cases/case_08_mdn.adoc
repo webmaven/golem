@@ -1,0 +1,199 @@
+= System Deconstruction: MDN Web Docs
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: highlight.js
+
+== Metadata
+
+[horizontal]
+System Name:: MDN Web Docs (Mozilla Developer Network / Yari platform)
+Category:: Hand-Curated / Web Standards Reference Architecture
+Target Ecosystem:: Web Platform (JavaScript, Web APIs, HTML, CSS, WebIDL)
+Underlying Engine:: `Yari` (MDN Static Site Engine) + Markdown / Kumascript + Lit Web Components + Browser Compatibility Data (`@mdn/browser-compat-data`)
+Evaluation Date:: 2026-09-06
+
+.Representative Target URLs Evaluated
+* *API Namespace Index*: `https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API`
+* *Interface / Class Specification*: `https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerRegistration`
+* *Nested Dictionary / Parameter Page*: `https://developer.mozilla.org/en-US/docs/Web/API/RequestInit`
+
+---
+
+== Design Tokens & Visual Grammar
+
+=== Typography Scale & Pairing
+[horizontal]
+Display & Body Font Stack:: `Inter, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif`
+Code / Monospace Font Stack:: `Menlo, Consolas, Monaco, "Liberation Mono", "Lucida Console", monospace`
+Base Font Size & Line Height:: `16px` base (`1rem`) with generous `1.6` line-height for high accessibility reading; headings use bold Sans-Serif (`h1` at `2.25rem`, `h2` at `1.5rem`, `h3` at `1.25rem`).
+Code Token Monospace:: Inline code tags (`<code>`) render at `0.875em` with subtle grey background and light border radius.
+
+=== Color Palette & Semantic Assignment (MDN Modern Theme)
+[cols="1,2,2,3", options="header"]
+|===
+| Role | Token / Variable | Hex / HSL | Usage Context
+| Canvas Background | `--background-primary` | `#ffffff` (Dark: `#1b1b1f`) | Document body canvas
+| Surface / Secondary | `--background-secondary` | `#f0f2f5` (Dark: `#2b2b30`) | Sidebar background, callout panels, BCD tables
+| Border Separator | `--border-primary` | `#d8d8d8` (Dark: `#3a3a40`) | Definition dividers, table borders
+| Text Primary | `--text-primary` | `#1b1b1f` (Dark: `#ffffff`) | Headings, property identifiers, body prose
+| Text Secondary / Muted | `--text-secondary` | `#5c5c66` (Dark: `#a0a0aa`) | Inheritance notices ("Also inherits properties from...")
+| Link Accent | `--color-link-normal` | `#086dfc` (Vibrant Blue) | Inline hyperlinks, API cross-references
+| Baseline Status Pill | `.baseline-indicator.high` | `#008554` (Emerald Green) | "Baseline: Widely available" badge
+| Status Badge (Read-Only) | `.badge.inline.readonly` | `#5c5c66` (Neutral grey pill) | Property immutability indicator
+| Status Badge (Experimental) | `.icon-experimental` | `#b35900` (Amber flask icon) | Web standard experimental flags
+|===
+
+=== Spacing & Layout Rhythm
+[horizontal]
+Layout Strategy:: Three-column responsive grid: Left reference tree (`layout__sidebar`), Center article reading column (`layout__content`), Right in-page TOC (`layout__toc`).
+Reading Width:: Optimal line length: `68ch` max paragraph width within the main content container.
+Vertical Rhythm:: Clear section breaks (`padding-bottom: 2.5rem`) with prominent section dividers.
+
+---
+
+== 1. Granularity
+
+=== Smallest Unit of Documentation
+MDN applies a **hierarchical split strategy**:
+* **Every Interface Member Has Its Own URL**: While `ServiceWorkerRegistration` lists all instance properties and methods on its overview page, clicking any member (e.g. `ServiceWorkerRegistration.active` or `ServiceWorkerRegistration.showNotification()`) navigates to a **dedicated sub-page** (`/en-US/docs/Web/API/ServiceWorkerRegistration/active`).
+* **Micro-Level Browser Compatibility**: Each individual property and method has its own independent Browser Compatibility row in the `@mdn/browser-compat-data` schema.
+* **Overload & Parameter Permalinking**: Sub-pages feature granular sections for `Syntax`, `Parameters`, `Return value`, `Exceptions`, and `Specifications`.
+
+=== Granularity Analysis
+[horizontal]
+URL Permalinking Scheme:: Hierarchical URI paths (`/Web/API/{Interface}/{member}`).
+Inheritance Granularity:: Explicitly documents inherited members via an introductory italic notice (`Also inherits properties from its parent interface, EventTarget`) rather than blindly duplicating the base class members into the local page.
+Feature Status Flags:: Badges appear at the member line level: `Read only`, `Experimental` (flask icon), `Deprecated` (trash icon), `Non-standard`.
+
+---
+
+== 2. Hierarchy Expression
+
+=== Multi-Tier Structural Mapping
+MDN maps deep WebIDL object-oriented structures into **clear human-centered categories**:
+
+[cols="1,2,2", options="header"]
+|===
+| Level Transition | Visual Mechanism | Design Tokens Involved
+| Web API Namespace -> Interface | Left sidebar navigation grouped under the API domain (`Service Worker API`). | `layout__sidebar`, `--text-primary`
+| Interface -> Member Categories | Section headers: `Instance properties`, `Instance methods`, `Events`, `Inherited members`. | `h2.heading`, `a.heading-anchor`
+| Category -> Symbol Definition | Classical HTML `<dl>`, `<dt>`, `<dd>` definition list with inline badges. | `dt[id]`, `dd p`, `.badge.inline`
+| Method -> Parameters | Dedicated sub-page with a structured parameter list and WebIDL dictionary types. | `<section class="parameters">`
+|===
+
+=== Spatial & Navigational Encodings
+* *Left Sidebar Context*: The sidebar automatically expands the current API family (e.g. all 12 interfaces comprising the Service Worker API), keeping the developer situated within the broader subsystem.
+* *The Baseline Widget*: Positioned immediately below the `h1`, a collapsible `<details class="baseline-indicator">` box displays browser engine support icons (Chrome, Edge, Firefox, Safari) and interoperability status.
+* *In-Page Right TOC*: Sticky navigation listing major section headings (`Instance properties`, `Instance methods`, `Events`, `Browser compatibility`, `See also`).
+
+---
+
+== 3. Within-Level Differentiation
+
+=== Sibling Entity Disambiguation
+On the interface overview page where dozens of properties, methods, and events coexist:
+
+[horizontal]
+Grouping Strategy:: **Hard Category Segmentation**:
+1. `Instance properties` (grouped together under `<h2>`).
+2. `Instance methods` (grouped together under `<h2>`).
+3. `Events` (grouped together under `<h2>`).
+4. `Inherited members` (linked out to parent interface).
+Kind Identifiers::
+* **Syntactic Affixes**: Methods always end in parentheses `()`, e.g. `showNotification()`; properties do not, e.g. `active`.
+* **Inline Semantic Pills**: Status badges appear inline immediately next to the symbol name:
+  - `<span class="badge inline readonly">Read only</span>`
+  - `<span role="img" class="icon icon-experimental"></span>`
+Typographic Treatment::
+* Symbol names are wrapped in clickable monospace code tags (`<a><code>ServiceWorkerRegistration.active</code></a>`).
+* Prose descriptions follow immediately in a clean `<dd>` definition block.
+
+[cols="1,1,2,2", options="header"]
+|===
+| Symbol Kind | Icon / Glyph | Badge Style / Color | Visual Distinction Mechanism
+| Property | None | `Read only` pill | Plain monospace identifier
+| Method | Parentheses `()` | None or `Async` | Explicit `()` in identifier name
+| Event | Lightning / Event tag | Listed under `Events` section | Lowercase event name (e.g. `updatefound`)
+| Experimental Member | Flask SVG icon | Amber tooltip | Warning icon before description
+| Inherited Member | Arrow glyph | Separate italic paragraph | Cross-linked to ancestor documentation
+|===
+
+---
+
+== 4. Detail Layout (Symbol Anatomy)
+
+=== Single Symbol Information Architecture (on Member Sub-Pages)
+Order of elements within an individual MDN method/property page:
+1. **Header & Title**: Full member name (`ServiceWorkerRegistration: showNotification() method`).
+2. **Baseline Compatibility Badge**: Real-time interoperability status across browser engines.
+3. **Summary Paragraph**: Concise description of what the method does.
+4. **Syntax Block**: Complete JavaScript call syntax showing parameter variations and optional arguments.
+5. **Parameters Section**: Detailed description list of every argument.
+6. **Return Value Section**: Exact JavaScript type returned (e.g. `A Promise that resolves with undefined`).
+7. **Exceptions Section**: List of errors that can be thrown (e.g. `TypeError`, `SecurityError`) with trigger conditions.
+8. **Live Interactive Examples**: Embedded runnable code blocks or GitHub example links.
+9. **Specifications Table**: Direct link to the W3C / WHATWG living standard specification URL.
+10. **Browser Compatibility Table**: Detailed BCD matrix across desktop, mobile, and webview engines.
+
+=== Layout Mechanics
+[horizontal]
+Parameter Representation:: Structured description list with parameter names in bold monospace and type contracts explained in prose.
+Collapsible Elements:: Baseline indicator and feedback widgets use collapsible `<details>`.
+Source Code Integration:: Direct links to official GitHub demo repositories (`mdn/dom-examples`) and WHATWG standards specifications.
+
+---
+
+== 5. Interlinking & Navigation
+
+=== Cross-Reference Anatomy
+[horizontal]
+WebIDL Type Precision:: Every returned type (e.g. `Promise`, `ServiceWorker`, `PushManager`, `EventTarget`) is hyperlinked to its respective documentation page.
+Specification Linking:: Every page links directly to the normative spec in the W3C / WHATWG specification repository.
+"See Also" Section:: Standardized curated list of related guides, tutorials, and sibling APIs at the bottom of the page.
+
+---
+
+== 6. Accessibility (A11y) Audit
+
+=== Semantic Landmarks & Document Structure
+[horizontal]
+HTML5 Landmark Roles:: Flawless compliance: `<header>`, `<nav class="layout__sidebar">`, `<main id="content">`, `<aside class="layout__toc">`, `<footer>`.
+Heading Hierarchy Integrity:: Strict `<h1>` -> `<h2>` -> `<h3>` hierarchy. Headings include accessible `.heading-anchor` links.
+Shadow DOM & Custom Elements:: Web components (`mdn-compat-table-lazy`, `mdn-survey`) use accessible shadow roots with `<noscript>` fallbacks.
+
+=== Keyboard & Focus Management
+[horizontal]
+Visible Focus Rings:: Custom accessible 2px focus outlines with clean offset across all interactive links and buttons.
+Screen Reader Support:: Status icons include explicit `aria-label` and `title` attributes (e.g. `aria-label="Experimental"`).
+Interactive Dialogs:: Theme pickers and search dropdowns manage focus and keyboard traps properly.
+
+=== Visual & Contrast Compliance
+[cols="1,2,2", options="header"]
+|===
+| Element | Measured Contrast Ratio | WCAG AA Status
+| Body Text on Canvas (`#1b1b1f` on `#fff`) | 16.8:1 | PASS (AAA)
+| Secondary Muted Text (`#5c5c66` on `#fff`) | 6.5:1 | PASS (AAA)
+| Interactive Link (`#086dfc` on `#fff`) | 4.8:1 | PASS (AA)
+| Baseline Green Status Pill | 5.1:1 | PASS (AA)
+| Read-Only Tag Badge | 6.5:1 | PASS (AAA)
+|===
+
+---
+
+== Unique Innovations & Failure Modes
+
+=== Standout Design Innovations
+* **The Baseline Status Indicator**: Immediately informs developers whether an API is safe to use in production across all major browser engines without needing to scroll to compatibility tables.
+* **Normative Specification Traceability**: Connects implementation documentation directly to W3C / WHATWG standards specs.
+* **Sub-Page Granularity with Index Summaries**: Gives developers the best of both worlds: a quick index on the class page, and an exhaustive, dedicated sub-page for every individual method.
+* **Explicit Inheritance Summaries**: Rather than copying 40 inherited methods from `EventTarget` into every class page, MDN links to ancestors with clear visual signposting.
+
+=== Critical Anti-Patterns / Friction Points
+* **Navigation Click Overhead**: Because every method lives on its own page, inspecting signatures for 5 methods requires opening 5 separate browser tabs.
+* **Heavy Shadow DOM Usage**: Lazy-loading compatibility tables with web components can cause a brief layout shift while rendering client-side.
+
+=== Transferable Principles for Future Autodoc Systems
+1. *The Compatibility / Availability Badge*: Display runtime or platform compatibility badges (e.g. "Node.js 18+ only", "Browser-only") immediately below the symbol title.
+2. *Normative Spec / RFC Linking*: Always provide a direct link to the underlying RFC, PEP, or specification from which the API was standardized.
+3. *Inheritance Signposting over Duplication*: Link to ancestor classes with an explicit note (`Also inherits from ...`) instead of polluting the local symbol table with dozens of inherited base methods.

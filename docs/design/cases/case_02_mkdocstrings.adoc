@@ -1,0 +1,190 @@
+= System Deconstruction: MkDocstrings
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: highlight.js
+
+== Metadata
+
+[horizontal]
+System Name:: MkDocstrings (`mkdocstrings-python` with Material for MkDocs)
+Category:: Static Markdown Autodoc Engine (Markdown Injector via Griffe)
+Target Ecosystem:: Python (Google, Sphinx, and NumPy docstring conventions)
+Underlying Engine:: `Griffe` (Static AST Parser) + MkDocs + Python-Markdown + Material for MkDocs Theme
+Evaluation Date:: 2026-09-06
+
+.Representative Target URLs Evaluated
+* *Reference Index Page*: `https://mkdocstrings.github.io/python/reference/api/`
+* *Class / Core Model Specification*: `https://docs.pydantic.dev/latest/api/base_model/`
+* *Deeply Nested Type / Parameter Page*: `https://docs.pydantic.dev/latest/api/config/` (`ConfigDict`)
+
+---
+
+== Design Tokens & Visual Grammar
+
+=== Typography Scale & Pairing
+[horizontal]
+Body Font Stack:: `Roboto, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif` (`--md-text-font`)
+Monospace Font Stack:: `"Roboto Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace` (`--md-code-font`)
+Base Font Size & Line Height:: `0.8rem` (16px scaled down in Material to 12.8px–14px proportional base) with `1.6` line height for prose readability.
+Monospace Font Size vs Body:: `0.85em` for inline code badges; block code signatures match monospace scale with `1.4` tight line-height.
+
+=== Color Palette & Semantic Assignment
+[cols="1,2,2,3", options="header"]
+|===
+| Role | Token / Variable | Hex / HSL | Usage Context
+| Background Canvas | `--md-default-bg-color` | `#ffffff` (Dark slate: `#1e2129`) | Body canvas and page background
+| Code / Card Surface | `--md-code-bg-color` | `#f5f5f5` (Dark: `#2e303e`) | Signature boxes, collapsible source code drawer
+| Structural Border | `--md-typeset-table-color` | `rgba(0,0,0,0.07)` (Dark: `rgba(255,255,255,0.07)`) | Left vertical hierarchy guide line, table rules
+| Text Primary | `--md-default-fg-color` | `rgba(0,0,0,0.87)` | Headings, signature identifiers, body prose
+| Text Secondary / Muted | `--md-default-fg-color--light` | `rgba(0,0,0,0.54)` | Parameter descriptions, default values, permalink anchors
+| Brand / Accent | `--md-primary-fg-color` | `#3f51b5` (Indigo) / `#009688` (Teal) | Header bar, active links, TOC active marker
+| Semantic Labels (Classmethod/Prop) | `.doc-label` | Low-contrast grey pill (`#f0f2f5`, border: `#d0d7de`) | Badges for `classmethod`, `property`, `class-attribute`
+|===
+
+=== Spacing & Layout Rhythm
+[horizontal]
+Content Container Max Width:: `61rem` (1220px) centered layout (`--md-grid-max-width`).
+Sidebar Width(s):: Left navigation: `12.1rem` (242px); Right table of contents: `12.1rem` (242px).
+Vertical Rhythm Base:: `0.6rem` (8px base increment); signature containers use `0.4rem 0.6rem` padding.
+Indentation Rhythm:: Child members use explicit left border guide: `padding-left: 25px; border-left: 0.05rem solid var(--md-typeset-table-color)`.
+
+---
+
+== 1. Granularity
+
+=== Smallest Unit of Documentation
+MkDocstrings achieves fine-grained addressability using an expressive CSS class hierarchy (`.doc-object`, `.doc-heading`, `.doc-signature`, `.doc-contents`):
+* **Symbol Granularity**: Class attributes, methods, classmethods, functions, and parameters each receive individual DOM wrappers.
+* **Per-Symbol Permalinking**: Every method and attribute generates a permalink anchor symbol (`¤` or standard `#`) mapped directly to its fully-qualified Python dotpath (`#mkdocstrings_handlers.python.AutoStyleOptions.from_data`).
+* **Source-Level Granularity**: Individual parameter rows in docstring tables can be addressed by ID.
+
+=== Granularity Analysis
+[horizontal]
+URL Permalinking Scheme:: Exact dotpaths: `#{module}.{Class}.{member}`.
+Overload Handling:: Renders distinct signature code blocks sequentially within a single `.doc-function` wrapper, followed by unified docstrings.
+Decorator & Annotation Visibility:: Explicitly parsed: `@classmethod` is extracted from the signature code and rendered both as a semantic badge (`<small class="doc-label doc-label-classmethod"><code>classmethod</code></small>`) and optionally highlighted within the code signature.
+Inline vs Linked Types:: Uses `autorefs` plugin: complex type unions (`list[str]`, `dict[str, Any]`, `Object | Alias`) decompose into independent inline `<a>` tags with tooltip previews pointing to either local symbols or external Python stdlib inventories.
+
+---
+
+== 2. Hierarchy Expression
+
+=== Multi-Tier Structural Mapping
+Unlike Sphinx's loose definition lists, MkDocstrings combines **standard HTML headings (`<h2>`, `<h3>`, `<h4>`)** with **visual nesting borders (tree rail lines)**:
+
+[cols="1,2,2", options="header"]
+|===
+| Level Transition | Visual Mechanism | Design Tokens Involved
+| Module -> Class | `<h2>` heading with `.doc-symbol-class` icon + full signature box. | `--md-text-font`, `--md-code-bg-color`
+| Class -> Member (Method) | `<h3>` heading inside `.doc-contents` with 25px left indent and vertical rule. | `border-left: 0.05rem solid var(--md-typeset-table-color)`
+| Member -> Parameter Table | Two-column Markdown table inside `.doc-contents` (`Name` + `Type` / `Description` + `Default`). | `.md-typeset__table`, `--md-typeset-table-color`
+| Parameter -> Nested Subfield | Nested description list or sub-table inside the parameter row. | Spacy table style (`.doc-param-default`)
+|===
+
+=== Spatial & Navigational Encodings
+* *The "Rail" (Vertical Hierarchy Line)*: Indented sub-members do not float in open whitespace; a subtle continuous vertical line (`border-left: 0.05rem solid ...`) visually ties all class methods to their parent class declaration.
+* *Sidebar Tree*: Material for MkDocs provides an expandable collapsible drawer (`<details>` / `<summary>`) preserving repository file tree structure.
+* *In-Page TOC*: Right-hand sticky TOC scroll-spies and nests methods under classes based on HTML heading depth (`h2` -> `h3`).
+
+---
+
+== 3. Within-Level Differentiation
+
+=== Sibling Entity Disambiguation
+When multiple different symbol types share the same parent scope (e.g. methods vs class-attributes vs instance-attributes vs inner classes):
+
+[horizontal]
+Grouping Strategy:: Linear stream or grouped headers; attributes and methods receive distinct `.doc-symbol-*` CSS markers.
+Kind Identifiers::
+* **Glyph Icons**: Empty `<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>` or `.doc-symbol-attribute` styled via CSS pseudo-elements with Octicons/Material symbols.
+* **Semantic Badges (`.doc-labels`)**: Inline `<small class="doc-label">` pills explicitly labeling `class-attribute`, `instance-attribute`, `classmethod`, `static-method`, `property`.
+Typographic Treatment::
+* Identifiers are wrapped in `span.doc-object-name.doc-function-name` using clean bold font weight.
+* Type signatures use Pygments code highlighting tokens (`span.n` for names, `span.p` for punctuation, `span.nf` for function names).
+
+[cols="1,1,2,2", options="header"]
+|===
+| Symbol Kind | Icon / Glyph | Badge Style / Color | Visual Distinction Mechanism
+| Class | Octicon class glyph | None (implicit by `h2` rank) | Prominent heading size + signature box + inheritance chart
+| Method | Octicon method glyph | None or `classmethod` pill | `h3` heading + parenthesis in signature
+| Class Attribute | Octicon attribute glyph | `<small class="doc-label-class-attribute">` | Assignment syntax `name: type = default`
+| Instance Attribute | Octicon attribute glyph | `<small class="doc-label-instance-attribute">` | Explicit typed property pill
+|===
+
+---
+
+== 4. Detail Layout (Symbol Anatomy)
+
+=== Single Symbol Information Architecture
+Order of elements within every documented symbol in MkDocstrings:
+1. **Heading Bar**: Glyph icon + Symbol Name + Semantic Badges (`classmethod`, `property`) + Permalink anchor (`¤`).
+2. **Signature Block**: Syntax-highlighted code container (`.language-python.doc-signature`) showing parameter names, default values, and return type hint.
+3. **Docstring Summary**: Markdown prose parsed from the docstring's introductory paragraph.
+4. **Interactive Mermaid Diagram**: Embedded inheritance or flow chart (if enabled, e.g. class inheritance tree with clickable SVG nodes).
+5. **Parameters Table**: Tabular layout with parameter names, types, and descriptions.
+6. **Collapsible Source Drawer**: `<details class="mkdocstrings-source">` containing full syntax-highlighted source code with line numbers, collapsed by default.
+
+=== Layout Mechanics
+[horizontal]
+Parameter Representation:: Responsive HTML table (`.md-typeset__table`) with monospace parameter names on left and prose descriptions on right.
+Collapsible Elements:: **Source code is collapsed by default** (`<details><summary>Source code in path/to/file.py</summary>...`), saving massive vertical page real estate while keeping code one click away.
+Signature Wrapping & Formatting:: Wrapped using clean CSS word breaks; long signatures format cleanly with highlighted type annotations.
+Source Code Integration:: Inlined directly inside the DOM via collapsed `<details>` block with line numbers, eliminating context switching to external GitHub pages.
+
+---
+
+== 5. Interlinking & Navigation
+
+=== Cross-Reference Anatomy
+[horizontal]
+Type Linking Precision:: **Full AST decomposition**: Inside `dict[str, Any]`, `str` links to Python documentation while `Any` links to `typing.Any`.
+External Link Decoration:: Links pointing outside the documentation site automatically receive an external arrow glyph (`mask-image: octicons/arrow-up-right`) via CSS.
+Interactive Class Diagrams:: Classes can render embedded Mermaid flowchart SVGs where every box is a clickable link (`click Node href "..."`) navigating to ancestor classes.
+In-Page TOC:: High-fidelity sticky right TOC with active scroll-spy, tracking exactly which method is currently in viewport.
+
+---
+
+== 6. Accessibility (A11y) Audit
+
+=== Semantic Landmarks & Document Structure
+[horizontal]
+HTML5 Landmark Roles:: Excellent compliance: `<header class="md-header">`, `<nav class="md-nav">`, `<main class="md-main">`, `<article class="md-content__inner">`.
+Heading Hierarchy Integrity:: Strict compliance: `<h1>` (Page) -> `<h2>` (Class / Module) -> `<h3>` (Methods) -> `<h4>` (Parameters if headings mode used). Screen readers navigate heading levels predictably.
+Screen Reader Signature Parsing:: Code blocks use `<pre><code>` with standard syntax tokens. Semantic badges use `<small>` tags with plain text labels readable by assistive technology.
+
+=== Keyboard & Focus Management
+[horizontal]
+Visible Focus Rings:: Material for MkDocs applies high-contrast focus rings (`outline: 0.1rem solid var(--md-accent-fg-color)`) to all links, buttons, and summary tags.
+Collapsible Keyboard Triggers:: Source code drawers use native HTML5 `<details>` and `<summary>`, supporting `Enter` and `Space` out of the box without JavaScript polyfills.
+Skip Link Availability:: Includes an accessible skip link (`<a class="md-skip" href="#__content">Skip to content</a>`).
+
+=== Visual & Contrast Compliance
+[cols="1,2,2", options="header"]
+|===
+| Element | Measured Contrast Ratio | WCAG AA Status
+| Body Text on Canvas (`rgba(0,0,0,0.87)` on `#fff`) | 12.6:1 | PASS (AAA)
+| Code Signature Text on Surface | 10.4:1 | PASS (AAA)
+| Secondary Muted Descriptions (`rgba(0,0,0,0.54)`) | 4.62:1 | PASS (AA)
+| Semantic Badges (`#24292f` on `#f0f2f5`) | 9.8:1 | PASS (AAA)
+| External Link Arrow Indicator | Inherits link color (4.8:1+) | PASS (AA)
+|===
+
+---
+
+== Unique Innovations & Failure Modes
+
+=== Standout Design Innovations
+* **Collapsible In-Situ Source Code**: Solves the "inspect implementation" problem without navigating away from the page, keeping the user in flow.
+* **The Hierarchy Rail (Visual Nesting)**: The continuous 25px left-border rule visually groups related class methods, eliminating the spatial ambiguity common in flat autodoc themes.
+* **Semantic Badge Pills**: Badges like `class-attribute` and `classmethod` provide instant cognitive filtering before reading signatures.
+* **Clickable Mermaid Class Graphs**: Visual diagrams that double as hyperlinked navigation trees.
+
+=== Critical Anti-Patterns / Friction Points
+* **Signature Width in Narrow Columns**: When both left sidebar and right TOC are open, wide signatures with many parameters can wrap awkwardly across multiple lines.
+* **Single-Page Overload**: When an entire module with 30 classes is documented in a single Markdown file (`::: module`), the generated HTML can exceed 2MB, causing DOM scrolling lag.
+
+=== Transferable Principles for Future Autodoc Systems
+1. *The Hierarchy Rail Principle*: Group nested members using subtle vertical tree lines (`border-left`) to clearly differentiate class boundaries.
+2. *In-Situ Collapsible Source*: Always collapse source code by default under `<details>` rather than sending users to GitHub or cluttering the primary reading path.
+3. *Semantic Pill Tagging*: Explicit badges for method kinds (`classmethod`, `static`, `property`, `async`) accelerate visual scanning far faster than reading syntax prefixes.

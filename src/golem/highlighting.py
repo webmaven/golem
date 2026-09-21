@@ -262,6 +262,36 @@ def get_pygments_css(
     dark_rules = "\n".join(f"    {line}" if line.strip() else "" for line in dark_css.splitlines())
     dark_system_rules = "\n".join(f"        {line}" if line.strip() else "" for line in dark_css.splitlines())
 
+    semantic_rules = (
+        f"{selector} .k, {selector} .kc, {selector} .kd, {selector} .kn, {selector} .kp, {selector} .kr {{ color: var(--code-keyword); font-weight: bold; }}\n"
+        f"{selector} .nf, {selector} .fm {{ color: var(--code-function); font-weight: bold; }}\n"
+        f"{selector} .nc {{ color: var(--code-class); font-weight: bold; }}\n"
+        f"{selector} .kt {{ color: var(--code-type); font-weight: bold; }}\n"
+        f"{selector} .s, {selector} .sa, {selector} .sb, {selector} .sc, {selector} .dl, {selector} .sd, "
+        f"{selector} .s2, {selector} .se, {selector} .sh, {selector} .si, {selector} .sx, {selector} .sr, "
+        f"{selector} .s1, {selector} .ss {{ color: var(--code-string); }}\n"
+        f"{selector} .m, {selector} .mb, {selector} .mf, {selector} .mh, {selector} .mi, {selector} .mo, "
+        f"{selector} .il, {selector} .l, {selector} .ld {{ color: var(--code-number); }}\n"
+        f"{selector} .c, {selector} .ch, {selector} .cm, {selector} .cp, {selector} .cpf, {selector} .c1, "
+        f"{selector} .cs {{ color: var(--code-comment); font-style: italic; }}\n"
+        f"{selector} .nb, {selector} .bp {{ color: var(--code-builtin); font-weight: bold; }}\n"
+        f"{selector} .o, {selector} .ow {{ color: var(--code-operator); }}\n"
+        f"{selector} .p {{ color: var(--color-text); }}\n"
+        f"{selector} .n, {selector} .nx, {selector} .py, {selector} .nv, {selector} .vc, {selector} .vg, "
+        f"{selector} .vi, {selector} .vm {{ color: var(--color-text); }}\n\n"
+        f'[data-theme="dark"] {selector} .k, [data-theme="dark"] {selector} .kc, [data-theme="dark"] {selector} .kd, [data-theme="dark"] {selector} .kn, [data-theme="dark"] {selector} .kp, [data-theme="dark"] {selector} .kr {{ color: var(--code-keyword); }}\n'
+        f'[data-theme="dark"] {selector} .nf, [data-theme="dark"] {selector} .fm {{ color: var(--code-function); }}\n'
+        f'[data-theme="dark"] {selector} .nc {{ color: var(--code-class); }}\n'
+        f'[data-theme="dark"] {selector} .kt {{ color: var(--code-type); }}\n'
+        f'[data-theme="dark"] {selector} .s, [data-theme="dark"] {selector} .sa, [data-theme="dark"] {selector} .sb, [data-theme="dark"] {selector} .sc, [data-theme="dark"] {selector} .dl, [data-theme="dark"] {selector} .sd, [data-theme="dark"] {selector} .s2, [data-theme="dark"] {selector} .se, [data-theme="dark"] {selector} .sh, [data-theme="dark"] {selector} .si, [data-theme="dark"] {selector} .sx, [data-theme="dark"] {selector} .sr, [data-theme="dark"] {selector} .s1, [data-theme="dark"] {selector} .ss {{ color: var(--code-string); }}\n'
+        f'[data-theme="dark"] {selector} .m, [data-theme="dark"] {selector} .mb, [data-theme="dark"] {selector} .mf, [data-theme="dark"] {selector} .mh, [data-theme="dark"] {selector} .mi, [data-theme="dark"] {selector} .mo, [data-theme="dark"] {selector} .il, [data-theme="dark"] {selector} .l, [data-theme="dark"] {selector} .ld {{ color: var(--code-number); }}\n'
+        f'[data-theme="dark"] {selector} .c, [data-theme="dark"] {selector} .ch, [data-theme="dark"] {selector} .cm, [data-theme="dark"] {selector} .cp, [data-theme="dark"] {selector} .cpf, [data-theme="dark"] {selector} .c1, [data-theme="dark"] {selector} .cs {{ color: var(--code-comment); }}\n'
+        f'[data-theme="dark"] {selector} .nb, [data-theme="dark"] {selector} .bp {{ color: var(--code-builtin); }}\n'
+        f'[data-theme="dark"] {selector} .o, [data-theme="dark"] {selector} .ow {{ color: var(--code-operator); }}\n'
+        f'[data-theme="dark"] {selector} .p {{ color: var(--color-text); }}\n'
+        f'[data-theme="dark"] {selector} .n, [data-theme="dark"] {selector} .nx, [data-theme="dark"] {selector} .py, [data-theme="dark"] {selector} .nv, [data-theme="dark"] {selector} .vc, [data-theme="dark"] {selector} .vg, [data-theme="dark"] {selector} .vi, [data-theme="dark"] {selector} .vm {{ color: var(--color-text); }}'
+    )
+
     return (
         f"/* Pygments Syntax Highlighting (Light) */\n"
         f"{light_css}\n\n"
@@ -271,7 +301,9 @@ def get_pygments_css(
         f"/* Pygments Syntax Highlighting (Dark) */\n"
         f"@media (prefers-color-scheme: dark) {{\n"
         f'    :root:not([data-theme="light"]) {{\n{dark_system_rules}\n    }}\n'
-        f"}}"
+        f"}}\n\n"
+        f"/* Semantic Code Token Mappings */\n"
+        f"{semantic_rules}\n"
     )
 
 

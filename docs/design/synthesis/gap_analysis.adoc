@@ -1,0 +1,147 @@
+= Frontier & Gap Analysis: Hand-Curated vs. Automated Documentation
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+[lead]
+This document contrasts the state-of-the-art hand-curated developer documentation experiences (exemplified by the *Stripe SDK Reference* and *MDN Web Docs*) against automated code-reflection engines (*Sphinx + autodoc2*, *MkDocstrings*, *Fumadocs*, *Quartodoc*, *TypeDoc*, and *Rustdoc*). We identify structural design gaps, anti-patterns prevalent in automated generators, and the design frontier required for next-generation autodoc systems.
+
+== Executive Summary: The Automation Dilemma
+
+Static autodocumentation tools extract documentation directly from ASTs and source code comments. While this guarantees 100% API coverage and eliminates drift, it frequently produces *mechanically complete but cognitively hostile* documentation. Conversely, hand-curated documentation architectures prioritize mental models, developer workflows, and progressive disclosure, but demand substantial human maintenance.
+
+[cols="1,2,2", options="header"]
+|===
+| Dimension | Hand-Curated Systems (Stripe, MDN) | Automated AST Generators (Sphinx, MkDocs, TypeDoc, Rustdoc)
+| *Information Architecture*
+| Organized around developer tasks, user intents, and lifecycle stages.
+| Mechanically mirrors source code file trees, AST structures, and class hierarchies.
+| *Signature Presentation*
+| Multi-column responsive layout; synchronized code examples in context.
+| Monolithic vertical linear flow; parameters divorced from runnable context.
+| *Disclosure Strategy*
+| Aggressive progressive disclosure (tier 1 parameters upfront, advanced hidden).
+| Flat dump of all parameters (50+ parameters rendered sequentially without tiering).
+| *Ecosystem Context*
+| Compatibility matrices (Baseline), deprecation timelines, migration guides.
+| Isolated type signatures; rare cross-ecosystem status indicators.
+| *Cognitive Load*
+| Curated to reduce time-to-first-successful-call.
+| Requires the reader to mentally parse language AST intricacies.
+|===
+
+'''
+
+== Core Frontier Gaps
+
+=== Gap 1: Progressive Parameter Disclosure (The "Flat Parameter Dump" Problem)
+
+==== The Problem in Autodoc Engines
+When an API function or constructor accepts 20 to 60 parameters (common in SDK clients, database models, or complex configuration objects), automated generators render all 60 parameters in an unweighted, alphabetical or declaration-ordered definition list or table.
+* In *Sphinx*, this produces an unbroken vertical scroll of 1,500 pixels of `<dl>` tags.
+* In *TypeDoc*, this yields an overwhelming table where the 3 mandatory parameters are visually indistinguishable from 57 niche edge-case options.
+
+==== The Hand-Curated Frontier: Stripe's Tiered Parameter Architecture
+Stripe categorizes parameters into two distinct tiers:
+1. *Primary / Required Parameters*: Displayed immediately with emphasized typography, explicit types, and inline rationale.
+2. *Collapsible "More Parameters" Drawer*: Secondary, optional, and niche configuration parameters are enclosed within a custom progressive disclosure container (`<details>` or animated disclosure button).
+3. *Child Attribute Trees*: When a parameter accepts a nested hash or object, Stripe renders an expandable sub-tree rather than flattening it or forcing a jump to a separate type definition page.
+
+[NOTE]
+====
+*Transferable Design Opportunity*: Autodoc engines should inspect docstring metadata (e.g. `@param [optional]`, `@param [deprecated]`, or keyword-only default values) and automatically split parameter presentations into *Essential* and *Advanced / Optional* disclosure tiers.
+====
+
+=== Gap 2: Synchronized Dual-Column Layout (Code as First-Class Anchor)
+
+==== The Problem in Autodoc Engines
+Automated tools almost universally follow a single-column linear flow (with left and right navigation sidebars). Code examples are treated as arbitrary paragraphs within the docstring body. As a result:
+* The user must scroll past prose to see the code, or scroll past the code to read the parameter documentation.
+* On wide screens (>1440px), the content area either stretches into unreadable 120-character line lengths or sits flanked by enormous empty margins.
+
+==== The Hand-Curated Frontier: Stripe's Sticky Split-Pane
+Stripe pins code examples in a sticky right-hand column (`ApiSection-Aside`) that remains pinned while the user scrolls through the corresponding method explanation and parameter descriptions in the left column (`ApiSection-MainContent`).
+* When the user scrolls to the next API endpoint, the right-hand code snippet smoothly transitions to match the active method.
+* Code snippets provide interactive language tabs (Python, Node.js, Ruby, Go, PHP, Java, cURL) that synchronize globally across the entire documentation session via localStorage.
+
+=== Gap 3: Cross-Environment Support & Ecosystem Viability (Baseline Badges)
+
+==== The Problem in Autodoc Engines
+Automated documentation treats types as static, timeless contracts. They rarely communicate:
+* Which runtime version introduced a specific method (e.g., Python 3.12+ only, Node 18+ only).
+* Browser or platform support constraints.
+* Whether a feature is experimental, stable, or deprecated, without manually reading prose remarks.
+
+==== The Hand-Curated Frontier: MDN's Baseline Engine Matrix
+MDN Web Docs surfaces a prominent *Baseline* widget at the top of every Web API page:
+* Integrates directly with the `browser-compat-data` (BCD) registry.
+* Instantly communicates whether a Web API is "Widely Available", "Newly Available", or "Limited Availability across engines".
+* Provides an interactive table displaying the exact version numbers for Chrome, Edge, Firefox, and Safari, complete with feature-flag caveats.
+
+[NOTE]
+====
+*Transferable Design Opportunity*: Next-gen autodoc engines should ingest package release tags or git history to automatically render "Added in vX.Y.Z" pills and platform-support badges directly alongside symbol headers.
+====
+
+=== Gap 4: In-Situ Interactive Type Exploration (The Fragment Navigation Trap)
+
+==== The Problem in Autodoc Engines
+When an argument type is complex (e.g., `opts: RequestInit` or `config: DatabaseOptions`), traditional tools handle interlinking in one of two suboptimal ways:
+1. *Link Jump*: Force the user to click a hyperlink, abandoning their current context and navigating to a separate page or scrolling down 5,000 pixels.
+2. *Unexpanded Identifier*: Render the type as a plain text string without inline breakdown, forcing the developer to search the docs manually.
+
+==== The Modern Frontier: Fumadocs Popover Previews & Inline TypeTables
+Fumadocs bridges this gap using headless UI popovers and expandable nested tables:
+* Hovering or tapping on a type identifier reveals an interactive Radix UI popover displaying the exact interface definition, fields, and descriptions without page navigation.
+* The `<AutoTypeTable />` component recursively expands nested object properties in an inline accordion, keeping the developer anchored in their workflow.
+
+'''
+
+== Anti-Patterns in Current Autodocumentation Tools
+
+[cols="1,2,2", options="header"]
+|===
+| Anti-Pattern | Manifestation in Tools | Negative User Impact
+| *The Tautological Docstring*
+| Autodoc engines generating empty shells for undocumented code: `def get_name(): """Get name."""`
+| Adds visual noise and clutters search indices with zero cognitive value.
+| *The Alphabetical Monolith*
+| Listing 100 methods alphabetically rather than grouping them by domain, lifecycle, or frequency of use.
+| Forces users to scan 100 entries to find the 3 methods relevant to initialization or cleanup.
+| *Signature Word-Wrap Explosion*
+| Long type signatures (especially in Python 3.10+ unions or TypeScript generic bounds) breaking across 10 unformatted lines without semantic indentation.
+| Destroys visual rhythm; makes reading parameters exhausting.
+| *The Ghost Inherited Method Flood*
+| Subclass documentation inheriting 80 methods from `object`, `dict`, or base framework classes without visual filtering.
+| Obscures the 4 methods that actually define the subclass's unique behavior.
+| *Dead-End Source Links*
+| Linking to a raw GitHub commit or unhighlighted line number without breadcrumb context or back-navigation.
+| Disorients the developer and pulls them out of the reading flow.
+|===
+
+'''
+
+== The Next-Generation Autodoc Design Frontier
+
+A modern autodocumentation engine should bridge the gap between AST automation and human-centric design by adopting five structural pillars:
+
+[mermaid]
+----
+graph TD
+    A[AST & Reflection Ingestion] --> B[Smart Classification & Weighting]
+    B --> C1[Tiered Parameter Disclosure]
+    B --> C2[Dual-Column Sticky Playgrounds]
+    B --> C3[In-Situ Popover Type Inspection]
+    B --> C4[Automated Lifecycle / Version Badging]
+    C1 --> D[Next-Gen Autodoc Experience]
+    C2 --> D
+    C3 --> D
+    C4 --> D
+----
+
+1. **Semantic Weighting & Tiering**: Instead of unranked parameter dumps, engines must parse parameter signatures (required vs optional with defaults vs keyword-only vs `**kwargs`) and automatically categorize parameters into *Primary* and *Advanced (Folded)* disclosure tiers.
+2. **Dual-Coding Within Levels**: Adopt TypeDoc's colored glyph system combined with MkDocstrings's semantic badges (`classmethod`, `pure-function`, `deprecated`) to enable immediate visual scanning without reading code keywords.
+3. **In-Situ Source & Type Disclosure**: Adopt MkDocstrings's expandable source drawers and Fumadocs's hover type popovers so developers never lose their reading anchor.
+4. **Adaptive Split-Pane Architecture**: Support responsive dual-column presentation for API references (documentation on the left, interactive runnable code on the right) on viewports $\ge 1200\text{px}$.
+5. **Universal Accessibility Standards**: Guarantee WCAG AA compliance, semantic heading depth consistency, keyboard shortcuts (`/` or `s` for search, `+`/`-` for folding), and full screen-reader announcements for dynamic disclosures.

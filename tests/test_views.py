@@ -193,3 +193,26 @@ def test_generate_asciidoc_views_with_explicit_renderer() -> None:
     assert views[0]["id"] == "source"
     assert views[1]["id"] == "preview"
     assert "admonitionblock note" in views[1]["content"]
+
+
+def test_extract_listing_views_preserves_indentation() -> None:
+    """Verify code indentation is strictly preserved during view extraction."""
+    code = (
+        "class BuildEngine:\n"
+        "    def compile_all(self, force: bool = False) -> list[Path]:\n"
+        "        stale = self.get_stale()\n"
+        "        return [f for f in stale]\n"
+    )
+    node = {
+        "name": "listing",
+        "value": code,
+        "attributes": {
+            "language": "python",
+            "render": "source",
+        },
+    }
+    views = extract_listing_views(node)
+    assert len(views) == 1
+    content = views[0]["content"]
+    assert "    def compile_all" in content or "    <span" in content or '<span class="w">    </span>' in content
+    assert "        stale" in content or "        <span" in content or '<span class="w">        </span>' in content
