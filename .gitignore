@@ -5,6 +5,7 @@ __pycache__/
 .coverage
 .golem/
 dist/
+dist_pkg/
 scratch/
 scratch_dist/
 .superpowers/

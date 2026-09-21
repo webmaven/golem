@@ -414,3 +414,111 @@ def test_footer_token_adoption():
     assert "var(--bg-surface)" in block, "#golem-footer must use var(--bg-surface)"
     assert "var(--border-color)" in block, "#golem-footer must use var(--border-color)"
     assert "var(--color-text-muted)" in block, "#golem-footer must use var(--color-text-muted)"
+
+
+def test_rules_adopt_semantic_tokens():
+    """Verify layout, headers, sidebars, listings, admonitions, and tables use semantic tokens."""
+    css = _read_css()
+    idx = css.find("*, *::before, *::after")
+    assert idx != -1
+    rules_text = css[idx:]
+
+    # Assert no legacy var(--golem-*) remains in any rule definition
+    legacy_vars = re.findall(r"var\(--golem-[\w-]+\)", rules_text)
+    assert not legacy_vars, f"Found active var(--golem-*) references in rule declarations: {legacy_vars}"
+
+    # Verify specific selectors adopt semantic design tokens
+    rules = _extract_css_rules(css)
+    rules_by_selector = {sel: body for sel, body in rules}
+
+    # body uses --bg-canvas, --color-text, --font-body
+    body_rule = rules_by_selector.get("body", "")
+    assert "var(--bg-canvas)" in body_rule, "body must use var(--bg-canvas)"
+    assert "var(--color-text)" in body_rule, "body must use var(--color-text)"
+    assert "var(--font-body)" in body_rule, "body must use var(--font-body)"
+
+    # #golem-header uses --bg-surface, --border-color
+    header_rule = rules_by_selector.get("#golem-header", "")
+    assert "var(--bg-surface)" in header_rule, "#golem-header must use var(--bg-surface)"
+    assert "var(--border-color)" in header_rule, "#golem-header must use var(--border-color)"
+
+    # #golem-sidebar-left uses --bg-surface, --border-color, --font-ui
+    sidebar_rule = rules_by_selector.get("#golem-sidebar-left", "")
+    assert "var(--bg-surface)" in sidebar_rule, "#golem-sidebar-left must use var(--bg-surface)"
+    assert "var(--border-color)" in sidebar_rule, "#golem-sidebar-left must use var(--border-color)"
+
+    # pre uses --bg-code, --border-color, --color-primary
+    pre_rule = rules_by_selector.get("pre", "")
+    assert "var(--bg-code)" in pre_rule, "pre must use var(--bg-code)"
+    assert "var(--border-color)" in pre_rule, "pre must use var(--border-color)"
+    assert "var(--color-primary)" in pre_rule, "pre must use var(--color-primary)"
+
+
+def test_signature_container_and_source_drawer_rules():
+    """Verify .signature-container and details.source-drawer rules exist and use design tokens."""
+    css = _read_css()
+    rules = _extract_css_rules(css)
+    rules_by_selector = {sel: body for sel, body in rules}
+
+    assert ".signature-container" in rules_by_selector, "Missing .signature-container rule"
+    sig_rule = rules_by_selector[".signature-container"]
+    assert "var(--bg-code)" in sig_rule or "var(--bg-surface" in sig_rule, ".signature-container must use background token"
+    assert "var(--border-color)" in sig_rule, ".signature-container must use var(--border-color)"
+    assert "var(--color-primary)" in sig_rule, ".signature-container must use var(--color-primary)"
+    assert "var(--font-mono)" in sig_rule, ".signature-container must use var(--font-mono)"
+
+    assert "details.source-drawer" in rules_by_selector, "Missing details.source-drawer rule"
+    drawer_rule = rules_by_selector["details.source-drawer"]
+    assert "var(--border-color)" in drawer_rule, "details.source-drawer must use var(--border-color)"
+    assert "var(--bg-surface)" in drawer_rule, "details.source-drawer must use var(--bg-surface)"
+
+    assert ".theme-toggle" in rules_by_selector, "Missing .theme-toggle rule"
+    toggle_rule = rules_by_selector[".theme-toggle"]
+    assert "var(--border-color)" in toggle_rule, ".theme-toggle must use var(--border-color)"
+
+
+def test_skeleton_template_includes_theme_toggle():
+    """Verify skeleton.pt contains the theme toggle button and anti-flicker script."""
+    skeleton_text = SKELETON_PATH.read_text(encoding="utf-8")
+    assert 'id="golem-theme-toggle"' in skeleton_text, "Missing id='golem-theme-toggle' in skeleton.pt"
+    assert "theme-toggle" in skeleton_text, "Missing .theme-toggle class in skeleton.pt"
+    assert "icon-sun" in skeleton_text, "Missing sun icon in skeleton.pt"
+    assert "icon-moon" in skeleton_text, "Missing moon icon in skeleton.pt"
+    assert "localStorage.getItem('golem-theme')" in skeleton_text or 'localStorage.getItem("golem-theme")' in skeleton_text, (
+        "Missing localStorage theme retrieval in skeleton.pt"
+    )
+    assert "data-theme" in skeleton_text, "Missing data-theme attribute manipulation in skeleton.pt"
+
+
+def test_showcase_page_source_and_build(tmp_path):
+    """Verify showcase.adoc exists, has correct frontmatter, and compiles cleanly into HTML."""
+    repo_root = Path(__file__).resolve().parent.parent
+    showcase_adoc = repo_root / "docs" / "about" / "showcase.adoc"
+    assert showcase_adoc.exists(), f"showcase.adoc not found at {showcase_adoc}"
+
+    content = showcase_adoc.read_text(encoding="utf-8")
+    assert "= Design System & Component Showcase" in content
+    assert ":nav_order: 12" in content
+    assert "glyph-c" in content
+    assert "glyph-m" in content
+    assert "glyph-f" in content
+    assert "glyph-i" in content
+    assert "glyph-t" in content
+    assert "glyph-x" in content
+    assert "glyph-v" in content
+    assert "doc-member" in content
+    assert "signature-container" in content
+    assert "source-drawer" in content
+
+    # Verify building via PageCompiler produces valid output with expected components
+    from golem.config import GolemConfig
+    from golem.templates import PageCompiler
+
+    config = GolemConfig(output_dir=str(tmp_path / "dist"))
+    compiler = PageCompiler(config)
+    compiled_html = compiler.compile_page(
+        title="Design System & Component Showcase",
+        body_html='<div class="doc-member"><span class="symbol-glyph glyph-c">C</span></div>',
+    )
+    assert "golem-theme-toggle" in compiled_html
+    assert "symbol-glyph glyph-c" in compiled_html

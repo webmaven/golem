@@ -1,0 +1,315 @@
+= Design System & Component Showcase
+Michael Bernstein <zopemaven@gmail.com>
+:nav_order: 12
+:idprefix:
+:idseparator: -
+:sectanchors:
+:source-highlighter: highlight.js
+
+This document serves as the living component showcase and specification for Golem's three-layer design token architecture. It exercises token rendering across light and dark themes, verifying typography, surface elevation, visual containment, API autodoc structures, and interactive documentation widgets.
+
+== 1. Symbol Kind Glyph Badges (Dual Coding)
+
+Golem employs a **dual-coding visual system** for language symbols: each symbol kind is distinguished by both a distinct letter glyph (`C`, `M`, `F`, `I`, `T`, `X`, `V`) and an accessible, WCAG AA compliant semantic color pair (foreground and background tint).
+
+++++
+<div class="doc-member" style="margin-bottom: 1.5rem;">
+  <table style="width: 100%; border-collapse: collapse;">
+    <thead>
+      <tr>
+        <th style="width: 15%;">Badge</th>
+        <th style="width: 25%;">Symbol Kind</th>
+        <th style="width: 25%;">Light Theme Color</th>
+        <th style="width: 35%;">Dark Theme Color</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="symbol-glyph glyph-c">C</span></td>
+        <td><strong>Class / Struct</strong></td>
+        <td><code>#2563eb</code> on <code>#eff6ff</code></td>
+        <td><code>#60a5fa</code> on <code>#1e3a8a44</code></td>
+      </tr>
+      <tr>
+        <td><span class="symbol-glyph glyph-m">M</span></td>
+        <td><strong>Method / Member Function</strong></td>
+        <td><code>#7c3aed</code> on <code>#f5f3ff</code></td>
+        <td><code>#a78bfa</code> on <code>#4c1d9544</code></td>
+      </tr>
+      <tr>
+        <td><span class="symbol-glyph glyph-f">F</span></td>
+        <td><strong>Function / Free Function</strong></td>
+        <td><code>#92400e</code> on <code>#fffbeb</code></td>
+        <td><code>#fbbf24</code> on <code>#78350f44</code></td>
+      </tr>
+      <tr>
+        <td><span class="symbol-glyph glyph-i">I</span></td>
+        <td><strong>Interface / Protocol / Trait</strong></td>
+        <td><code>#047857</code> on <code>#ecfdf5</code></td>
+        <td><code>#34d399</code> on <code>#064e3b44</code></td>
+      </tr>
+      <tr>
+        <td><span class="symbol-glyph glyph-t">T</span></td>
+        <td><strong>Type / TypeAlias / Enum</strong></td>
+        <td><code>#0e7490</code> on <code>#ecfeff</code></td>
+        <td><code>#22d3ee</code> on <code>#164e6344</code></td>
+      </tr>
+      <tr>
+        <td><span class="symbol-glyph glyph-x">X</span></td>
+        <td><strong>Exception / Error</strong></td>
+        <td><code>#b91c1c</code> on <code>#fef2f2</code></td>
+        <td><code>#f87171</code> on <code>#7f1d1d44</code></td>
+      </tr>
+      <tr>
+        <td><span class="symbol-glyph glyph-v">V</span></td>
+        <td><strong>Variable / Constant / Attribute</strong></td>
+        <td><code>#475569</code> on <code>#f1f5f9</code></td>
+        <td><code>#94a3b8</code> on <code>#33415544</code></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+++++
+
+== 2. Structural Containment & Left-Rail Hierarchy
+
+According to Principle 3, member methods, attributes, and inner types are grouped within a parent symbol using **left-rail visual indentation** (`.doc-member`). When focused or hovered, the active rail dynamically shifts from `--border-rail` to `--border-rail-active`.
+
+++++
+<div class="doc-member" id="doc-class-buildengine">
+  <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+    <span class="symbol-glyph glyph-c">C</span>
+    <h3 style="margin: 0; font-size: 1.2rem;"><code>BuildEngine</code></h3>
+  </div>
+  <p>The primary DAG compilation orchestrator responsible for incremental page synthesis.</p>
+
+  <div class="signature-container">
+    <code><span class="sig-keyword">class</span> <span class="sig-name">BuildEngine</span><span class="sig-paren">(</span><span class="sig-param">config</span>: <span class="sig-type">GolemConfig</span>, <span class="sig-param">staleness_tracker</span>: <span class="sig-type">StalenessTracker</span> = <span class="sig-default">None</span><span class="sig-paren">)</span>:</code>
+  </div>
+
+  <details class="source-drawer">
+    <summary>View Source</summary>
+    <div class="listingblock">
+      <div class="listing-content">
+        <pre class="highlight"><code class="language-python">class BuildEngine:
+    """Orchestrates AsciiDoc parsing, template composition, and artifact writing."""
+    def __init__(self, config: GolemConfig, staleness_tracker: Optional[StalenessTracker] = None):
+        self.config = config
+        self.staleness_tracker = staleness_tracker or StalenessTracker(config)</code></pre>
+      </div>
+    </div>
+  </details>
+
+  <!-- Nested Method Member 1 -->
+  <div class="doc-member" id="doc-method-compile-all" style="margin-top: 1rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+      <span class="symbol-glyph glyph-m">M</span>
+      <h4 style="margin: 0; font-size: 1.05rem;"><code>compile_all()</code></h4>
+    </div>
+    <p>Executes an end-to-end incremental rebuild of all stale AsciiDoc documents.</p>
+
+    <div class="signature-container">
+      <code><span class="sig-keyword">def</span> <span class="sig-name">compile_all</span><span class="sig-paren">(</span><span class="sig-param">self</span>, <span class="sig-param">force</span>: <span class="sig-type">bool</span> = <span class="sig-default">False</span><span class="sig-paren">)</span> -&gt; <span class="sig-return">list[Path]</span>:</code>
+    </div>
+
+    <details class="source-drawer">
+      <summary>View Source</summary>
+      <div class="listingblock">
+        <div class="listing-content">
+          <pre class="highlight"><code class="language-python">def compile_all(self, force: bool = False) -> list[Path]:
+    stale_files = self.staleness_tracker.get_outdated_files() if not force else self.all_files
+    return [self.compile_page(f) for f in stale_files]</code></pre>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <!-- Nested Attribute Member 2 -->
+  <div class="doc-member" id="doc-attr-staleness-tracker" style="margin-top: 1rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+      <span class="symbol-glyph glyph-v">V</span>
+      <h4 style="margin: 0; font-size: 1.05rem;"><code>staleness_tracker</code></h4>
+    </div>
+    <p>Instance tracking file hashes, mtimes, and include dependencies for incremental builds.</p>
+    <div class="signature-container">
+      <code><span class="sig-name">staleness_tracker</span>: <span class="sig-type">StalenessTracker</span></code>
+    </div>
+  </div>
+</div>
+++++
+
+== 3. Monospace Signature Blocks & Source Drawer
+
+Autodoc signature containers (`.signature-container`) provide monospace, token-highlighted function and method definitions that render with high legibility across themes.
+
+++++
+<div class="signature-container">
+  <code><span class="sig-keyword">async def</span> <span class="sig-name">stream_diagnostics</span><span class="sig-paren">(</span><span class="sig-param">engine</span>: <span class="sig-type">BuildEngine</span>, <span class="sig-param">channel</span>: <span class="sig-type">AsyncIterator[str]</span>, <span class="sig-param">timeout</span>: <span class="sig-type">float</span> = <span class="sig-default">30.0</span><span class="sig-paren">)</span> -&gt; <span class="sig-return">AsyncGenerator[DiagnosticEvent, None]</span>:</code>
+</div>
+
+<details class="source-drawer">
+  <summary>View Source Implementation</summary>
+  <div class="listingblock">
+    <div class="listing-content">
+      <pre class="highlight"><code class="language-python">async def stream_diagnostics(
+    engine: BuildEngine,
+    channel: AsyncIterator[str],
+    timeout: float = 30.0,
+) -> AsyncGenerator[DiagnosticEvent, None]:
+    async with asyncio.timeout(timeout):
+        async for line in channel:
+            yield parse_diagnostic(line)</code></pre>
+    </div>
+  </div>
+</details>
+++++
+
+== 4. Typography Scale & Surface Elevations
+
+The typographic scale combines Adobe's **Source Serif 4** for display and prose, **Source Sans 3** for navigation and UI chrome, and **Source Code Pro** for code listings and signatures.
+
+++++
+<div class="surface-grid">
+  <div class="surface-card surface-canvas">
+    <div style="font-weight: 700; font-family: var(--font-ui); margin-bottom: 0.25rem;">Canvas</div>
+    <code>--bg-canvas</code>
+    <div style="margin-top: 0.5rem; font-size: var(--font-size-sm); color: var(--color-text-muted);">Root page background</div>
+  </div>
+  <div class="surface-card surface-base">
+    <div style="font-weight: 700; font-family: var(--font-ui); margin-bottom: 0.25rem;">Surface</div>
+    <code>--bg-surface</code>
+    <div style="margin-top: 0.5rem; font-size: var(--font-size-sm); color: var(--color-text-muted);">Sidebar, header, admonitions</div>
+  </div>
+  <div class="surface-card surface-card-bg">
+    <div style="font-weight: 700; font-family: var(--font-ui); margin-bottom: 0.25rem;">Card</div>
+    <code>--bg-card</code>
+    <div style="margin-top: 0.5rem; font-size: var(--font-size-sm); color: var(--color-text-muted);">Pagination cards, listings</div>
+  </div>
+  <div class="surface-card surface-elevated">
+    <div style="font-weight: 700; font-family: var(--font-ui); margin-bottom: 0.25rem;">Elevated</div>
+    <code>--bg-surface-elevated</code>
+    <div style="margin-top: 0.5rem; font-size: var(--font-size-sm); color: var(--color-text-muted);">Popups, overlays, tooltips</div>
+  </div>
+  <div class="surface-card surface-code">
+    <div style="font-weight: 700; font-family: var(--font-ui); margin-bottom: 0.25rem;">Code</div>
+    <code>--bg-code</code>
+    <div style="margin-top: 0.5rem; font-size: var(--font-size-sm); color: var(--color-text-muted);">Pre blocks, inline code</div>
+  </div>
+</div>
+++++
+
+=== Heading Scale Demonstration
+
+The following sections illustrate heading styles from `H1` down to `H6`:
+
+# Heading 1 (2.1rem Display Serif)
+## Heading 2 (1.55rem Display Serif with Underline)
+### Heading 3 (1.25rem Display Serif)
+#### Heading 4 (1.05rem Sans UI Bold)
+##### Heading 5 (0.90rem Sans UI Uppercase Tracked)
+###### Heading 6 (0.80rem Sans UI Sub-heading)
+
+Prose paragraph with *bold text*, _italicized phrases_, `inline_code_identifiers`, and a link:index.html[hyperlink to home] demonstrating subtle underline styling and focus ring contrast.
+
+== 5. Admonition Callouts
+
+Golem formats all 5 standard AsciiDoc admonition types with custom semantic colors and uppercase labels:
+
+[NOTE]
+====
+This is a **Note** admonition, utilizing `--color-note` (Forest Teal). It provides supplementary context or background explanations.
+====
+
+[TIP]
+====
+This is a **Tip** admonition, utilizing `--color-tip` (Olive Green). It highlights best practices, keyboard shortcuts, or performance recommendations.
+====
+
+[IMPORTANT]
+====
+This is an **Important** admonition, utilizing `--color-important` (Terracotta Clay). It flags essential prerequisites and crucial requirements.
+====
+
+[WARNING]
+====
+This is a **Warning** admonition, utilizing `--color-warning` (Warm Amber Yellow). It cautions users against unintended consequences or deprecated interfaces.
+====
+
+[CAUTION]
+====
+This is a **Caution** admonition, utilizing `--color-caution` (Crimson Red). It alerts readers to potentially destructive operations or security risks.
+====
+
+== 6. Color Tokens & Palettes
+
+The Golem color system is organized into primitive palettes and semantic mappings.
+
+=== Fired Clay Brand Palette
+
+++++
+<div class="palette-grid">
+  <div class="palette-tile"><div class="palette-swatch" style="background-color: var(--palette-clay-100);"></div><div class="palette-info"><span class="palette-name">Clay 100</span><span class="palette-value">#fbeee6</span></div></div>
+  <div class="palette-tile"><div class="palette-swatch" style="background-color: var(--palette-clay-300);"></div><div class="palette-info"><span class="palette-name">Clay 300</span><span class="palette-value">#eeb79b</span></div></div>
+  <div class="palette-tile"><div class="palette-swatch" style="background-color: var(--palette-clay-500);"></div><div class="palette-info"><span class="palette-name">Clay 500</span><span class="palette-value">#d4692a</span></div></div>
+  <div class="palette-tile"><div class="palette-swatch" style="background-color: var(--palette-clay-700);"></div><div class="palette-info"><span class="palette-name">Clay 700</span><span class="palette-value">#8b3a12</span></div></div>
+  <div class="palette-tile"><div class="palette-swatch" style="background-color: var(--palette-clay-900);"></div><div class="palette-info"><span class="palette-name">Clay 900</span><span class="palette-value">#3e2518</span></div></div>
+</div>
+++++
+
+=== Neutral Workbench Palette
+
+++++
+<div class="palette-grid">
+  <div class="palette-tile"><div class="palette-swatch" style="background-color: var(--palette-neutral-50);"></div><div class="palette-info"><span class="palette-name">Neutral 50</span><span class="palette-value">#faf9f5</span></div></div>
+  <div class="palette-tile"><div class="palette-swatch" style="background-color: var(--palette-neutral-200);"></div><div class="palette-info"><span class="palette-name">Neutral 200</span><span class="palette-value">#ede8df</span></div></div>
+  <div class="palette-tile"><div class="palette-swatch" style="background-color: var(--palette-neutral-400);"></div><div class="palette-info"><span class="palette-name">Neutral 400</span><span class="palette-value">#cbd5e1</span></div></div>
+  <div class="palette-tile"><div class="palette-swatch" style="background-color: var(--palette-neutral-600);"></div><div class="palette-info"><span class="palette-name">Neutral 600</span><span class="palette-value">#6b5d52</span></div></div>
+  <div class="palette-tile"><div class="palette-swatch" style="background-color: var(--palette-neutral-800);"></div><div class="palette-info"><span class="palette-name">Neutral 800</span><span class="palette-value">#1e1a16</span></div></div>
+  <div class="palette-tile"><div class="palette-swatch" style="background-color: var(--palette-neutral-950);"></div><div class="palette-info"><span class="palette-name">Neutral 950</span><span class="palette-value">#090d16</span></div></div>
+</div>
+++++
+
+== 7. Interactive UI & Multi-View Code Listings
+
+=== Multi-View Listing Tabs (Zero-JS)
+
+Code listings support tabbed switching (e.g. Source, ASG, and Preview) through pure CSS `:has()` pseudo-class selectors:
+
+.Example Multi-View Component
+[source,python,render="source,preview"]
+----
+def greet(name: str) -> str:
+    """Return a warm greeting."""
+    return f"Hello, {name}!"
+----
+
+=== Keyboard Shortcuts & UI Buttons
+
+Inline user interface macros render tactile, elevated widgets:
+
+* Open Command Palette: kbd:[Ctrl+Shift+P] or kbd:[Cmd+Shift+P]
+* Quick Save: kbd:[Ctrl+S]
+* Action Button: btn:[Rebuild Site]
+* Menu Sequence: menu:File[Export > Static HTML]
+
+=== Tables & Column Alignments
+
+[cols="1,2,^1,>1",options="header",stripes=even]
+|===
+| Parameter | Description | Type | Default
+
+| `config`
+| Primary configuration containing paths and plugins
+| `GolemConfig`
+| _Required_
+
+| `force`
+| When `True`, invalidates all cached page artifacts
+| `bool`
+| `False`
+
+| `workers`
+| Maximum parallel compilation workers
+| `int`
+| `4`
+|===

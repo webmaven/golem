@@ -224,9 +224,13 @@
     --bg-symbol-constant:        var(--bg-symbol-v);
     --color-symbol-constant-bg:  var(--bg-symbol-v);
 
+    /* Layout & Geometry */
+    --content-pad-x:      3.5rem;
+
     /* Legacy Golem Token Aliases (Complete Backward Compatibility) */
     --golem-bg:           var(--bg-canvas);
     --golem-surface:      var(--bg-surface);
+    --golem-surface-alt:  var(--bg-surface-subtle);
     --golem-code-bg:      var(--bg-code);
     --golem-text:         var(--color-text);
     --golem-text-muted:   var(--color-text-muted);
@@ -249,6 +253,7 @@
     --golem-font-mono:    var(--font-mono);
 
     --golem-texture: var(--texture-paper);
+    --golem-content-pad-x: var(--content-pad-x);
 }
 
 /* Explicit Light Theme Switch (matches when data-theme="light" is set on html or root) */
@@ -475,10 +480,10 @@
 }
 
 body {
-    background-color: var(--golem-bg);
-    background-image: var(--golem-texture);
-    color: var(--golem-text);
-    font-family: var(--golem-font-body);
+    background-color: var(--bg-canvas);
+    background-image: var(--texture-paper);
+    color: var(--color-text);
+    font-family: var(--font-body);
     font-optical-sizing: auto;
     font-variation-settings: "opsz" 12;
     margin: 0;
@@ -490,32 +495,87 @@ body {
 
 /* ── Header ────────────────────────────────────────── */
 #golem-header {
-    background: var(--golem-surface);
-    padding: 1rem 1.75rem;
-    border-bottom: 1px solid var(--golem-border);
+    background: var(--bg-surface);
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
 }
 #golem-header h1 {
     margin: 0;
     font-size: 1.35rem;
     font-weight: 700;
-    font-family: var(--golem-font-display);
+    font-family: var(--font-display);
     font-variation-settings: "opsz" 36;
     letter-spacing: -0.01em;
 }
 #golem-header a {
-    color: var(--golem-text);
+    color: var(--color-text);
     text-decoration: none;
 }
 #golem-header a:hover {
-    color: var(--golem-primary);
+    color: var(--color-primary);
+}
+.golem-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
 }
 .golem-author {
-    color: var(--golem-text-muted);
-    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+/* ── Theme Toggle Button ───────────────────────────── */
+.theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--color-text-muted);
+    border-radius: var(--radius-md);
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.theme-toggle:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background-color: var(--bg-surface-subtle);
+}
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+.theme-toggle svg {
+    width: 18px;
+    height: 18px;
+}
+.theme-toggle .icon-sun {
+    display: none;
+}
+.theme-toggle .icon-moon {
+    display: block;
+}
+[data-theme="dark"] .theme-toggle .icon-sun {
+    display: block;
+}
+[data-theme="dark"] .theme-toggle .icon-moon {
+    display: none;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .theme-toggle .icon-sun {
+        display: block;
+    }
+    :root:not([data-theme="light"]) .theme-toggle .icon-moon {
+        display: none;
+    }
 }
 
 /* ── Layout Grid / Columns ─────────────────────────── */
@@ -547,10 +607,10 @@ body {
 /* ── Left Sidebar (Navigation) ─────────────────────── */
 #golem-sidebar-left {
     width: 270px;
-    background: var(--golem-surface);
-    padding: 1.5rem 1.25rem;
-    border-right: 1px solid var(--golem-border);
-    font-family: var(--golem-font-ui);
+    background: var(--bg-surface);
+    padding: var(--space-lg) 1.25rem;
+    border-right: 1px solid var(--border-color);
+    font-family: var(--font-ui);
     flex-shrink: 0;
     position: sticky;
     top: 0;
@@ -560,8 +620,8 @@ body {
 }
 #golem-sidebar-left h3 {
     margin-top: 0;
-    margin-bottom: 0.75rem;
-    color: var(--golem-text-muted);
+    margin-bottom: var(--space-sm);
+    color: var(--color-text-muted);
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -573,11 +633,11 @@ body {
     margin: 0;
 }
 #golem-sidebar-left li {
-    margin-bottom: 0.25rem;
+    margin-bottom: var(--space-xs);
 }
 .golem-nav-section {
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
+    margin-top: var(--space-md);
+    margin-bottom: var(--space-sm);
 }
 .golem-nav-section-title {
     display: block;
@@ -585,122 +645,123 @@ body {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--golem-text-muted);
+    color: var(--color-text-muted);
     margin-bottom: 0.35rem;
-    padding: 0.15rem 0.5rem;
+    padding: 0.15rem var(--space-sm);
 }
 .golem-nav-section-title a {
-    color: var(--golem-text-muted) !important;
+    color: var(--color-text-muted) !important;
     font-weight: 700 !important;
     font-size: 0.8rem !important;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    padding: 0.15rem 0.5rem !important;
-    border-radius: 4px;
+    padding: 0.15rem var(--space-sm) !important;
+    border-radius: var(--radius-sm);
 }
 .golem-nav-section-title a:hover {
-    color: var(--golem-primary) !important;
-    background-color: var(--golem-surface-alt, rgba(0, 0, 0, 0.04));
+    color: var(--color-primary) !important;
+    background-color: var(--bg-surface-subtle);
 }
 .golem-nav-section-title a.active,
 .golem-nav-section-title a[aria-current="page"] {
-    color: var(--golem-primary) !important;
-    background-color: var(--golem-surface-alt, rgba(0, 0, 0, 0.05));
-    border-left: 3px solid var(--golem-primary);
+    color: var(--color-primary) !important;
+    background-color: var(--bg-surface-muted);
+    border-left: 3px solid var(--color-primary);
 }
 .golem-nav-sublist {
     list-style: none;
-    padding-left: 0.5rem !important;
-    margin: 0.25rem 0 0.5rem 0 !important;
-    border-left: 1px solid var(--golem-border);
+    padding-left: var(--space-sm) !important;
+    margin: var(--space-xs) 0 var(--space-sm) 0 !important;
+    border-left: 1px solid var(--border-color);
 }
 #golem-sidebar-left a {
-    color: var(--golem-text);
+    color: var(--color-text);
     text-decoration: none;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     display: block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
     transition: color 0.15s ease, background-color 0.15s ease, padding-left 0.15s ease;
 }
 #golem-sidebar-left a:hover {
-    color: var(--golem-primary);
-    background-color: var(--golem-surface-alt, rgba(0, 0, 0, 0.04));
+    color: var(--color-primary);
+    background-color: var(--bg-surface-subtle);
     padding-left: 0.75rem;
 }
 #golem-sidebar-left a.active,
 #golem-sidebar-left a[aria-current="page"] {
-    color: var(--golem-primary);
+    color: var(--color-primary);
     font-weight: 600;
-    background-color: var(--golem-surface-alt, rgba(0, 0, 0, 0.05));
-    border-left: 3px solid var(--golem-primary);
-    padding-left: 0.5rem;
+    background-color: var(--bg-surface-muted);
+    border-left: 3px solid var(--color-primary);
+    padding-left: var(--space-sm);
 }
 
 /* ── Main Content Area ─────────────────────────────── */
 #golem-content {
     flex: 1;
-    --golem-content-pad-x: 3.5rem;
-    padding: 2.5rem var(--golem-content-pad-x);
-    max-width: calc(72ch + (2 * var(--golem-content-pad-x)));
+    --content-pad-x: 3.5rem;
+    --golem-content-pad-x: var(--content-pad-x);
+    padding: 2.5rem var(--content-pad-x);
+    max-width: calc(72ch + (2 * var(--content-pad-x)));
 }
 #golem-content h1 {
-    font-family: var(--golem-font-display);
-    font-size: 2.1rem;
+    font-family: var(--font-display);
+    font-size: var(--font-size-2xl);
     font-weight: 700;
     font-variation-settings: "opsz" 36;
     line-height: 1.2;
     margin-top: 0;
     margin-bottom: 1.25rem;
-    color: var(--golem-text);
+    color: var(--color-text);
     letter-spacing: -0.01em;
 }
 #golem-content h2 {
-    font-family: var(--golem-font-display);
-    font-size: 1.55rem;
+    font-family: var(--font-display);
+    font-size: var(--font-size-xl);
     font-weight: 600;
     font-variation-settings: "opsz" 24;
     line-height: 1.3;
-    margin-top: 2rem;
+    margin-top: var(--space-xl);
     margin-bottom: 0.85rem;
-    color: var(--golem-text);
-    border-bottom: 1px solid var(--golem-border);
+    color: var(--color-text);
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 0.35rem;
 }
 #golem-content h3 {
-    font-family: var(--golem-font-display);
-    font-size: 1.25rem;
+    font-family: var(--font-display);
+    font-size: var(--font-size-lg);
     font-weight: 600;
     font-variation-settings: "opsz" 18;
-    margin-top: 1.5rem;
-    margin-bottom: 0.5rem;
-    color: var(--golem-text);
+    margin-top: var(--space-lg);
+    margin-bottom: var(--space-sm);
+    color: var(--color-text);
 }
 #golem-content h4 {
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-size: 1.05rem;
     font-weight: 700;
-    color: var(--golem-text);
+    color: var(--color-text);
     margin-top: 1.25rem;
     margin-bottom: 0.35rem;
 }
 #golem-content h5 {
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-size: 0.9rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--golem-text-muted);
-    margin-top: 1rem;
-    margin-bottom: 0.25rem;
+    color: var(--color-text-muted);
+    margin-top: var(--space-md);
+    margin-bottom: var(--space-xs);
 }
 #golem-content h6 {
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-size: 0.8rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--golem-text-muted);
+    color: var(--color-text-muted);
     margin-top: 0.75rem;
     margin-bottom: 0.2rem;
 }
@@ -709,51 +770,51 @@ body {
     margin-bottom: 1.25rem;
 }
 #golem-content a {
-    color: var(--golem-link);
-    text-decoration-color: color-mix(in srgb, var(--golem-link) 45%, transparent);
+    color: var(--color-link);
+    text-decoration-color: color-mix(in srgb, var(--color-link) 45%, transparent);
     text-underline-offset: 3px;
     text-decoration-thickness: 1px;
     transition: color 0.15s ease;
 }
 #golem-content a:hover {
-    color: var(--golem-link-hover);
-    text-decoration-color: var(--golem-link-hover);
+    color: var(--color-link-hover);
+    text-decoration-color: var(--color-link-hover);
 }
 #golem-content a:visited {
-    color: var(--golem-link-visited);
+    color: var(--color-link-visited);
 }
 
 /* ── Code & Inline Elements ────────────────────────── */
 code, samp {
-    font-family: var(--golem-font-mono);
+    font-family: var(--font-mono);
     font-size: 0.875em;
 }
 p code, li code, td code {
-    background: var(--golem-code-bg);
+    background: var(--bg-code);
     padding: 0.1em 0.35em;
-    border-radius: 2px;
-    border: 1px solid var(--golem-border);
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border-color);
 }
 h1 code, h2 code, h3 code, h4 code, h5 code, h6 code {
-    background: var(--golem-code-bg);
+    background: var(--bg-code);
     padding: 0.1em 0.3em;
-    border-radius: 2px;
-    border: 1px solid var(--golem-border);
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border-color);
     font-size: 0.85em;
 }
 
 /* ── UI Macros (kbd, btn, menu) ────────────────────── */
 kbd {
     display: inline-block;
-    font-family: var(--golem-font-mono);
+    font-family: var(--font-mono);
     font-size: 0.8em;
     font-weight: 600;
     line-height: 1.25;
-    color: var(--golem-text);
-    background-color: var(--golem-surface);
-    border: 1px solid var(--golem-border);
-    border-bottom: 2px solid var(--golem-border);
-    border-radius: 4px;
+    color: var(--color-text);
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-bottom: 2px solid var(--border-color);
+    border-radius: var(--radius-sm);
     padding: 0.15em 0.45em;
     box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
     vertical-align: middle;
@@ -761,53 +822,53 @@ kbd {
 }
 b.button, .button {
     display: inline-block;
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-size: 0.85em;
     font-weight: 600;
     line-height: 1.3;
-    color: var(--golem-text);
-    background-color: var(--golem-surface);
-    border: 1px solid var(--golem-border);
-    border-radius: 5px;
+    color: var(--color-text);
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
     padding: 0.15em 0.55em;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     vertical-align: baseline;
     white-space: nowrap;
 }
 span.menuseq {
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-size: 0.92em;
-    color: var(--golem-text);
+    color: var(--color-text);
 }
 span.menuseq b.menu,
 span.menuseq b.submenu,
 span.menuseq b.menuitem {
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-weight: 600;
-    color: var(--golem-text);
+    color: var(--color-text);
 }
 /* ── Code Blocks & Listings ────────────────────────── */
 .listingblock {
     position: relative;
     margin: 1.25rem 0;
-    border: 1px solid var(--golem-border);
-    border-left: 3px solid var(--golem-primary);
-    border-radius: 4px;
-    background: var(--golem-code-bg);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    background: var(--bg-code);
     overflow: hidden;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .listingblock:has(.listing-content:focus-within, .listing-panes:focus-within) {
-    border-color: var(--golem-primary);
-    box-shadow: 0 0 0 1px var(--golem-primary);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
 }
 pre {
     position: relative;
-    background: var(--golem-code-bg);
-    border: 1px solid var(--golem-border);
-    border-left: 3px solid var(--golem-primary);
-    border-radius: 4px;
-    padding: 1rem 1.25rem;
+    background: var(--bg-code);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    padding: var(--space-md) 1.25rem;
     overflow-x: auto;
     line-height: 1.55;
     margin: 1.25rem 0;
@@ -817,8 +878,8 @@ pre {
 pre:focus-within {
     user-select: all;
     -webkit-user-select: all;
-    border-color: var(--golem-primary);
-    box-shadow: 0 0 0 1px var(--golem-primary);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
 }
 .listingblock pre {
     margin: 0;
@@ -826,7 +887,7 @@ pre:focus-within {
     border-left: none;
     border-radius: 0;
     background: transparent;
-    padding: 1rem 1.25rem;
+    padding: var(--space-md) 1.25rem;
     box-shadow: none;
 }
 .listingblock:has(.listing-content:focus-within, .listing-panes:focus-within) pre {
@@ -837,7 +898,7 @@ pre code {
     background: transparent;
     padding: 0;
     border: none;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
 }
 
 /* ── Listing Header & Actions ──────────────────────── */
@@ -845,16 +906,16 @@ pre code {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: var(--space-sm);
     padding: 0.45rem 0.75rem;
-    background: var(--golem-surface);
-    border-bottom: 1px solid var(--golem-border);
-    font-family: var(--golem-font-ui);
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-color);
+    font-family: var(--font-ui);
     font-size: 0.8rem;
 }
 .listing-title {
     font-weight: 600;
-    color: var(--golem-text);
+    color: var(--color-text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -869,66 +930,66 @@ pre code {
 .badge {
     display: inline-flex;
     align-items: center;
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-size: 0.68rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     padding: 0.15em 0.55em;
-    border-radius: 3px;
-    background: var(--golem-surface);
-    color: var(--golem-text-muted);
-    border: 1px solid var(--golem-border);
+    border-radius: var(--radius-xs);
+    background: var(--bg-surface);
+    color: var(--color-text-muted);
+    border: 1px solid var(--border-color);
     line-height: 1.2;
 }
 .badge-lang {
-    color: var(--golem-text-muted);
-    border-color: var(--golem-border);
-    background: var(--golem-bg);
+    color: var(--color-text-muted);
+    border-color: var(--border-color);
+    background: var(--bg-canvas);
 }
 .badge-test {
-    color: var(--golem-note);
-    border-color: color-mix(in srgb, var(--golem-note) 40%, var(--golem-border));
-    background: color-mix(in srgb, var(--golem-note) 10%, transparent);
+    color: var(--color-note);
+    border-color: color-mix(in srgb, var(--color-note) 40%, var(--border-color));
+    background: color-mix(in srgb, var(--color-note) 10%, transparent);
 }
 .badge-shared {
-    color: var(--golem-tip);
-    border-color: color-mix(in srgb, var(--golem-tip) 40%, var(--golem-border));
-    background: color-mix(in srgb, var(--golem-tip) 10%, transparent);
+    color: var(--color-tip);
+    border-color: color-mix(in srgb, var(--color-tip) 40%, var(--border-color));
+    background: color-mix(in srgb, var(--color-tip) 10%, transparent);
 }
 .badge-reset {
-    color: var(--golem-warning);
-    border-color: color-mix(in srgb, var(--golem-warning) 40%, var(--golem-border));
-    background: color-mix(in srgb, var(--golem-warning) 10%, transparent);
+    color: var(--color-warning);
+    border-color: color-mix(in srgb, var(--color-warning) 40%, var(--border-color));
+    background: color-mix(in srgb, var(--color-warning) 10%, transparent);
 }
 .listing-copy-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-size: 0.72rem;
     font-weight: 600;
     padding: 0.15em 0.55em;
-    border-radius: 3px;
-    background: var(--golem-surface);
-    color: var(--golem-text-muted);
-    border: 1px solid var(--golem-border);
+    border-radius: var(--radius-xs);
+    background: var(--bg-surface);
+    color: var(--color-text-muted);
+    border: 1px solid var(--border-color);
     cursor: pointer;
     line-height: 1.2;
     transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
 .listing-copy-btn:hover {
-    color: var(--golem-text);
-    border-color: var(--golem-primary);
-    background: var(--golem-bg);
+    color: var(--color-text);
+    border-color: var(--color-primary);
+    background: var(--bg-canvas);
 }
 .listing-copy-btn:focus-visible {
-    outline: 2px solid var(--golem-primary);
+    outline: 2px solid var(--color-primary);
     outline-offset: 1px;
 }
 .listing-copy-btn.copied {
-    color: var(--golem-tip);
-    border-color: var(--golem-tip);
+    color: var(--color-tip);
+    border-color: var(--color-tip);
 }
 .listing-copy-btn svg {
     display: block;
@@ -969,15 +1030,15 @@ pre code {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-size: 0.73rem;
     font-weight: 600;
     padding: 0.35rem 0.75rem calc(0.35rem + 1px);
-    border-radius: 5px 5px 0 0;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     border: 1px solid transparent;
     border-bottom: none;
     background: transparent;
-    color: var(--golem-text-muted);
+    color: var(--color-text-muted);
     cursor: pointer;
     line-height: 1.2;
     position: relative;
@@ -985,12 +1046,12 @@ pre code {
     transition: color 0.15s ease, background-color 0.15s ease;
 }
 .tab-btn:hover {
-    color: var(--golem-text);
-    background: color-mix(in srgb, var(--golem-text) 5%, transparent);
-    border-color: color-mix(in srgb, var(--golem-border) 60%, transparent) color-mix(in srgb, var(--golem-border) 60%, transparent) transparent;
+    color: var(--color-text);
+    background: color-mix(in srgb, var(--color-text) 5%, transparent);
+    border-color: color-mix(in srgb, var(--border-color) 60%, transparent) color-mix(in srgb, var(--border-color) 60%, transparent) transparent;
 }
 .tab-btn:focus-visible {
-    outline: 2px solid var(--golem-primary);
+    outline: 2px solid var(--color-primary);
     outline-offset: 1px;
 }
 
@@ -999,22 +1060,22 @@ pre code {
 .listingblock:has(.tab-input[value="asg"]:checked) .tab-btn[data-tab="asg"],
 .listingblock:has(.tab-input[value="html"]:checked) .tab-btn[data-tab="html"],
 .listingblock:has(.tab-input[value="preview"]:checked) .tab-btn[data-tab="preview"] {
-    color: var(--golem-primary);
+    color: var(--color-primary);
     font-weight: 700;
-    background: var(--golem-code-bg);
-    border: 1px solid var(--golem-border);
-    border-bottom: 1px solid var(--golem-code-bg);
+    background: var(--bg-code);
+    border: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--bg-code);
     margin-bottom: -1px;
     z-index: 20;
 }
 .listingblock:has(.tab-input[value="preview"]:checked) .tab-btn[data-tab="preview"] {
-    background: var(--golem-bg);
-    border-bottom: 1px solid var(--golem-bg);
+    background: var(--bg-canvas);
+    border-bottom: 1px solid var(--bg-canvas);
 }
 
 .listing-panes {
     position: relative;
-    background: var(--golem-code-bg);
+    background: var(--bg-code);
 }
 .listing-panes .tab-pane {
     display: none;
@@ -1040,10 +1101,10 @@ pre code {
 }
 .rendered-preview {
     padding: 1.25rem;
-    background: var(--golem-bg);
-    border-radius: 0 0 4px 4px;
-    color: var(--golem-text);
-    font-family: var(--golem-font-body);
+    background: var(--bg-canvas);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    color: var(--color-text);
+    font-family: var(--font-body);
 }
 .rendered-preview > :first-child {
     margin-top: 0;
@@ -1121,6 +1182,110 @@ i.conum b {
 .glyph-t, .glyph-type      { color: var(--color-symbol-t); background-color: var(--bg-symbol-t); }
 .glyph-x, .glyph-exception { color: var(--color-symbol-x); background-color: var(--bg-symbol-x); }
 .glyph-v, .glyph-variable  { color: var(--color-symbol-v); background-color: var(--bg-symbol-v); }
+
+/* ── Monospace Signature Blocks ────────────────────── */
+.signature-container {
+    background-color: var(--bg-code);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm) var(--space-md);
+    margin: var(--space-sm) 0;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sig);
+    line-height: 1.5;
+    overflow-x: auto;
+    color: var(--color-text);
+}
+.signature-container code {
+    background: transparent;
+    padding: 0;
+    border: none;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+}
+.signature-container .sig-keyword {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+.signature-container .sig-name {
+    font-weight: 700;
+    color: var(--color-text);
+}
+.signature-container .sig-param {
+    color: var(--color-text-secondary);
+}
+.signature-container .sig-type {
+    color: var(--color-symbol-t);
+}
+.signature-container .sig-default {
+    color: var(--color-text-muted);
+}
+.signature-container .sig-punct {
+    color: var(--color-text-muted);
+}
+.signature-container .sig-return {
+    color: var(--color-symbol-t);
+}
+
+/* ── In-Situ Source Drawer ─────────────────────────── */
+details.source-drawer {
+    margin: var(--space-sm) 0 var(--space-md) 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    overflow: hidden;
+    transition: border-color 0.15s ease;
+}
+details.source-drawer[open] {
+    border-color: var(--border-focus);
+}
+details.source-drawer > summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    font-family: var(--font-ui);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+details.source-drawer > summary::-webkit-details-marker {
+    display: none;
+}
+details.source-drawer > summary::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 0.2s ease;
+    margin-left: 2px;
+    margin-right: 4px;
+}
+details.source-drawer[open] > summary::before {
+    transform: rotate(45deg);
+}
+details.source-drawer > summary:hover {
+    color: var(--color-text);
+    background-color: var(--bg-surface-subtle);
+}
+details.source-drawer .source-content,
+details.source-drawer > .listingblock,
+details.source-drawer > pre {
+    border: none;
+    border-left: none;
+    border-radius: 0;
+    border-top: 1px solid var(--border-color);
+    margin: 0;
+}
 .colist, ol.colist {
     margin: 1rem 0;
     font-size: 0.95rem;
@@ -1135,13 +1300,13 @@ ol.colist > li {
     display: flex;
     align-items: baseline;
     gap: 0.5em;
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-sm);
 }
 .colist ol {
     padding-left: 1.25rem;
 }
 .colist ol > li {
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-sm);
 }
 .colist table {
     border: none;
@@ -1150,7 +1315,7 @@ ol.colist > li {
 }
 .colist table td {
     border: none;
-    padding: 0.25rem 0.5rem;
+    padding: var(--space-xs) var(--space-sm);
     vertical-align: top;
 }
 .colist table td:first-child {
@@ -1162,72 +1327,72 @@ ol.colist > li {
 .admonitionblock, aside.golem-admonition, .admonition {
     margin: 1.5rem 0;
     padding: 0.85rem 1.15rem;
-    background: var(--golem-surface);
-    border-left: 4px solid var(--golem-note);
-    border-top: 1px solid var(--golem-border);
-    border-right: 1px solid var(--golem-border);
-    border-bottom: 1px solid var(--golem-border);
-    border-radius: 0 4px 4px 0;
+    background: var(--bg-surface);
+    border-left: 4px solid var(--color-note);
+    border-top: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
-.admonitionblock.note, aside.golem-admonition.note, .admonition.note { border-left-color: var(--golem-note); }
-.admonitionblock.tip, aside.golem-admonition.tip, .admonition.tip { border-left-color: var(--golem-tip); }
-.admonitionblock.important, aside.golem-admonition.important, .admonition.important { border-left-color: var(--golem-important); }
-.admonitionblock.warning, aside.golem-admonition.warning, .admonition.warning { border-left-color: var(--golem-warning); }
-.admonitionblock.caution, aside.golem-admonition.caution, .admonition.caution { border-left-color: var(--golem-caution); }
+.admonitionblock.note, aside.golem-admonition.note, .admonition.note { border-left-color: var(--color-note); }
+.admonitionblock.tip, aside.golem-admonition.tip, .admonition.tip { border-left-color: var(--color-tip); }
+.admonitionblock.important, aside.golem-admonition.important, .admonition.important { border-left-color: var(--color-important); }
+.admonitionblock.warning, aside.golem-admonition.warning, .admonition.warning { border-left-color: var(--color-warning); }
+.admonitionblock.caution, aside.golem-admonition.caution, .admonition.caution { border-left-color: var(--color-caution); }
 
 .admonitionblock::before,
 aside.golem-admonition::before,
 .admonition::before {
     display: inline-block;
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     margin-bottom: 0.4rem;
     padding: 0.1em 0.45em;
-    border-radius: 3px;
+    border-radius: var(--radius-xs);
     line-height: 1.3;
 }
 .admonitionblock.note::before,
 aside.golem-admonition.note::before,
 .admonition.note::before {
     content: 'NOTE';
-    color: var(--golem-note);
-    background: color-mix(in srgb, var(--golem-note) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--golem-note) 30%, transparent);
+    color: var(--color-note);
+    background: color-mix(in srgb, var(--color-note) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-note) 30%, transparent);
 }
 .admonitionblock.tip::before,
 aside.golem-admonition.tip::before,
 .admonition.tip::before {
     content: 'TIP';
-    color: var(--golem-tip);
-    background: color-mix(in srgb, var(--golem-tip) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--golem-tip) 30%, transparent);
+    color: var(--color-tip);
+    background: color-mix(in srgb, var(--color-tip) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-tip) 30%, transparent);
 }
 .admonitionblock.important::before,
 aside.golem-admonition.important::before,
 .admonition.important::before {
     content: 'IMPORTANT';
-    color: var(--golem-important);
-    background: color-mix(in srgb, var(--golem-important) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--golem-important) 30%, transparent);
+    color: var(--color-important);
+    background: color-mix(in srgb, var(--color-important) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-important) 30%, transparent);
 }
 .admonitionblock.warning::before,
 aside.golem-admonition.warning::before,
 .admonition.warning::before {
     content: 'WARNING';
-    color: var(--golem-warning);
-    background: color-mix(in srgb, var(--golem-warning) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--golem-warning) 30%, transparent);
+    color: var(--color-warning);
+    background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
 }
 .admonitionblock.caution::before,
 aside.golem-admonition.caution::before,
 .admonition.caution::before {
     content: 'CAUTION';
-    color: var(--golem-caution);
-    background: color-mix(in srgb, var(--golem-caution) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--golem-caution) 30%, transparent);
+    color: var(--color-caution);
+    background: color-mix(in srgb, var(--color-caution) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-caution) 30%, transparent);
 }
 
 /* ── Definition Lists (API Parameters) ─────────────── */
@@ -1235,15 +1400,15 @@ aside.golem-admonition.caution::before,
     margin: 1rem 0 1.25rem 0;
 }
 #golem-content dt {
-    font-family: var(--golem-font-mono);
+    font-family: var(--font-mono);
     font-weight: 600;
-    color: var(--golem-primary);
+    color: var(--color-primary);
     margin-top: 0.75rem;
 }
 #golem-content dd {
     margin-left: 1.25rem;
-    margin-bottom: 0.5rem;
-    color: var(--golem-text);
+    margin-bottom: var(--space-sm);
+    color: var(--color-text);
 }
 
 /* ── Tables ────────────────────────────────────────── */
@@ -1255,10 +1420,10 @@ table, table.tableblock, table.golem-table {
 }
 table caption.title,
 .tableblock caption.title {
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-size: 0.85rem;
     font-weight: 600;
-    color: var(--golem-text-muted);
+    color: var(--color-text-muted);
     text-align: left;
     padding-bottom: 0.5rem;
     caption-side: top;
@@ -1267,24 +1432,24 @@ colgroup col {
     /* Support proportional column width styles */
 }
 th {
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     text-align: left;
     padding: 0.6rem 0.85rem;
-    border-bottom: 2px solid var(--golem-border);
-    color: var(--golem-text-muted);
-    background-color: var(--golem-surface);
+    border-bottom: 2px solid var(--border-color);
+    color: var(--color-text-muted);
+    background-color: var(--bg-surface);
 }
 td {
     padding: 0.6rem 0.85rem;
-    border-bottom: 1px solid var(--golem-border);
+    border-bottom: 1px solid var(--border-color);
     vertical-align: top;
 }
 tr:last-child td {
-    border-bottom: 1px solid var(--golem-border);
+    border-bottom: 1px solid var(--border-color);
 }
 
 /* ── Table Alignment Classes (AsciiDoc / AsciiDoctype DSL) ── */
@@ -1301,22 +1466,22 @@ th.valign-bottom, td.valign-bottom, .valign-bottom { vertical-align: bottom; }
 table.stripes-even tbody tr:nth-child(even),
 table.stripes-odd tbody tr:nth-child(odd),
 table.stripes-hover tbody tr:hover {
-    background-color: color-mix(in srgb, var(--golem-surface) 60%, transparent);
+    background-color: color-mix(in srgb, var(--bg-surface) 60%, transparent);
 }
-table.frame-all { border: 1px solid var(--golem-border); }
-table.frame-sides { border-left: 1px solid var(--golem-border); border-right: 1px solid var(--golem-border); }
-table.frame-topbot { border-top: 1px solid var(--golem-border); border-bottom: 1px solid var(--golem-border); }
+table.frame-all { border: 1px solid var(--border-color); }
+table.frame-sides { border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color); }
+table.frame-topbot { border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
 table.frame-none { border: none; }
-table.grid-all th, table.grid-all td { border: 1px solid var(--golem-border); }
-table.grid-cols th, table.grid-cols td { border-left: 1px solid var(--golem-border); border-right: 1px solid var(--golem-border); }
-table.grid-rows th, table.grid-rows td { border-top: 1px solid var(--golem-border); border-bottom: 1px solid var(--golem-border); }
+table.grid-all th, table.grid-all td { border: 1px solid var(--border-color); }
+table.grid-cols th, table.grid-cols td { border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color); }
+table.grid-rows th, table.grid-rows td { border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
 table.grid-none th, table.grid-none td { border: none; }
 
 /* ── Full-Bleed Table Breakout ──────────────────────── */
 #golem-content table,
 #golem-content .tableblock {
-    margin-inline: calc(-1 * var(--golem-content-pad-x));
-    width: calc(100% + (2 * var(--golem-content-pad-x)));
+    margin-inline: calc(-1 * var(--content-pad-x));
+    width: calc(100% + (2 * var(--content-pad-x)));
     max-width: none;
     display: block;
     overflow-x: auto;
@@ -1328,17 +1493,17 @@ table.grid-none th, table.grid-none td { border: none; }
     max-width: 100%;
     height: auto;
     display: block;
-    border-radius: 6px;
-    border: 1px solid var(--golem-border);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
 }
 #golem-content .imageblock {
     margin: 1.5rem 0;
 }
 #golem-content .imageblock .title {
-    font-family: var(--golem-font-ui);
+    font-family: var(--font-ui);
     font-size: 0.85rem;
-    color: var(--golem-text-muted);
+    color: var(--color-text-muted);
     margin-top: 0.5rem;
     text-align: center;
 }
@@ -1348,23 +1513,23 @@ a:focus-visible,
 button:focus-visible,
 details summary:focus-visible,
 [tabindex]:focus-visible {
-    outline: 2px solid var(--golem-primary);
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
 }
 
 /* ── Right Sidebar (TOC) ───────────────────────────── */
 #golem-sidebar-right {
     width: 230px;
-    padding: 1.5rem 1rem;
-    border-left: 1px solid var(--golem-border);
-    font-family: var(--golem-font-ui);
+    padding: var(--space-lg) var(--space-md);
+    border-left: 1px solid var(--border-color);
+    font-family: var(--font-ui);
     flex-shrink: 0;
 }
 #golem-sidebar-right h4 {
     margin-top: 0;
-    margin-bottom: 0.75rem;
-    color: var(--golem-text-muted);
+    margin-bottom: var(--space-sm);
+    color: var(--color-text-muted);
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -1379,7 +1544,7 @@ details summary:focus-visible,
     margin-bottom: 0.35rem;
 }
 #golem-sidebar-right a {
-    color: var(--golem-text-muted);
+    color: var(--color-text-muted);
     text-decoration: none;
     font-size: 0.825rem;
     line-height: 1.4;
@@ -1387,7 +1552,7 @@ details summary:focus-visible,
     transition: color 0.15s ease;
 }
 #golem-sidebar-right a:hover {
-    color: var(--golem-primary);
+    color: var(--color-primary);
 }
 
 /* ── Footer ────────────────────────────────────────── */
@@ -1425,8 +1590,8 @@ details summary:focus-visible,
 /* ── Breadcrumbs ───────────────────────────────────── */
 .golem-breadcrumbs {
     margin-bottom: 1.5rem;
-    font-family: var(--golem-font-ui);
-    font-size: 0.875rem;
+    font-family: var(--font-ui);
+    font-size: var(--font-size-sm);
 }
 .golem-breadcrumbs ol {
     list-style: none;
@@ -1435,30 +1600,30 @@ details summary:focus-visible,
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-sm);
 }
 .golem-breadcrumbs li {
     display: inline-flex;
     align-items: center;
-    color: var(--golem-text-muted);
+    color: var(--color-text-muted);
 }
 .golem-breadcrumbs li:not(:last-child)::after {
     content: "›";
-    margin-left: 0.5rem;
-    color: var(--golem-text-muted);
+    margin-left: var(--space-sm);
+    color: var(--color-text-muted);
     opacity: 0.6;
 }
 .golem-breadcrumbs a {
-    color: var(--golem-link);
+    color: var(--color-link);
     text-decoration: none;
 }
 .golem-breadcrumbs a:hover {
-    color: var(--golem-link-hover);
+    color: var(--color-link-hover);
     text-decoration: underline;
 }
 .golem-breadcrumbs [aria-current="page"] span,
 .golem-breadcrumbs [aria-current="page"] {
-    color: var(--golem-text);
+    color: var(--color-text);
     font-weight: 500;
 }
 
@@ -1467,11 +1632,11 @@ details summary:focus-visible,
     display: flex;
     align-items: stretch;
     justify-content: space-between;
-    gap: 1.25rem;
+    gap: var(--space-md);
     margin-top: 3.5rem;
     padding-top: 1.75rem;
-    border-top: 1px solid var(--golem-border);
-    font-family: var(--golem-font-ui);
+    border-top: 1px solid var(--border-color);
+    font-family: var(--font-ui);
 }
 .golem-pagination-spacer {
     flex: 1;
@@ -1481,14 +1646,14 @@ details summary:focus-visible,
     display: flex;
     flex-direction: column;
     padding: 0.9rem 1.15rem;
-    background: var(--golem-surface);
-    border: 1px solid var(--golem-border);
-    border-radius: 6px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
     text-decoration: none;
     transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 .golem-pagination-card:hover {
-    border-color: var(--golem-primary);
+    border-color: var(--color-primary);
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
     transform: translateY(-1px);
 }
@@ -1505,17 +1670,86 @@ details summary:focus-visible,
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--golem-text-muted);
-    margin-bottom: 0.25rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-xs);
 }
 .golem-pagination-title {
     font-size: 0.95rem;
     font-weight: 600;
-    color: var(--golem-text);
+    color: var(--color-text);
     line-height: 1.35;
 }
 .golem-pagination-card:hover .golem-pagination-title {
-    color: var(--golem-primary);
+    color: var(--color-primary);
+}
+
+/* ── Showcase Component & Design System Utilities ─── */
+.surface-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-md);
+    margin: var(--space-md) 0;
+}
+.surface-card {
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+}
+.surface-card.surface-canvas {
+    background-color: var(--bg-canvas);
+}
+.surface-card.surface-base {
+    background-color: var(--bg-surface);
+}
+.surface-card.surface-card-bg {
+    background-color: var(--bg-card);
+}
+.surface-card.surface-subtle {
+    background-color: var(--bg-surface-subtle);
+}
+.surface-card.surface-muted {
+    background-color: var(--bg-surface-muted);
+}
+.surface-card.surface-elevated {
+    background-color: var(--bg-surface-elevated);
+    box-shadow: var(--shadow-md);
+}
+.surface-card.surface-code {
+    background-color: var(--bg-code);
+}
+.palette-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: var(--space-sm);
+    margin: var(--space-md) 0;
+}
+.palette-tile {
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    font-size: var(--font-size-xs);
+    font-family: var(--font-ui);
+    box-shadow: var(--shadow-sm);
+}
+.palette-swatch {
+    height: 44px;
+    width: 100%;
+}
+.palette-info {
+    padding: var(--space-xs);
+    background: var(--bg-surface);
+    display: flex;
+    flex-direction: column;
+}
+.palette-name {
+    font-weight: 600;
+    color: var(--color-text);
+}
+.palette-value {
+    font-family: var(--font-mono);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-2xs);
 }
 
 /* ── Reduced Motion ────────────────────────────────── */
@@ -1544,7 +1778,7 @@ details summary:focus-visible,
         height: auto;
         max-height: none;
         border-right: none;
-        border-bottom: 1px solid var(--golem-border);
+        border-bottom: 1px solid var(--border-color);
         padding: 0.75rem 1.25rem;
     }
     .golem-nav-details summary {
@@ -1552,7 +1786,7 @@ details summary:focus-visible,
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0.25rem 0;
+        padding: var(--space-xs) 0;
     }
     .golem-nav-details summary::after {
         content: "▾";
@@ -1563,8 +1797,9 @@ details summary:focus-visible,
         transform: rotate(180deg);
     }
     #golem-content {
-        --golem-content-pad-x: 1.25rem;
-        padding: 1.5rem var(--golem-content-pad-x);
+        --content-pad-x: 1.25rem;
+        --golem-content-pad-x: var(--content-pad-x);
+        padding: 1.5rem var(--content-pad-x);
         max-width: 100%;
     }
     .golem-pagination {
