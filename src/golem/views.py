@@ -125,6 +125,7 @@ def generate_asciidoc_views(
     highlighter: Optional[Callable[[str, str], Optional[str]]] = None,
     renderer_func: Optional[Union[BodyRendererProtocol, Callable[..., str]]] = None,
     renderer: Optional[Union[BodyRendererProtocol, Callable[..., str]]] = None,
+    source_language: str = "asciidoc",
 ) -> list[dict[str, str]]:
     """Synthesize multi-representation derived views for an AsciiDoc snippet.
 
@@ -140,6 +141,7 @@ def generate_asciidoc_views(
     `highlighter` (Callable[[str, str], Optional[str]] | None, optional):: Syntax highlighter callable. Defaults to `None`.
     `renderer_func` (BodyRendererProtocol | Callable[..., str] | None, optional):: Body renderer callable or protocol implementation. Defaults to `None`.
     `renderer` (BodyRendererProtocol | Callable[..., str] | None, optional):: Body renderer callable or protocol implementation alias. Defaults to `None`.
+    `source_language` (str, optional):: Declared language of the source snippet for syntax highlighting. Defaults to `"asciidoc"`.
 
     [returns]
     `list[dict[str, str]]`:: List of view dictionaries, each containing `id`, `label`, `content`, and `language`.
@@ -212,17 +214,15 @@ def generate_asciidoc_views(
         label = VIEW_LABELS.get(view_id, view_id.capitalize())
 
         if view_id == "source":
-            highlighted = active_highlighter(code_text, "asciidoc")
+            highlighted = active_highlighter(code_text, source_language)
             if not highlighted:
-                highlighted = (
-                    f'<pre class="highlight asciidoc"><code class="language-asciidoc">{html.escape(code_text)}</code></pre>'
-                )
+                highlighted = f'<pre class="highlight {source_language}"><code class="language-{source_language}">{html.escape(code_text)}</code></pre>'
             result.append(
                 {
                     "id": "source",
                     "label": label,
                     "content": highlighted,
-                    "language": "asciidoc",
+                    "language": source_language,
                 }
             )
 
@@ -312,9 +312,14 @@ def extract_listing_views(
         else:
             code_text = ""
 
+    source_language = str(
+        attributes.get("language") or attributes.get(1) or attributes.get("1") or node.get("language") or "asciidoc"
+    )
+
     return generate_asciidoc_views(
         code_text=str(code_text),
         views=views,
         highlighter=highlighter,
         renderer=active_renderer,
+        source_language=source_language,
     )

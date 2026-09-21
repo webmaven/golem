@@ -322,7 +322,7 @@
     --color-primary-subtle: #451a03;
     --color-link:           #d4692a;
     --color-link-hover:     #e07a3a;
-    --color-link-visited:   #8a4c32;
+    --color-link-visited:   var(--palette-clay-300);
 
     --border-color:   #3d2a20;
     --border-subtle:  #2a1e17;
@@ -335,7 +335,7 @@
     --color-tip:       #7aaa3a;
     --color-important: #d4692a;
     --color-warning:   #d4a020;
-    --color-caution:   #c04040;
+    --color-caution:   #f87171;
 
     /* Symbol Kind Badges (Dark Mode: Translucent bg + Vibrant tint) */
     --color-symbol-c:         #60a5fa;
@@ -409,7 +409,7 @@
         --color-primary-subtle: #451a03;
         --color-link:           #d4692a;
         --color-link-hover:     #e07a3a;
-        --color-link-visited:   #8a4c32;
+        --color-link-visited:   var(--palette-clay-300);
 
         --border-color:   #3d2a20;
         --border-subtle:  #2a1e17;
@@ -422,7 +422,7 @@
         --color-tip:       #7aaa3a;
         --color-important: #d4692a;
         --color-warning:   #d4a020;
-        --color-caution:   #c04040;
+        --color-caution:   #f87171;
 
         /* Symbol Kind Badges (Dark Mode: Translucent bg + Vibrant tint) */
         --color-symbol-c:         #60a5fa;

@@ -260,13 +260,17 @@ def get_pygments_css(
     dark_css = dark_formatter.get_style_defs(selector)
 
     dark_rules = "\n".join(f"    {line}" if line.strip() else "" for line in dark_css.splitlines())
+    dark_system_rules = "\n".join(f"        {line}" if line.strip() else "" for line in dark_css.splitlines())
 
     return (
         f"/* Pygments Syntax Highlighting (Light) */\n"
         f"{light_css}\n\n"
+        f"/* Pygments Syntax Highlighting (Dark: Explicit Theme) */\n"
+        f'[data-theme="dark"] {{\n{dark_rules}\n}}\n\n'
+        f"/* Pygments Syntax Highlighting (Dark: System Preference) */\n"
         f"/* Pygments Syntax Highlighting (Dark) */\n"
         f"@media (prefers-color-scheme: dark) {{\n"
-        f"{dark_rules}\n"
+        f'    :root:not([data-theme="light"]) {{\n{dark_system_rules}\n    }}\n'
         f"}}"
     )
 

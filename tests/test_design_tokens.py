@@ -338,15 +338,19 @@ def test_wcag_contrast_ratios():
                 bg_key = candidate
                 break
         if fg_key in root_tokens and bg_key:
-            try:
-                fg_rgb = _resolve_color(root_tokens[fg_key], root_tokens)
-                bg_rgb = _resolve_color(root_tokens[bg_key], root_tokens)
-                sym_ratio = _contrast_ratio(fg_rgb, bg_rgb)
-                assert sym_ratio >= 3.0, (
-                    f"Symbol {full_name} badge contrast {sym_ratio:.2f}:1 between {fg_key} and {bg_key} is below 3.0:1"
-                )
-            except ValueError:
-                pass
+            fg_rgb = _resolve_color(root_tokens[fg_key], root_tokens)
+            bg_rgb = _resolve_color(root_tokens[bg_key], root_tokens)
+            sym_ratio = _contrast_ratio(fg_rgb, bg_rgb)
+            assert sym_ratio >= 3.0, (
+                f"Symbol {full_name} badge contrast {sym_ratio:.2f}:1 between {fg_key} and {bg_key} is below 3.0:1"
+            )
+
+    # 4. Dark Mode: visited link on surface (>= 4.5:1)
+    if "--color-link-visited" in all_dark and "--bg-surface" in all_dark:
+        visited_rgb = _resolve_color(all_dark["--color-link-visited"], all_dark)
+        dark_bg_rgb = _resolve_color(all_dark["--bg-surface"], all_dark)
+        visited_ratio = _contrast_ratio(visited_rgb, dark_bg_rgb)
+        assert visited_ratio >= 4.5, f"Dark mode visited link contrast ratio {visited_ratio:.2f}:1 is below 4.5:1"
 
 
 def test_skeleton_template_has_no_hardcoded_color_styles():
@@ -522,3 +526,60 @@ def test_showcase_page_source_and_build(tmp_path):
     )
     assert "golem-theme-toggle" in compiled_html
     assert "symbol-glyph glyph-c" in compiled_html
+
+
+def test_pygments_css_manual_dark_mode():
+    """Verify get_pygments_css includes explicit [data-theme='dark'] rules."""
+    from golem.highlighting import get_pygments_css
+
+    css = get_pygments_css()
+    assert '[data-theme="dark"]' in css
+    assert ':root:not([data-theme="light"])' in css
+    assert "@media (prefers-color-scheme: dark)" in css
+
+
+def test_extract_listing_views_uses_declared_language():
+    """Verify extract_listing_views highlights source using the block's declared language."""
+    from golem.views import extract_listing_views
+
+    called_languages: list[str] = []
+
+    def mock_highlighter(code: str, lang: str) -> str:
+        called_languages.append(lang)
+        return f'<pre class="highlight {lang}"><code>{code}</code></pre>'
+
+    # 1. Attribute dict 'language' key
+    node_attr = {
+        "attributes": {"views": "source", "language": "python"},
+        "value": "print('hello')",
+    }
+    views = extract_listing_views(node_attr, highlighter=mock_highlighter)
+    assert len(views) == 1
+    assert views[0]["id"] == "source"
+    assert views[0]["language"] == "python"
+    assert "python" in called_languages
+
+    # 2. Positional attribute 1 (AsciiDoc [source,python])
+    called_languages.clear()
+    node_pos = {
+        "attributes": {"views": "source", 1: "rust"},
+        "value": "fn main() {}",
+    }
+    views = extract_listing_views(node_pos, highlighter=mock_highlighter)
+    assert len(views) == 1
+    assert views[0]["id"] == "source"
+    assert views[0]["language"] == "rust"
+    assert "rust" in called_languages
+
+    # 3. Node-level language key
+    called_languages.clear()
+    node_key = {
+        "attributes": {"views": "source"},
+        "language": "json",
+        "value": '{"key": "value"}',
+    }
+    views = extract_listing_views(node_key, highlighter=mock_highlighter)
+    assert len(views) == 1
+    assert views[0]["id"] == "source"
+    assert views[0]["language"] == "json"
+    assert "json" in called_languages

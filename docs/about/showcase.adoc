@@ -91,11 +91,11 @@ According to Principle 3, member methods, attributes, and inner types are groupe
     <summary>View Source</summary>
     <div class="listingblock">
       <div class="listing-content">
-        <pre class="highlight"><code class="language-python">class BuildEngine:
-    """Orchestrates AsciiDoc parsing, template composition, and artifact writing."""
-    def __init__(self, config: GolemConfig, staleness_tracker: Optional[StalenessTracker] = None):
-        self.config = config
-        self.staleness_tracker = staleness_tracker or StalenessTracker(config)</code></pre>
+        <pre class="highlight python"><code class="language-python"><span class="k">class</span><span class="w"> </span><span class="nc">BuildEngine</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Orchestrates AsciiDoc parsing, template composition, and artifact writing.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">GolemConfig</span><span class="p">,</span> <span class="n">staleness_tracker</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">StalenessTracker</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">staleness_tracker</span> <span class="o">=</span> <span class="n">staleness_tracker</span> <span class="ow">or</span> <span class="n">StalenessTracker</span><span class="p">(</span><span class="n">config</span><span class="p">)</span></code></pre>
       </div>
     </div>
   </details>
@@ -116,9 +116,9 @@ According to Principle 3, member methods, attributes, and inner types are groupe
       <summary>View Source</summary>
       <div class="listingblock">
         <div class="listing-content">
-          <pre class="highlight"><code class="language-python">def compile_all(self, force: bool = False) -> list[Path]:
-    stale_files = self.staleness_tracker.get_outdated_files() if not force else self.all_files
-    return [self.compile_page(f) for f in stale_files]</code></pre>
+          <pre class="highlight python"><code class="language-python"><span class="k">def</span><span class="w"> </span><span class="nf">compile_all</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+    <span class="n">stale_files</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">staleness_tracker</span><span class="o">.</span><span class="n">get_outdated_files</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">force</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">all_files</span>
+    <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">compile_page</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">stale_files</span><span class="p">]</span></code></pre>
         </div>
       </div>
     </details>
@@ -151,14 +151,14 @@ Autodoc signature containers (`.signature-container`) provide monospace, token-h
   <summary>View Source Implementation</summary>
   <div class="listingblock">
     <div class="listing-content">
-      <pre class="highlight"><code class="language-python">async def stream_diagnostics(
-    engine: BuildEngine,
-    channel: AsyncIterator[str],
-    timeout: float = 30.0,
-) -> AsyncGenerator[DiagnosticEvent, None]:
-    async with asyncio.timeout(timeout):
-        async for line in channel:
-            yield parse_diagnostic(line)</code></pre>
+      <pre class="highlight python"><code class="language-python"><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">stream_diagnostics</span><span class="p">(</span>
+    <span class="n">engine</span><span class="p">:</span> <span class="n">BuildEngine</span><span class="p">,</span>
+    <span class="n">channel</span><span class="p">:</span> <span class="n">AsyncIterator</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">30.0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AsyncGenerator</span><span class="p">[</span><span class="n">DiagnosticEvent</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+    <span class="k">async</span> <span class="k">with</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">timeout</span><span class="p">(</span><span class="n">timeout</span><span class="p">):</span>
+        <span class="k">async</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">channel</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">parse_diagnostic</span><span class="p">(</span><span class="n">line</span><span class="p">)</span></code></pre>
     </div>
   </div>
 </details>
@@ -202,12 +202,16 @@ The typographic scale combines Adobe's **Source Serif 4** for display and prose,
 
 The following sections illustrate heading styles from `H1` down to `H6`:
 
-# Heading 1 (2.1rem Display Serif)
-## Heading 2 (1.55rem Display Serif with Underline)
-### Heading 3 (1.25rem Display Serif)
-#### Heading 4 (1.05rem Sans UI Bold)
-##### Heading 5 (0.90rem Sans UI Uppercase Tracked)
-###### Heading 6 (0.80rem Sans UI Sub-heading)
+++++
+<div class="heading-scale-demo">
+  <h1>Heading 1 (2.1rem Display Serif)</h1>
+  <h2>Heading 2 (1.55rem Display Serif with Underline)</h2>
+  <h3>Heading 3 (1.25rem Display Serif)</h3>
+  <h4>Heading 4 (1.05rem Sans UI Bold)</h4>
+  <h5>Heading 5 (0.90rem Sans UI Uppercase Tracked)</h5>
+  <h6>Heading 6 (0.80rem Sans UI Sub-heading)</h6>
+</div>
+++++
 
 Prose paragraph with *bold text*, _italicized phrases_, `inline_code_identifiers`, and a link:index.html[hyperlink to home] demonstrating subtle underline styling and focus ring contrast.
 
