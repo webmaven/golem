@@ -182,6 +182,37 @@ class StalenessTracker:
 
         return forward_deps, reverse_deps
 
+    def get_reverse_deps(self, path: Path | str, recursive: bool = True) -> set[Path]:
+        """Retrieve parent documents that include the specified file in the DAG.
+
+        Traverses the reverse include dependency graph to identify all parent
+        documents (and ancestor documents if recursive) that depend on `path`.
+
+        [parameters]
+        `path` (Path | str):: Path to the target document or partial dependency.
+        `recursive` (bool, optional):: Whether to recursively traverse ancestor parent documents. Defaults to `True`.
+
+        [returns]
+        `set[Path]`:: Set of parent document `Path` objects that depend on `path`.
+        """
+        target = Path(path).resolve()
+        _, reverse_deps = self._build_dependency_graph()
+        if not recursive:
+            return reverse_deps.get(target, set())
+
+        ancestors: set[Path] = set()
+        queue = [target]
+        visited = {target}
+        while queue:
+            curr = queue.pop(0)
+            for parent in reverse_deps.get(curr, set()):
+                if parent not in visited:
+                    visited.add(parent)
+                    if parent.exists() and not self.is_partial(parent):
+                        ancestors.add(parent)
+                    queue.append(parent)
+        return ancestors
+
     def _get_template_search_paths(self) -> list[Path]:
         """Collect filesystem search paths for custom, workspace theme, and built-in templates.
 
