@@ -1251,6 +1251,8 @@ i.conum b {
     line-height: 1.5;
     overflow-x: auto;
     color: var(--color-text);
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 .signature-container code {
     background: transparent;
@@ -1259,7 +1261,8 @@ i.conum b {
     font-family: inherit;
     font-size: inherit;
     color: inherit;
-    white-space: pre;
+    white-space: pre-wrap;
+    word-break: break-word;
     tab-size: 4;
 }
 .signature-container .sig-keyword {
