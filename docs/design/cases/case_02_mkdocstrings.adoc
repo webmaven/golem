@@ -181,8 +181,8 @@ Skip Link Availability:: Includes an accessible skip link (`<a class="md-skip" h
 * **Clickable Mermaid Class Graphs**: Visual diagrams that double as hyperlinked navigation trees.
 
 === Critical Anti-Patterns / Friction Points
-* **Signature Width in Narrow Columns**: When both left sidebar and right TOC are open, wide signatures with many parameters can wrap awkwardly across multiple lines.
-* **Single-Page Overload**: When an entire module with 30 classes is documented in a single Markdown file (`::: module`), the generated HTML can exceed 2MB, causing DOM scrolling lag.
+* **Signature Width in Narrow Columns** -- When both left sidebar and right TOC are open, wide signatures with many parameters can wrap awkwardly across multiple lines.
+* **Single-Page Overload** -- When an entire module with 30 classes is documented in a single Markdown file (`::: module`), the generated HTML can exceed 2MB, causing DOM scrolling lag.
 
 === Transferable Principles for Future Autodoc Systems
 1. *The Hierarchy Rail Principle*: Group nested members using subtle vertical tree lines (`border-left`) to clearly differentiate class boundaries.
