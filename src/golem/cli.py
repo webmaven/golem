@@ -75,6 +75,35 @@ class GolemGroup(click.Group):
         return super().get_command(ctx, cmd_name)
 
 
+def _resolve_effective_directory(ctx: click.Context | None, explicit_dir: Path | str | None) -> Path | str | None:
+    """Resolve the working directory from an explicit argument or ancestor Click contexts."""
+    if explicit_dir:
+        return explicit_dir
+    curr = ctx
+    while curr is not None:
+        if hasattr(curr, "params") and curr.params.get("directory"):
+            return curr.params["directory"]
+        curr = curr.parent
+    return None
+
+
+class NewGroup(GolemGroup):
+    """Click Group for `golem new` that defaults to document scaffolding for unknown subcommands."""
+
+    def __init__(self, *args: Any, default_cmd: click.Command | None = None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.default_cmd = default_cmd
+
+    def resolve_command(self, ctx: click.Context, args: list[str]) -> tuple[str | None, click.Command | None, list[str]]:
+        cmd_name = args[0] if args else None
+        cmd = self.get_command(ctx, cmd_name) if cmd_name else None
+        if cmd is not None:
+            return cmd_name, cmd, args[1:]
+        if cmd_name and not cmd_name.startswith("-") and self.default_cmd is not None:
+            return self.default_cmd.name or "document", self.default_cmd, args
+        return super().resolve_command(ctx, args)
+
+
 @click.group(cls=GolemGroup, invoke_without_command=True)
 @click.option("--version", is_flag=True, help="Print version details")
 @click.option(
@@ -438,7 +467,7 @@ This is the homepage of your newly initialized Golem static documentation portal
         click.echo("Initialization complete! Project structure is ready.")
 
 
-@main.command()
+@click.command(name="document", hidden=True)
 @click.argument("doc_type")
 @click.argument("name")
 @click.option(
@@ -447,27 +476,21 @@ This is the homepage of your newly initialized Golem static documentation portal
     type=click.Path(file_okay=False, dir_okay=True),
     help="Change working directory before executing",
 )
-def new(doc_type, name, directory=None):
+@click.pass_context
+def new_document(ctx: click.Context, doc_type: str, name: str, directory: str | None = None) -> None:
+    """Generate a structured `.adoc` file with pre-populated metadata templates.
+
+    [parameters]
+    `ctx` (click.Context):: Click context object.
+    `doc_type` (str):: Document category or classification (such as post, page, chapter).
+    `name` (str):: Human-readable document title.
+    `directory` (str | None, optional):: Project directory path. Defaults to `None`.
+
+    [raises]
+    `click.ClickException`:: If configuration fails, slug is invalid, or target file exists.
     """
-
-    Generate a structured `.adoc` file with pre-populated metadata templates.
-
-    === Examples
-
-    [source,python]
-    ----
-    >>> from click.testing import CliRunner
-    >>> from golem.cli import main
-    >>> runner = CliRunner()
-    >>> result = runner.invoke(main, ["new", "post", "hello-world"])
-    >>> result.exit_code == 0
-    True
-    >>> "Created new post" in result.output
-    True
-
-    ----
-    """
-    with change_working_dir(directory):
+    effective_dir = _resolve_effective_directory(ctx, directory)
+    with change_working_dir(effective_dir):
         config_path = find_default_config_path()
         try:
             config = load_config(config_path)
@@ -508,6 +531,475 @@ Welcome to your newly scaffolded {doc_type}: "{name}".
             raise click.ClickException(f"Failed to create file {target_file}: {e}")
 
         click.echo(f"Created new {doc_type}: '{target_file}'")
+
+
+@main.group(cls=NewGroup, default_cmd=new_document)
+@click.option(
+    "-C",
+    "--directory",
+    type=click.Path(file_okay=False, dir_okay=True),
+    help="Change working directory before executing",
+)
+@click.pass_context
+def new(ctx: click.Context, directory: str | None = None) -> None:
+    """Generate structured AsciiDoc documents, custom themes, or plugins.
+
+    Running `golem new <doc_type> <name>` scaffolds an AsciiDoc document
+    with pre-populated metadata templates (for example, `golem new post hello-world`).
+
+    Running `golem new theme <name>` scaffolds a complete custom theme.
+
+    Running `golem new plugin <name>` scaffolds a local Python plugin.
+
+    === Examples
+
+    [source,python]
+    ----
+    >>> from click.testing import CliRunner
+    >>> from golem.cli import main
+    >>> runner = CliRunner()
+    >>> result = runner.invoke(main, ["new", "post", "hello-world"])
+    >>> result.exit_code == 0
+    True
+    >>> "Created new post" in result.output
+    True
+
+    ----
+    """
+    ctx.ensure_object(dict)
+    if directory:
+        ctx.obj["directory"] = directory
+
+
+new.add_command(new_document, name="document")
+
+
+@new.command(name="theme")
+@click.argument("name")
+@click.option(
+    "-C",
+    "--directory",
+    type=click.Path(file_okay=False, dir_okay=True),
+    help="Change working directory before executing",
+)
+@click.pass_context
+def new_theme(ctx: click.Context, name: str, directory: str | None = None) -> None:
+    """Scaffold a new custom Golem theme with templates, styles, and configuration.
+
+    [parameters]
+    `ctx` (click.Context):: Click context object.
+    `name` (str):: Theme name or slug.
+    `directory` (str | None, optional):: Project directory path. Defaults to `None`.
+
+    [raises]
+    `click.ClickException`:: If the theme slug is empty or target directory already exists and is non-empty.
+
+    === Examples
+
+    [source,python]
+    ----
+    >>> from click.testing import CliRunner
+    >>> from golem.cli import main
+    >>> runner = CliRunner()
+    >>> with runner.isolated_filesystem():
+    ...     res = runner.invoke(main, ["new", "theme", "clean-slate"])
+    ...     res.exit_code == 0
+    True
+    ----
+    """
+    import re
+
+    effective_dir = _resolve_effective_directory(ctx, directory)
+    with change_working_dir(effective_dir):
+        slug = re.sub(r"[^a-zA-Z0-9]+", "-", name).lower().strip("-")
+        if not slug:
+            raise click.ClickException(f"Invalid theme name: '{name}' resulting in an empty slug.")
+
+        target_dir = Path("themes") / slug
+        if target_dir.exists() and any(target_dir.iterdir()):
+            raise click.ClickException(f"Theme directory '{target_dir}' already exists and is not empty.")
+
+        config_path = find_default_config_path()
+        try:
+            config = load_config(config_path) if config_path.exists() else GolemConfig()
+        except Exception:
+            config = GolemConfig()
+
+        author = getattr(config, "site_author", None) or _get_git_author()
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+        templates_dir = target_dir / "templates"
+        templates_dir.mkdir(parents=True, exist_ok=True)
+        css_dir = target_dir / "static" / "css"
+        css_dir.mkdir(parents=True, exist_ok=True)
+
+        skeleton_pt = f"""<!DOCTYPE html>
+<html lang="en" metal:define-macro="layout">
+<head metal:define-slot="head">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${{title}} - ${{site_title}}</title>
+    <meta name="generator" content="${{generator_version | nothing}}" />
+    <meta tal:condition="site_author | nothing" name="author" content="${{site_author}}" />
+    <link rel="canonical" tal:condition="site_url | nothing" href="${{site_url}}" />
+    <link rel="stylesheet" href="${{root_path}}static/css/{slug}.css" />
+    <tal:block tal:repeat="css_file custom_css | nothing">
+        <link rel="stylesheet" href="${{css_file}}" />
+    </tal:block>
+    <style tal:condition="pygments_css | nothing" tal:content="structure pygments_css"></style>
+</head>
+<body tal:attributes="class body_class | nothing">
+    <header class="site-header" metal:define-slot="header">
+        <div class="container">
+            <h1><a href="${{site_url or root_path}}">${{site_title}}</a></h1>
+            <span tal:condition="site_author | nothing" class="site-author">${{site_author}}</span>
+        </div>
+    </header>
+    <div class="site-container">
+        <nav tal:condition="nav_html | nothing" class="site-nav" metal:define-slot="navigation" tal:content="structure nav_html"></nav>
+        <main id="golem-content" class="site-main" metal:define-slot="content">
+            <article class="content">
+                <h1>${{title}}</h1>
+                <div tal:content="structure body_html"></div>
+            </article>
+        </main>
+        <aside tal:condition="toc_html | nothing" class="site-toc" metal:define-slot="table-of-contents" tal:content="structure toc_html"></aside>
+    </div>
+    <footer class="site-footer" metal:define-slot="footer">
+        <div class="container">
+            <p>Built with Golem v${{generator_version | nothing}}</p>
+        </div>
+    </footer>
+</body>
+</html>
+"""
+
+        layout_pt = f"""<metal:block define-macro="layout">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${{title}} - ${{site_title}}</title>
+    <link rel="stylesheet" href="${{root_path}}static/css/{slug}.css" />
+</head>
+<body tal:attributes="class body_class or None">
+    <header class="site-header">
+        <div class="container">
+            <h1><a href="${{site_url or root_path}}">${{site_title}}</a></h1>
+        </div>
+    </header>
+    <div class="site-container">
+        <main id="golem-content" class="site-main" metal:define-slot="content">
+            <article class="content">
+                <h1>${{title}}</h1>
+                <div tal:content="structure body_html"></div>
+            </article>
+        </main>
+    </div>
+</body>
+</html>
+</metal:block>
+"""
+
+        page_pt = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${{title}} - ${{site_title}}</title>
+    <link rel="stylesheet" href="${{root_path}}static/css/{slug}.css" />
+</head>
+<body tal:attributes="class body_class or None">
+    <header class="site-header">
+        <div class="container">
+            <h1><a href="${{site_url or root_path}}">${{site_title}}</a></h1>
+            <span tal:condition="site_author" class="site-author">${{site_author}}</span>
+        </div>
+    </header>
+    <div class="site-container">
+        <main id="golem-content" class="site-main">
+            <article class="content">
+                <h1>${{title}}</h1>
+                <div tal:content="structure body_html"></div>
+            </article>
+        </main>
+    </div>
+</body>
+</html>
+"""
+
+        css_content = f"""\
+/* {slug} theme stylesheet */
+:root {{
+    --color-bg: #ffffff;
+    --color-text: #1a1a1a;
+    --color-primary: #2563eb;
+    --color-border: #e5e7eb;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}}
+
+[data-theme="dark"] {{
+    --color-bg: #111827;
+    --color-text: #f9fafb;
+    --color-primary: #3b82f6;
+    --color-border: #374151;
+}}
+
+body {{
+    margin: 0;
+    font-family: var(--font-sans);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    line-height: 1.6;
+}}
+
+.site-container {{
+    display: flex;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem 2rem;
+    gap: 2rem;
+}}
+
+.site-header {{
+    border-bottom: 1px solid var(--color-border);
+    padding: 1rem 2rem;
+}}
+
+.site-main {{
+    flex: 1;
+    min-width: 0;
+}}
+
+.site-nav {{
+    width: 240px;
+}}
+
+.site-toc {{
+    width: 200px;
+}}
+"""
+
+        theme_toml = f"""[theme]
+name = "{slug}"
+version = "0.1.0"
+description = "Custom theme {slug} for Golem documentation portals"
+author = "{author}"
+"""
+
+        readme_md = f"""# {slug} Theme
+
+Custom theme for Golem documentation portals.
+
+## Activating the Theme
+
+Configure your project to use this theme:
+
+In `golem.toml`:
+
+```toml
+[build]
+theme = "{slug}"
+```
+
+Or in `pyproject.toml`:
+
+```toml
+[tool.golem.build]
+theme = "{slug}"
+```
+
+## Structure
+
+- `skeleton.pt`: Foundational HTML layout template with METAL slots.
+- `page.pt`: Standard documentation page template.
+- `layout.pt`: Main layout macro definition.
+- `templates/`: Secondary template search path matching workspace standards.
+- `static/css/{slug}.css`: Main theme styling and CSS custom properties.
+- `static/css/theme.css`: Standard theme stylesheet alias.
+- `theme.toml`: Theme metadata.
+"""
+
+        # Write core templates
+        (target_dir / "skeleton.pt").write_text(skeleton_pt, encoding="utf-8")
+        (target_dir / "layout.pt").write_text(layout_pt, encoding="utf-8")
+        (target_dir / "page.pt").write_text(page_pt, encoding="utf-8")
+
+        # Write template directory files
+        (templates_dir / "skeleton.pt").write_text(skeleton_pt, encoding="utf-8")
+        (templates_dir / "layout.pt").write_text(layout_pt, encoding="utf-8")
+        (templates_dir / "page.pt").write_text(page_pt, encoding="utf-8")
+
+        # Write CSS
+        (css_dir / f"{slug}.css").write_text(css_content, encoding="utf-8")
+        (css_dir / "theme.css").write_text(css_content, encoding="utf-8")
+
+        # Write metadata
+        (target_dir / "theme.toml").write_text(theme_toml, encoding="utf-8")
+        (target_dir / "README.md").write_text(readme_md, encoding="utf-8")
+
+        click.echo(f"""Created new theme '{slug}' in '{target_dir}':
+  - {target_dir}/skeleton.pt
+  - {target_dir}/page.pt
+  - {target_dir}/layout.pt
+  - {target_dir}/templates/skeleton.pt
+  - {target_dir}/templates/page.pt
+  - {target_dir}/templates/layout.pt
+  - {target_dir}/static/css/{slug}.css
+  - {target_dir}/static/css/theme.css
+  - {target_dir}/theme.toml
+  - {target_dir}/README.md
+
+To activate this theme:
+  In golem.toml:
+    [build]
+    theme = "{slug}"
+
+  Or in pyproject.toml:
+    [tool.golem.build]
+    theme = "{slug}"\
+""")
+
+
+@new.command(name="plugin")
+@click.argument("name")
+@click.option(
+    "-C",
+    "--directory",
+    type=click.Path(file_okay=False, dir_okay=True),
+    help="Change working directory before executing",
+)
+@click.pass_context
+def new_plugin(ctx: click.Context, name: str, directory: str | None = None) -> None:
+    """Scaffold a new custom Golem plugin with standard lifecycle hooks.
+
+    [parameters]
+    `ctx` (click.Context):: Click context object.
+    `name` (str):: Plugin module name or identifier.
+    `directory` (str | None, optional):: Project directory path. Defaults to `None`.
+
+    [raises]
+    `click.ClickException`:: If the plugin name cannot form a valid identifier or file exists.
+
+    === Examples
+
+    [source,python]
+    ----
+    >>> from click.testing import CliRunner
+    >>> from golem.cli import main
+    >>> runner = CliRunner()
+    >>> with runner.isolated_filesystem():
+    ...     res = runner.invoke(main, ["new", "plugin", "my-plugin"])
+    ...     res.exit_code == 0
+    True
+    ----
+    """
+    import re
+
+    effective_dir = _resolve_effective_directory(ctx, directory)
+    with change_working_dir(effective_dir):
+        mod_name = re.sub(r"[^a-zA-Z0-9_]+", "_", name).lower().strip("_")
+        if mod_name and mod_name[0].isdigit():
+            mod_name = f"plugin_{mod_name}"
+        if not mod_name or not mod_name.isidentifier():
+            raise click.ClickException(f"Invalid plugin name: '{name}'. Must result in a valid Python identifier.")
+
+        config_path = find_default_config_path()
+        try:
+            config = load_config(config_path) if config_path.exists() else GolemConfig()
+        except Exception:
+            config = GolemConfig()
+
+        plugins_dir = Path(getattr(config, "plugins_dir", "plugins") or "plugins")
+        target_file = plugins_dir / f"{mod_name}.py"
+
+        if target_file.exists():
+            raise click.ClickException(f"Plugin file already exists: {target_file}")
+
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+
+        plugin_title = " ".join(part.capitalize() for part in mod_name.split("_"))
+
+        template = f'''\
+"""
+= {plugin_title} Plugin for Golem
+
+Custom plugin providing build lifecycle hooks and template context extensions.
+
+[attributes]
+`name` (str):: Plugin registration identifier.
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+from golem.plugins import hookimpl
+
+if TYPE_CHECKING:
+    from golem.config import GolemConfig
+    from golem.model import PageContext
+
+logger = logging.getLogger("{mod_name}")
+
+
+@hookimpl
+def on_build_start(config: GolemConfig) -> None:
+    """Execute pre-flight checks before compilation begins.
+
+    [parameters]
+    `config` (GolemConfig):: Active site configuration for this build.
+    """
+    logger.info("Initializing {plugin_title} plugin for build...")
+
+
+@hookimpl
+def on_template_context(context: PageContext, doc_path: Path) -> PageContext:
+    """Enrich the template context before Chameleon HTML rendering.
+
+    [parameters]
+    `context` (PageContext):: Active template context dictionary.
+    `doc_path` (Path):: Path to the source document being compiled.
+
+    [returns]
+    `PageContext`:: Enriched template context.
+    """
+    context["{mod_name}_active"] = True
+    return context
+
+
+@hookimpl
+def on_post_render(html_content: str) -> str:
+    """Transform compiled HTML content prior to writing to disk.
+
+    [parameters]
+    `html_content` (str):: Rendered HTML document markup.
+
+    [returns]
+    `str`:: Transformed HTML markup.
+    """
+    return html_content
+'''
+        try:
+            target_file.write_text(template, encoding="utf-8")
+        except Exception as e:
+            raise click.ClickException(f"Failed to create plugin file {target_file}: {e}")
+
+        click.echo(f"""Created new plugin '{mod_name}' at '{target_file}'.
+
+To enable this plugin:
+  In golem.toml:
+    [build]
+    plugins = ["{mod_name}"]
+
+  Or in pyproject.toml:
+    [tool.golem.build]
+    plugins = ["{mod_name}"]\
+""")
 
 
 def report_engine_diagnostics(engine: BuildEngine, strict: bool = False) -> None:

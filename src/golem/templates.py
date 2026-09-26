@@ -152,6 +152,8 @@ class PageCompiler:
                 # Fallback to configured themes folder override if exists
                 theme_dir = Path("themes") / self.config.theme
                 skeleton_pt = theme_dir / "skeleton.pt"
+                if not skeleton_pt.exists():
+                    skeleton_pt = theme_dir / "templates" / "skeleton.pt"
                 if skeleton_pt.exists():
                     template = self._get_disk_template(skeleton_pt)
                 else:
