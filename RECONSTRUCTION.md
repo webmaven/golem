@@ -179,6 +179,12 @@ State 4  — ≥ BP_wide                          : APPEARS, even with sidebars
 - **Position is a separate axis** (B9/B10). Appearing in State 2/4 means *visible*,
   not *adjacent* — where it sits is decided independently of whether it shows.
 - **Breakpoint px values are lost** — re-derive against existing `1100px`/`800px`.
+- **State 4 must be checked against four columns, not three.** At the widest
+  breakpoint with sidebars present the layout carries: (1) left site nav,
+  (2) main content, (3) in-page/API sidebar, (4) in-page nav. Verify the prose
+  column still measures ~65–75ch. If it does not, dropping the left site nav to
+  a drawer at that breakpoint is the honest trade — do not narrow the text
+  column to keep all four.
 
 
 
