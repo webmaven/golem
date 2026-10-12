@@ -418,9 +418,17 @@ class LiveReloadServer:
             except OSError as exc:
                 import errno
 
+                # Windows reports a port held with SO_EXCLUSIVEADDRUSE as WSAEACCES
+                # (winerror 10013) rather than WSAEADDRINUSE when this server's socket
+                # carries SO_REUSEADDR. That still means "the address is taken", so fold
+                # it into the collision check; the original error is re-raised once the
+                # retries are exhausted. `winerror` is absent off-Windows, so this never
+                # matches there.
+                winerror = getattr(exc, "winerror", None)
                 is_in_use = (
                     exc.errno == errno.EADDRINUSE
                     or (hasattr(errno, "WSAEADDRINUSE") and exc.errno == errno.WSAEADDRINUSE)
+                    or (winerror is not None and hasattr(errno, "WSAEACCES") and winerror == errno.WSAEACCES)
                     or exc.errno in (48, 98)
                     or "address already in use" in str(exc).lower()
                 )

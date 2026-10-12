@@ -1,4 +1,5 @@
 import socket
+import sys
 import threading
 import time
 from pathlib import Path
@@ -16,6 +17,30 @@ def get_free_port():
     port = s.getsockname()[1]
     s.close()
     return port
+
+
+def occupy_port(port: int) -> socket.socket:
+    """Occupy `port` with a listening socket that no other socket can bind.
+
+    [parameters]
+    `port` (int):: TCP port to hold.
+
+    [returns]
+    `socket.socket`:: The listening socket; the caller is responsible for closing it.
+
+    On Windows `SO_REUSEADDR` does not exclude other sockets — a second bind to an
+    already-listening address succeeds, so a collision test would never observe one.
+    `SO_EXCLUSIVEADDRUSE` is required there to make the port genuinely unavailable.
+    Elsewhere `SO_REUSEADDR` preserves the original behaviour.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if sys.platform == "win32":
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+    else:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(("", port))
+    s.listen(1)
+    return s
 
 
 def test_dev_server_hosting(tmp_path):
@@ -227,10 +252,7 @@ def test_dev_server_port_collision_fallback(tmp_path):
 
     initial_port = get_free_port()
     # Occupy initial_port with a listening socket
-    blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    blocker.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    blocker.bind(("", initial_port))
-    blocker.listen(1)
+    blocker = occupy_port(initial_port)
 
     server = LiveReloadServer(
         public_dir=dist_dir,
@@ -263,15 +285,8 @@ def test_dev_server_port_collision_exhaustion(tmp_path):
     dist_dir.mkdir()
 
     initial_port = get_free_port()
-    b1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    b1.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    b1.bind(("", initial_port))
-    b1.listen(1)
-
-    b2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    b2.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    b2.bind(("", initial_port + 1))
-    b2.listen(1)
+    b1 = occupy_port(initial_port)
+    b2 = occupy_port(initial_port + 1)
 
     try:
         server = LiveReloadServer(
