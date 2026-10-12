@@ -28,6 +28,22 @@ def test_page_layout_compilation(tmp_path):
     assert "golem-toc" in html
 
 
+@pytest.mark.parametrize("current_path", [r"guide\x.adoc", "C:/guide/x.adoc", "/guide/x.adoc", "guide/../x.adoc"])
+def test_compile_page_rejects_invalid_current_path(tmp_path, current_path):
+    compiler = PageCompiler(GolemConfig(output_dir=str(tmp_path / "dist")))
+
+    with pytest.raises(ValueError, match="normalized, relative POSIX path"):
+        compiler.compile_page(title="Invalid Path", current_path=current_path)
+
+
+def test_compile_page_accepts_normalized_posix_current_path(tmp_path):
+    compiler = PageCompiler(GolemConfig(output_dir=str(tmp_path / "dist")))
+
+    html = compiler.compile_page(title="Nested", current_path="guide/x.adoc")
+
+    assert 'href="../static/css/golem.css"' in html
+
+
 def test_custom_disk_template_compilation(tmp_path):
     config = GolemConfig(output_dir=str(tmp_path / "dist"))
     compiler = PageCompiler(config)
