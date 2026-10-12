@@ -142,15 +142,22 @@ done** — every downstream feature renders through the path they fix.
 | **B6** | **Sidebars return to the main column when narrow** — `position: static` below ~1180px |
 | **B7** | Collapsed-by-default source listings: reasonable **`max-height` + `overflow-y: auto` when expanded** |
 | **B8** | **In-page nav visibility — 4-state non-monotonic ladder** (see §4.1) |
-| **B9** | **No sidebars + width permitting → nav adjacent to main column**, not flush right |
-| **B10** | **New `nav_helpers` config flag to force flush-right** even without sidebars, for mixed-layout sites where flipping is distracting |
+| **B9** | **Position default:** when the nav is visible and there are **no sidebars**, sit it **adjacent to the main column** (width permitting) rather than flush right, so the blank expanse is not wasted |
+| **B10** | **New `nav_helpers` config flag to force flush-right** *whenever the nav is visible* — the escape hatch for mixed-layout sites where the adjacent↔flush-right flip is distracting. **Affects position only; never visibility** |
 | **B11** | `.display: contents` on `.class-multi-grid .adoc-section` / `.section-blocks` — pre-approved subgrid fix from #26's review comment |
 | **B12** | **Strip non-rail left borders** to reduce visual clutter; keep only `.doc-rail` |
 | **B13** | **Do not re-introduce unnecessary padding** (avoid, not fix) |
 
-> **B8/B9/B10 are one cohesive design**, sharing `#golem-sidebar-right` + `:has()`
-> rules. **B10 is the only Python-side change** (`nav_helpers.py` currently exposes
-> only `home_title`/`home_url`).
+> **Two independent axes — do not couple them.**
+> - **Visibility (B8)** — pure CSS in `golem.css`: breakpoint × sidebar-presence.
+>   **Not flag-dependent, in any state.**
+> - **Position (B9/B10)** — adjacent-by-default vs. forced flush-right. The **only**
+>   flag-dependent axis and the **only** Python-side change (`nav_helpers.py` exposes
+>   only `home_title`/`home_url` today); the flag must reach the template as a class
+>   or attribute on the nav element so CSS can act on it.
+>
+> They share selectors, but the flag must **never** gate visibility, and no
+> visibility change may reposition the nav.
 
 #### 4.1 The B8 visibility ladder 🎚
 
@@ -159,15 +166,18 @@ Non-monotonic — appears, dips, reappears. Replaces today's monotonic rule
 
 ```
 State 1  — narrowest                          : HIDDEN
-State 2  — ≥ BP_nav                           : APPEARS (adjacent, per B9)
+State 2  — ≥ BP_nav                           : APPEARS (position per B9/B10)
 State 3  — ≥ BP_sticky, only IF sidebars exist: HIDDEN
 State 4  — ≥ BP_wide                          : APPEARS, even with sidebars
 ```
 
 - **CSS-only**, via `:has(.sidebar-column)`-style conditions — the nav stays in
   the DOM; visibility is breakpoint **and** sidebar-presence driven.
+  **This ladder is entirely flag-independent.**
 - **State 3 is conditional on sidebars.** A page with no sidebars goes straight
-  State 2 → State 4, changing *position* per B9 but never dipping.
+  State 2 → State 4 — no dip, since nothing competes for the right-hand space.
+- **Position is a separate axis** (B9/B10). Appearing in State 2/4 means *visible*,
+  not *adjacent* — where it sits is decided independently of whether it shows.
 - **Breakpoint px values are lost** — re-derive against existing `1100px`/`800px`.
 
 
