@@ -472,7 +472,7 @@ def test_listing_template_has_no_dynamic_imports():
 
 def test_copy_button_falls_back_to_source_pane():
     """Verify client JS has fallback to source pane for clipboard copy."""
-    content = Path("src/golem/templates/default/skeleton.pt").read_text()
+    content = Path("src/golem/templates/default/skeleton.pt").read_text(encoding="utf-8")
     assert 'data-tab="source"' in content  # fallback selector present
 
 

@@ -78,11 +78,11 @@ def format_diagnostic(error: Diagnostic | Exception, content_dir: Path | str | N
             p = Path(file_path_raw)
             if p.is_absolute():
                 try:
-                    file_display = str(p.relative_to(Path.cwd()))
+                    file_display = p.relative_to(Path.cwd()).as_posix()
                 except ValueError:
                     file_display = str(p)
             else:
-                file_display = str(p)
+                file_display = p.as_posix()
         except Exception:
             file_display = str(file_path_raw)
 
