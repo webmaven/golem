@@ -591,7 +591,7 @@ class IndexPlugin(GolemPlugin):
         [returns]
         `Node`:: Unmodified ASG node.
         """
-        doc_path_str = str(doc_path) if doc_path is not None else ""
+        doc_path_str = doc_path.as_posix() if doc_path is not None else ""
         file_entries: dict[str, dict[str, Any]] = {}
         visitor = AsgCollectorVisitor(index_entries=file_entries, doc_path_str=doc_path_str)
         visitor.visit(asg)
@@ -797,7 +797,7 @@ class GlossaryPlugin(GolemPlugin):
         [returns]
         `Node`:: Unmodified ASG node.
         """
-        doc_path_str = str(doc_path) if doc_path is not None else ""
+        doc_path_str = doc_path.as_posix() if doc_path is not None else ""
         file_entries: dict[str, dict[str, Any]] = {}
         visitor = AsgCollectorVisitor(glossary_entries=file_entries, doc_path_str=doc_path_str)
         visitor.visit(asg)
