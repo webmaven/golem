@@ -111,7 +111,9 @@ class PageCompiler:
         - `template_path`:: Optional layout override path.
         - `nav_html`:: Rendered left navigation HTML.
         - `nav_tree`:: Hierarchical site map navigation tree.
-        - `current_path`:: Current document path relative to content dir.
+        - `current_path`:: Optional document path relative to content dir,
+          using normalized POSIX separators (e.g. ``"guide/x.adoc"``).
+          The empty string is accepted when no page-relative path is available.
         - `custom_css`:: Custom CSS stylesheet links to inject.
         - `custom_js`:: Custom JS script links to inject.
         - `prev_page`:: Previous document metadata for pagination.
@@ -124,6 +126,23 @@ class PageCompiler:
         for forbidden in ("body_content", "page_title", "page_class"):
             if forbidden in extra_context:
                 raise TypeError(f"compile_page() got an unexpected keyword argument '{forbidden}'")
+
+        if current_path:
+            from pathlib import PurePosixPath
+
+            path = PurePosixPath(current_path)
+            if (
+                "\\" in current_path
+                or path.is_absolute()
+                or (len(current_path) >= 2 and current_path[1] == ":")
+                or any(part in ("", ".", "..") for part in current_path.split("/"))
+                or path.as_posix() != current_path
+            ):
+                raise ValueError(
+                    "compile_page() expected current_path to be a normalized, relative POSIX path "
+                    "using forward slashes (for example 'guide/x.adoc'); "
+                    f"got {current_path!r}. Pass an empty string if no relative page path is available."
+                )
 
         effective_body_class = (body_class or "").strip()
         effective_content_class = (content_class or "").strip()

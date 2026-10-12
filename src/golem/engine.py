@@ -580,7 +580,7 @@ class BuildEngine:
                     "toc_html": toc_html,
                     "nav_html": nav_html,
                     "nav_tree": _nav_tree,
-                    "current_path": str(rel_path),
+                    "current_path": rel_path.as_posix(),
                     "prev_page": prev_page,
                     "next_page": next_page,
                     "body_class": resolved_body_class,
