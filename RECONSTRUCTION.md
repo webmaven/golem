@@ -227,9 +227,13 @@ independent reason Detour A matters** — it is not only a performance win; the
 docstring→AsciiDoc→reparse round-trip is what destroys the object/example
 association the sidebar layout depends on.
 
-So B0a is: keep `DocstringExample` instances typed end-to-end, tag each with its
-enclosing Griffe object path, and emit them into the sidebar column rather than the
-prose column. `is_interactive` is the hook for the future interactive examples.
+**Examples do render today — just in the wrong column.** `griffe_bridge.to_asciidoc`
+handles `kind_value == "examples"` and emits a `[source,python]` fence inline with the
+rest of the docstring. So the content is not lost; only its *column placement* and its
+*typed identity* are. B0a is a relocation, not a rebuild.
+
+**The enclosing object is already in hand — no association mechanism to invent.**
+`formatter.py` threads it and then drops it: `format_class(cls)` → `format_docstring(cls.docstring, …)`, `format_function(func)` → `format_docstring(func.docstring, …)`, likewise `format_attribute(attr)` and `format_module(module)`. Each caller holds the Griffe object, so `func.path` / `cls.path` is available at the exact point the docstring is turned into a string. The association is discarded, not absent. That makes B0a narrower than §4.0 implies: keep the `DocstringExample` list out of the flattening, pass the already-held `.path` alongside it, and emit into the sidebar column. `is_interactive` is the hook for future interactive examples.
 
 **Prose trigger: undecided.** For long-form pages the in-prose trigger was never
 settled; presumed similar. Note this makes B0's pieces (1)-(4) apply to prose only —
