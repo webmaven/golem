@@ -132,8 +132,29 @@ done** — every downstream feature renders through the path they fix.
 
 ### Wave 2 — Detour B: layout *(in flight)*
 
+> **Terminology hazard — "sidebar" means two different things.**
+> Every one of the ~28 `sidebar` matches in `src/` at HEAD refers to **page chrome**:
+> `#golem-sidebar-left` (site navigation) and `#golem-sidebar-right` (in-page TOC).
+> Neither is a *content* sidebar. **Content sidebars — the illustrative/interactive
+> column — do not exist in any form.** See B0.
+
+#### What content sidebars are for
+
+**Primary motivating target: <https://webmaven.github.io/wgsl-primer>** (long-form
+prose). Sidebars exist to hold **illustrative code examples and interactive content
+related to the surrounding prose**. That is the requirement to design against.
+
+In apidoc pages they are emitted **most commonly for example code** — eventually
+including interactive examples — but **anything illustrative** may go in a sidebar.
+
+> The wgsl-primer layout is **not** a design target. It was whatever could be
+> implemented with the existing templates without breaking them. Take the *content
+> requirement* from it, not any layout value. Equally, the `420-480px` sidebar
+> width in `#26`'s comment is a *proposal*, not a measurement.
+
 | # | Task |
 |---|---|
+| **B0** | **Content sidebars have no emission path at all** — this is the real gate on B6-B10. See §4.0 |
 | **B1** | Sticky right sidebar (TOC) — mirror `#golem-sidebar-left` (`golem.css:659`). Currently the only `sticky` in `src/` |
 | **B2′** | **API pages:** sticky sidebars align with the **top of the header in the left column** (reference uses `top: 3.5rem` global-nav / `top: 4.5rem` sidebar-card) |
 | **B3** | **Uniform heading sizes on API pages** — nesting already conveys hierarchy, so per-level size is redundant. **Prose pages keep variable sizes** (`golem.css:752-790`, four distinct `h1..h4` rules — do not touch) |
@@ -147,6 +168,27 @@ done** — every downstream feature renders through the path they fix.
 | **B11** | `.display: contents` on `.class-multi-grid .adoc-section` / `.section-blocks` — pre-approved subgrid fix from #26's review comment |
 | **B12** | **Strip non-rail left borders** to reduce visual clutter; keep only `.doc-rail` |
 | **B13** | **Do not re-introduce unnecessary padding** (avoid, not fix) |
+
+#### 4.0 B0 — sidebars cannot currently be emitted (verified)
+
+B6-B10 all presuppose a sidebar that renders. **None can.** Verified against
+`asciidoctrine 0.2.0a8` and Golem `HEAD`:
+
+| Probe | Parses to | Golem renderer handles? |
+|---|---|---|
+| `[sidebar]` `====` … `====` | `Example` `{style: 'sidebar'}` | ❌ no dispatch |
+| `[.sidebar]` `****` … `****` | **`Sidebar`** `{role: 'sidebar'}` | ❌ no dispatch |
+| `[.aside-col]` `--` … `--` | `Open` `{role: 'aside-col'}` | ❌ no dispatch |
+| `[source,python,role=sidebar]` | `Listing` `{role: 'sidebar'}` | ❌ role never inspected for layout |
+
+`.split-row`, `.prose-column`, `.sidebar-column`, `.doc-rail`, `.member-card`,
+`.sticky-sidebar-card` are **all absent from `src/`** — they exist only in the
+borrowed-from mock (`docs/examples/autodoc_reference.html`), which is not a target.
+
+So B0 is four coupled pieces, all missing: **(1)** an authoring syntax, **(2)**
+renderer dispatch for `Sidebar`/`Example`/`Open` (and a role→layout check),
+**(3)** the `.split-row` layout template, **(4)** the CSS. Until B0 lands there is
+nothing for B6-B10 to position.
 
 > **Two independent axes — do not couple them.**
 > - **Visibility (B8)** — pure CSS in `golem.css`: breakpoint × sidebar-presence.
