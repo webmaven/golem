@@ -154,7 +154,7 @@ including interactive examples — but **anything illustrative** may go in a sid
 
 | # | Task |
 |---|---|
-| **B0** | **Content sidebars have no emission path at all** — this is the real gate on B6-B10. See §4.0 |
+| **B0** | **Content sidebars have no emission path at all** — this is the real gate on B6-B10. Splits into **B0a** (apidoc: examples *derived* from docstrings, no authoring syntax) and **B0b** (prose: syntax undecided). See §4.0 / §4.0.1 |
 | **B1** | Sticky right sidebar (TOC) — mirror `#golem-sidebar-left` (`golem.css:659`). Currently the only `sticky` in `src/` |
 | **B2′** | **API pages:** sticky sidebars align with the **top of the header in the left column** (reference uses `top: 3.5rem` global-nav / `top: 4.5rem` sidebar-card) |
 | **B3** | **Uniform heading sizes on API pages** — nesting already conveys hierarchy, so per-level size is redundant. **Prose pages keep variable sizes** (`golem.css:752-790`, four distinct `h1..h4` rules — do not touch) |
@@ -189,6 +189,52 @@ So B0 is four coupled pieces, all missing: **(1)** an authoring syntax, **(2)**
 renderer dispatch for `Sidebar`/`Example`/`Open` (and a role→layout check),
 **(3)** the `.split-row` layout template, **(4)** the CSS. Until B0 lands there is
 nothing for B6-B10 to position.
+
+#### 4.0.1 B0a — apidoc is the common case, and it needs no authoring syntax
+
+> **This supersedes part of B0.** The four-piece framing above assumes an authoring
+> syntax is required. For the **most common apidoc case it is not** — the sidebar is
+> *derived*, not written.
+
+**Any source listing extracted from within a docstring becomes an example tied to
+its object** (class, method, or function) **on that page.** No AsciiDoc author
+decides; the association is a consequence of where the listing was written. So for
+apidoc, B0's piece (1) **disappears** — the trigger is Griffe's docstring
+structure, not markup.
+
+The dependency already models this. `asciidocstring.DocstringExample` (in
+`0.1.0a11`) carries exactly the fields needed:
+
+```python
+content: str
+language: str = "python"
+line_number: int = 1
+is_interactive: bool = False   # >>> prompts present
+attributes: dict[str, Any]
+```
+
+**But Golem consumes none of it.** Verified: `asciidocstring` appears in exactly
+**one** place in `src/` — `formatter.py`, and only at lines 6, 159, 162, 190 — via
+`asciidocstring.griffe_bridge.to_asciidoc(sections)`. The string
+`example`/`DocstringExample` has **zero** matches across
+`src/golem/plugins/apidoc/` **and** `src/golem/plugins/doctest/`.
+
+That is the crux: `format_docstring()` flattens the whole docstring to an
+AsciiDoc **string**, so examples are no longer addressable objects by the time the
+pipeline holds them. They cannot be moved to a sidebar because nothing knows which
+block was an example, or which object it belonged to. **This is a second,
+independent reason Detour A matters** — it is not only a performance win; the
+docstring→AsciiDoc→reparse round-trip is what destroys the object/example
+association the sidebar layout depends on.
+
+So B0a is: keep `DocstringExample` instances typed end-to-end, tag each with its
+enclosing Griffe object path, and emit them into the sidebar column rather than the
+prose column. `is_interactive` is the hook for the future interactive examples.
+
+**Prose trigger: undecided.** For long-form pages the in-prose trigger was never
+settled; presumed similar. Note this makes B0's pieces (1)-(4) apply to prose only —
+so B0 splits into **B0a** (apidoc: derived, needs no syntax) and **B0b** (prose:
+needs the syntax decision above).
 
 > **Two independent axes — do not couple them.**
 > - **Visibility (B8)** — pure CSS in `golem.css`: breakpoint × sidebar-presence.
