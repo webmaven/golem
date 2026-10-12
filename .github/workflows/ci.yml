@@ -7,10 +7,15 @@ on:
     branches: [ main, master ]
 
 jobs:
+  # Both OSes are required. `ubuntu-latest` alone cannot see locale-dependent
+  # text I/O (cp1252 vs UTF-8), text-mode newline translation, or POSIX-only
+  # path assumptions -- the exact classes that let 17 Windows-only failures
+  # reach a merged `main`.
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.14"]
 
     steps:
