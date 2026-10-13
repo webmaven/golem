@@ -119,6 +119,40 @@ def test_staleness_tracker_registered_plugin_template_discovery(tmp_path):
             asciidoctype.AsciiDoctypeRenderer._PLUGIN_TEMPLATE_DIRS.clear()
 
 
+def test_staleness_tracker_registered_plugin_template_precedence(tmp_path):
+    import asciidoctype
+
+    custom_tpls = tmp_path / "custom_templates"
+    custom_tpls.mkdir()
+    (custom_tpls / "signature.html").write_text("<div class='custom'></div>", encoding="utf-8")
+
+    plugin_tpls = tmp_path / "plugin_templates"
+    plugin_tpls.mkdir()
+    (plugin_tpls / "signature.html").write_text("<div class='plugin'></div>", encoding="utf-8")
+
+    asciidoctype.AsciiDoctypeRenderer.register_template_directory(plugin_tpls)
+    try:
+        content = tmp_path / "content"
+        content.mkdir()
+        config = GolemConfig(
+            content_dir=str(content),
+            output_dir=str(tmp_path / "dist"),
+            templates_dir=str(custom_tpls),
+        )
+        cache = BuildCache(tmp_path / "cache.json")
+        tracker = StalenessTracker(config, cache, content)
+
+        search_paths = tracker._get_template_search_paths()
+        resolved_paths = [p.resolve() for p in search_paths]
+        # Upstream AsciiDoctypeRenderer puts registered plugin dirs FIRST
+        assert resolved_paths.index(plugin_tpls.resolve()) < resolved_paths.index(custom_tpls.resolve())
+    finally:
+        if hasattr(asciidoctype.AsciiDoctypeRenderer, "clear_registered_template_directories"):
+            asciidoctype.AsciiDoctypeRenderer.clear_registered_template_directories()
+        elif hasattr(asciidoctype.AsciiDoctypeRenderer, "_PLUGIN_TEMPLATE_DIRS"):
+            asciidoctype.AsciiDoctypeRenderer._PLUGIN_TEMPLATE_DIRS.clear()
+
+
 def test_staleness_tracker_outdated_file_detection(tmp_path):
     content = tmp_path / "content"
     content.mkdir()

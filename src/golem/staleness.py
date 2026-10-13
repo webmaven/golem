@@ -240,21 +240,6 @@ class StalenessTracker:
         ----
         """
         paths: list[Path] = []
-        if hasattr(self.config, "templates_dir") and self.config.templates_dir:
-            tpl_path = Path(self.config.templates_dir)
-            paths.append(tpl_path.resolve() if tpl_path.exists() else tpl_path)
-
-        if hasattr(self.config, "theme") and self.config.theme:
-            theme_path = Path("themes") / self.config.theme
-            paths.append(theme_path.resolve() if theme_path.exists() else theme_path)
-
-        pkg_theme = Path(__file__).parent / "templates" / getattr(self.config, "theme", "default")
-        if pkg_theme.exists() and pkg_theme.is_dir():
-            paths.append(pkg_theme.resolve())
-        pkg_default = Path(__file__).parent / "templates" / "default"
-        if pkg_default != pkg_theme and pkg_default.exists() and pkg_default.is_dir():
-            paths.append(pkg_default.resolve())
-
         try:
             import asciidoctype
 
@@ -266,6 +251,29 @@ class StalenessTracker:
                         paths.append(p_res)
         except Exception:
             pass
+
+        if hasattr(self.config, "templates_dir") and self.config.templates_dir:
+            tpl_path = Path(self.config.templates_dir)
+            p_res = tpl_path.resolve() if tpl_path.exists() else tpl_path
+            if p_res not in paths:
+                paths.append(p_res)
+
+        if hasattr(self.config, "theme") and self.config.theme:
+            theme_path = Path("themes") / self.config.theme
+            p_res = theme_path.resolve() if theme_path.exists() else theme_path
+            if p_res not in paths:
+                paths.append(p_res)
+
+        pkg_theme = Path(__file__).parent / "templates" / getattr(self.config, "theme", "default")
+        if pkg_theme.exists() and pkg_theme.is_dir():
+            p_res = pkg_theme.resolve()
+            if p_res not in paths:
+                paths.append(p_res)
+        pkg_default = Path(__file__).parent / "templates" / "default"
+        if pkg_default != pkg_theme and pkg_default.exists() and pkg_default.is_dir():
+            p_res = pkg_default.resolve()
+            if p_res not in paths:
+                paths.append(p_res)
 
         return paths
 

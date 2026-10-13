@@ -138,6 +138,50 @@ def test_get_asg_nodes_includes_nested_classes(tmp_path):
         sys.path.remove(str(tmp_path))
 
 
+def test_get_asg_nodes_class_attribute_with_docstring_retains_default_value(tmp_path):
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "attr_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        "class Config:\n    port: int = 8080\n    '''Port number configuration.'''\n",
+        encoding="utf-8",
+    )
+    sys.path.insert(0, str(tmp_path))
+    try:
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("attr_pkg.Config")
+        html = render_body(nodes[0])
+
+        assert "port" in html
+        assert "Port number configuration." in html
+        assert "8080" in html
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
+def test_get_asg_nodes_resolves_aliased_members(tmp_path):
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "alias_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "mod.py").write_text("def helper():\n    '''A helper.'''\n    pass\n", encoding="utf-8")
+    (pkg_dir / "__init__.py").write_text("from .mod import helper\n", encoding="utf-8")
+    sys.path.insert(0, str(tmp_path))
+    try:
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("alias_pkg")
+        assert len(nodes) > 0
+        html = "\n".join(render_body(n) for n in nodes)
+        assert "helper" in html
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
 def test_on_asg_created_macro_replacement(tmp_path):
     import asciidoctrine
     from asciidoctrine.resolver import ASGResolver

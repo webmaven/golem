@@ -171,6 +171,16 @@ class AsciiDocApi:
         return docs
 
     @staticmethod
+    def _unwrap_member(member: griffe.Object | griffe.Alias) -> griffe.Object | griffe.Alias:
+        """Unwrap a Griffe Alias if its target can be resolved."""
+        if isinstance(member, griffe.Alias):
+            try:
+                return member.target
+            except Exception:
+                return member
+        return member
+
+    @staticmethod
     def ensure_absolute_levels(nodes: Sequence[Node], base_level: int = 2) -> None:
         """Ensure all Section and DiscreteHeading nodes have absolute_level set.
 
@@ -195,6 +205,13 @@ class AsciiDocApi:
                 next_level = min(6, effective_level + 1) if is_heading_node else base_level
                 AsciiDocApi.ensure_absolute_levels(child_blocks, base_level=next_level)
 
+            items = getattr(node, "items", None)
+            if isinstance(items, list) and items:
+                for item in items:
+                    item_blocks = getattr(item, "blocks", None)
+                    if isinstance(item_blocks, list) and item_blocks:
+                        AsciiDocApi.ensure_absolute_levels(item_blocks, base_level=base_level)
+
     def get_asg_nodes(
         self,
         symbol: str,
@@ -214,8 +231,7 @@ class AsciiDocApi:
         try:
             target_depth = depth if depth is not None else self.options.depth
             obj = self.resolve_symbol(symbol)
-            if isinstance(obj, griffe.Alias):
-                obj = obj.target
+            obj = self._unwrap_member(obj)
 
             level = max(1, min(6, 2 + heading_level_offset + self.options.heading_level_offset))
             if isinstance(obj, griffe.Module):
@@ -288,31 +304,35 @@ class AsciiDocApi:
         )
         child_level = min(level + 1, 6)
 
-        attributes = [member for member in members["attributes"] if isinstance(member, griffe.Attribute)]
+        raw_attributes = [self._unwrap_member(m) for m in members["attributes"]]
+        attributes = [m for m in raw_attributes if isinstance(m, griffe.Attribute)]
         if attributes and depth != "summary":
             items: list[DescriptionListItem] = []
             for attr in attributes:
                 annotation = f" ({attr.annotation})" if attr.annotation else ""
                 term = DescriptionListTerm(inlines=[Text(f"{attr.name}{annotation}")])
                 description = self._docstring_nodes(attr.docstring, child_level)
-                if not description:
+                if attr.value is not None:
                     value = _safe_attr_value(attr)
-                    label = f"Default value: {value}" if value else "(no description)"
-                    description = [Paragraph(inlines=[Text(label)])]
+                    description.append(Paragraph(inlines=[Text(f"Default value: {value}")]))
+                elif not description:
+                    description = [Paragraph(inlines=[Text("(no description)")])]
                 items.append(DescriptionListItem(terms=[term], blocks=description))
             blocks.append(self._section("Attributes", child_level, [DescriptionList(items=items)]))
 
         if depth in ("all", "methods"):
+            raw_methods = [self._unwrap_member(m) for m in members["methods"]]
             blocks.extend(
                 self._function_node(method, child_level)
-                for method in members["methods"]
+                for method in raw_methods
                 if isinstance(method, griffe.Function)
             )
 
         if depth != "summary":
+            raw_nested = [self._unwrap_member(m) for m in members["nested_classes"]]
             blocks.extend(
                 self._class_node(nested_class, depth, child_level)
-                for nested_class in members["nested_classes"]
+                for nested_class in raw_nested
                 if isinstance(nested_class, griffe.Class)
             )
 
@@ -326,19 +346,23 @@ class AsciiDocApi:
             include_special=self.options.include_special,
         )
 
+        raw_attributes = [self._unwrap_member(m) for m in members["attributes"]]
         if depth != "summary":
             blocks.extend(
-                self._attribute_node(attr, level) for attr in members["attributes"] if isinstance(attr, griffe.Attribute)
+                self._attribute_node(attr, level) for attr in raw_attributes if isinstance(attr, griffe.Attribute)
             )
         if depth in ("all", "classes"):
-            blocks.extend(self._class_node(cls, depth, level) for cls in members["classes"] if isinstance(cls, griffe.Class))
+            raw_classes = [self._unwrap_member(m) for m in members["classes"]]
+            blocks.extend(self._class_node(cls, depth, level) for cls in raw_classes if isinstance(cls, griffe.Class))
         if depth in ("all", "functions"):
+            raw_functions = [self._unwrap_member(m) for m in members["functions"]]
             blocks.extend(
-                self._function_node(func, level) for func in members["functions"] if isinstance(func, griffe.Function)
+                self._function_node(func, level) for func in raw_functions if isinstance(func, griffe.Function)
             )
 
         if depth == "all":
-            submodules = [mod for mod in members["submodules"] if isinstance(mod, griffe.Module)]
+            raw_submodules = [self._unwrap_member(m) for m in members["submodules"]]
+            submodules = [mod for mod in raw_submodules if isinstance(mod, griffe.Module)]
             if submodules:
                 items = []
                 for submodule in submodules:
