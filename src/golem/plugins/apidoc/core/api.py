@@ -5,15 +5,31 @@ from pathlib import Path
 from typing import Sequence
 
 import asciidoctrine
-from asciidoctrine.nodes import Admonition, Node, Paragraph, Text
+from asciidoctrine.nodes import (
+    Admonition,
+    DescriptionList,
+    DescriptionListItem,
+    DescriptionListTerm,
+    Listing,
+    Node,
+    Paragraph,
+    Section,
+    Text,
+    Title,
+)
 from asciidoctrine.resolver import ASGResolver
 import griffe
 
-from .extractor import create_griffe_loader, resolve_symbol
+from .extractor import create_griffe_loader, get_class_members, get_module_members, resolve_symbol
 from .formatter import (
+    _safe_attr_value,
     format_attribute,
+    format_attribute_signature,
     format_class,
+    format_class_signature,
+    format_docstring,
     format_function,
+    format_function_signature,
     format_module,
 )
 
@@ -185,7 +201,7 @@ class AsciiDocApi:
         depth: str | None = None,
         heading_level_offset: int = 0,
     ) -> list[Node]:
-        """Resolve a Python symbol, render to AsciiDoc markup, and resolve into ASG block nodes.
+        """Resolve a Python symbol and construct typed ASG block nodes directly.
 
         [parameters]
         `symbol` (str):: Fully qualified Python symbol path to document.
@@ -195,26 +211,146 @@ class AsciiDocApi:
         [returns]
         `list[Node]`:: Structured ASG block nodes suitable for splicing into a document ASG.
         """
-        target_depth = depth if depth is not None else self.options.depth
-        orig_offset = self.options.heading_level_offset
         try:
-            if heading_level_offset != 0:
-                self.options.heading_level_offset = orig_offset + heading_level_offset
-            try:
-                adoc_markup = self.render_symbol(symbol, depth=target_depth)
-                if not adoc_markup.strip():
-                    return []
-                ast = asciidoctrine.parse_to_ast(adoc_markup)
-                doc = ASGResolver(ast).resolve_to_ast(ast)
-                blocks = list(doc.blocks)
-                self.ensure_absolute_levels(blocks, base_level=2 + self.options.heading_level_offset)
-                return blocks
-            except Exception as e:
-                return [
-                    Admonition(
-                        variant="warning",
-                        blocks=[Paragraph(inlines=[Text(f"Golem ApiDoc: Could not resolve target '{symbol}': {e}")])],
+            target_depth = depth if depth is not None else self.options.depth
+            obj = self.resolve_symbol(symbol)
+            if isinstance(obj, griffe.Alias):
+                obj = obj.target
+
+            level = max(1, min(6, 2 + heading_level_offset + self.options.heading_level_offset))
+            if isinstance(obj, griffe.Module):
+                blocks = self._module_nodes(obj, target_depth, level)
+            elif isinstance(obj, griffe.Class):
+                blocks = [self._class_node(obj, target_depth, level)]
+            elif isinstance(obj, griffe.Function):
+                blocks = [self._function_node(obj, level)]
+            elif isinstance(obj, griffe.Attribute):
+                blocks = [self._attribute_node(obj, level)]
+            else:
+                raise TypeError(f"Unsupported symbol type for ASG construction: {type(obj).__name__}")
+
+            self.ensure_absolute_levels(blocks, base_level=level)
+            return blocks
+        except Exception as e:
+            return [
+                Admonition(
+                    variant="warning",
+                    blocks=[Paragraph(inlines=[Text(f"Golem ApiDoc: Could not resolve target '{symbol}': {e}")])],
+                )
+            ]
+
+    @staticmethod
+    def _section(title: str, level: int, blocks: Sequence[Node]) -> Section:
+        """Build a titled API section at an explicit absolute heading level."""
+        return Section(
+            level=level,
+            title=Title(inlines=[Text(title)]),
+            blocks=blocks,
+            absolute_level=level,
+        )
+
+    @staticmethod
+    def _signature_listing(signature: str) -> Listing:
+        """Represent a Python declaration as a typed source listing node."""
+        return Listing(inlines=[Text(signature)], attributes={"style": "source", "language": "python"})
+
+    def _docstring_nodes(self, docstring: griffe.Docstring | None, heading_offset: int) -> list[Node]:
+        """Parse authored docstring markup without reparsing generated API structure."""
+        rendered = format_docstring(
+            docstring,
+            style=self.options.docstring_style,
+            heading_offset=heading_offset,
+        )
+        if not rendered.strip():
+            return []
+        ast = asciidoctrine.parse_to_ast(rendered)
+        return list(ASGResolver(ast).resolve_to_ast(ast).blocks)
+
+    def _function_node(self, func: griffe.Function, level: int) -> Section:
+        blocks: list[Node] = [self._signature_listing(format_function_signature(func))]
+        blocks.extend(self._docstring_nodes(func.docstring, level))
+        return self._section(func.name, level, blocks)
+
+    def _attribute_node(self, attr: griffe.Attribute, level: int) -> Section:
+        blocks: list[Node] = [self._signature_listing(format_attribute_signature(attr))]
+        blocks.extend(self._docstring_nodes(attr.docstring, level))
+        if attr.value is not None:
+            blocks.append(Paragraph(inlines=[Text(f"Default value: {_safe_attr_value(attr)}")]))
+        return self._section(attr.name, level, blocks)
+
+    def _class_node(self, cls: griffe.Class, depth: str, level: int) -> Section:
+        blocks: list[Node] = [self._signature_listing(format_class_signature(cls))]
+        blocks.extend(self._docstring_nodes(cls.docstring, level))
+        members = get_class_members(
+            cls,
+            include_private=self.options.include_private,
+            include_special=self.options.include_special,
+        )
+        child_level = min(level + 1, 6)
+
+        attributes = [member for member in members["attributes"] if isinstance(member, griffe.Attribute)]
+        if attributes and depth != "summary":
+            items: list[DescriptionListItem] = []
+            for attr in attributes:
+                annotation = f" ({attr.annotation})" if attr.annotation else ""
+                term = DescriptionListTerm(inlines=[Text(f"{attr.name}{annotation}")])
+                description = self._docstring_nodes(attr.docstring, child_level)
+                if not description:
+                    value = _safe_attr_value(attr)
+                    label = f"Default value: {value}" if value else "(no description)"
+                    description = [Paragraph(inlines=[Text(label)])]
+                items.append(DescriptionListItem(terms=[term], blocks=description))
+            blocks.append(self._section("Attributes", child_level, [DescriptionList(items=items)]))
+
+        if depth in ("all", "methods"):
+            blocks.extend(
+                self._function_node(method, child_level)
+                for method in members["methods"]
+                if isinstance(method, griffe.Function)
+            )
+
+        if depth != "summary":
+            blocks.extend(
+                self._class_node(nested_class, depth, child_level)
+                for nested_class in members["nested_classes"]
+                if isinstance(nested_class, griffe.Class)
+            )
+
+        return self._section(f"class {cls.name}", level, blocks)
+
+    def _module_nodes(self, module: griffe.Module, depth: str, level: int) -> list[Node]:
+        blocks = self._docstring_nodes(module.docstring, max(0, level - 1))
+        members = get_module_members(
+            module,
+            include_private=self.options.include_private,
+            include_special=self.options.include_special,
+        )
+
+        if depth != "summary":
+            blocks.extend(
+                self._attribute_node(attr, level) for attr in members["attributes"] if isinstance(attr, griffe.Attribute)
+            )
+        if depth in ("all", "classes"):
+            blocks.extend(self._class_node(cls, depth, level) for cls in members["classes"] if isinstance(cls, griffe.Class))
+        if depth in ("all", "functions"):
+            blocks.extend(
+                self._function_node(func, level) for func in members["functions"] if isinstance(func, griffe.Function)
+            )
+
+        if depth == "all":
+            submodules = [mod for mod in members["submodules"] if isinstance(mod, griffe.Module)]
+            if submodules:
+                items = []
+                for submodule in submodules:
+                    description = (
+                        submodule.docstring.value.splitlines()[0] if submodule.docstring and submodule.docstring.value else ""
                     )
-                ]
-        finally:
-            self.options.heading_level_offset = orig_offset
+                    items.append(
+                        DescriptionListItem(
+                            terms=[DescriptionListTerm(inlines=[Text(submodule.path)])],
+                            blocks=[Paragraph(inlines=[Text(description)])] if description else [],
+                        )
+                    )
+                blocks.append(self._section("Submodules", level, [DescriptionList(items=items)]))
+
+        return blocks

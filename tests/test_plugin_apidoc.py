@@ -92,6 +92,52 @@ def test_get_asg_nodes_invalid_symbol_returns_typed_admonition():
     assert "Could not resolve target" in str(nodes[0].blocks[0].inlines[0].value)
 
 
+def test_get_asg_nodes_does_not_parse_generated_symbol_markup(tmp_path, monkeypatch):
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+
+    pkg_dir = tmp_path / "direct_asg_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text("def square(value: int) -> int:\n    return value * value\n", encoding="utf-8")
+    sys.path.insert(0, str(tmp_path))
+    try:
+
+        def unexpected_parse(_source):
+            raise AssertionError("generated symbol markup should not be parsed")
+
+        monkeypatch.setattr("golem.plugins.apidoc.core.api.asciidoctrine.parse_to_ast", unexpected_parse)
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("direct_asg_pkg.square")
+
+        assert nodes
+        assert nodes[0].name == "section"
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
+def test_get_asg_nodes_includes_nested_classes(tmp_path):
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "nested_class_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        "class Outer:\n    class Inner:\n        pass\n",
+        encoding="utf-8",
+    )
+    sys.path.insert(0, str(tmp_path))
+    try:
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("nested_class_pkg.Outer")
+        html = render_body(nodes[0])
+
+        assert "Outer" in html
+        assert "Inner" in html
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
 def test_on_asg_created_macro_replacement(tmp_path):
     import asciidoctrine
     from asciidoctrine.resolver import ASGResolver
