@@ -92,6 +92,33 @@ def test_staleness_tracker_template_discovery(tmp_path):
     assert "component.pt" in fingerprints
 
 
+def test_staleness_tracker_registered_plugin_template_discovery(tmp_path):
+    import asciidoctype
+
+    plugin_tpls = tmp_path / "plugin_templates"
+    plugin_tpls.mkdir()
+    (plugin_tpls / "signature.html").write_text("<div class='sig'></div>", encoding="utf-8")
+
+    asciidoctype.AsciiDoctypeRenderer.register_template_directory(plugin_tpls)
+    try:
+        content = tmp_path / "content"
+        content.mkdir()
+        config = GolemConfig(content_dir=str(content), output_dir=str(tmp_path / "dist"))
+        cache = BuildCache(tmp_path / "cache.json")
+        tracker = StalenessTracker(config, cache, content)
+
+        search_paths = tracker._get_template_search_paths()
+        assert plugin_tpls.resolve() in [p.resolve() for p in search_paths]
+
+        tpl_files = tracker._get_template_files()
+        assert any(t.name == "signature.html" for t in tpl_files)
+    finally:
+        if hasattr(asciidoctype.AsciiDoctypeRenderer, "clear_registered_template_directories"):
+            asciidoctype.AsciiDoctypeRenderer.clear_registered_template_directories()
+        elif hasattr(asciidoctype.AsciiDoctypeRenderer, "_PLUGIN_TEMPLATE_DIRS"):
+            asciidoctype.AsciiDoctypeRenderer._PLUGIN_TEMPLATE_DIRS.clear()
+
+
 def test_staleness_tracker_outdated_file_detection(tmp_path):
     content = tmp_path / "content"
     content.mkdir()

@@ -255,6 +255,18 @@ class StalenessTracker:
         if pkg_default != pkg_theme and pkg_default.exists() and pkg_default.is_dir():
             paths.append(pkg_default.resolve())
 
+        try:
+            import asciidoctype
+
+            if hasattr(asciidoctype.AsciiDoctypeRenderer, "get_registered_template_directories"):
+                for reg_path in asciidoctype.AsciiDoctypeRenderer.get_registered_template_directories():
+                    p = Path(reg_path)
+                    p_res = p.resolve() if p.exists() else p
+                    if p_res not in paths:
+                        paths.append(p_res)
+        except Exception:
+            pass
+
         return paths
 
     def _get_template_files(self) -> list[Path]:

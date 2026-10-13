@@ -1,8 +1,30 @@
 # Golem — Reconstruction & Execution Plan (post data-loss)
 
-Status of work as of HEAD `b2279b5` (2026-09-26), reconstructed from issue bodies,
+Baseline status at HEAD `b2279b5` (2026-09-26), reconstructed from issue bodies,
 issue comments, `git` provenance, and the `asciidoctype`/`asciidoctrine` upstreams.
-Nothing here is implemented — this is the plan to resume from.
+Execution resumed on `reconstruction-plan` on 2026-10-12; current progress is below.
+
+---
+
+## Execution status (2026-10-12)
+
+**Wave 1 / A1 is in progress.** `AsciiDocApi.get_asg_nodes()` now constructs
+typed sections, signatures, attributes, and nested classes directly from Griffe.
+Only authored docstring markup is parsed into ASG; generated signatures and
+structure are no longer emitted as an AsciiDoc document and reparsed. The
+standalone `render_symbol()` / formatter path remains until generated `.adoc`
+files become skeleton stubs, then can be removed. The direct construction slice
+is covered by red/green tests; the full A1 migration is not complete yet.
+
+**Methodology:** All upcoming implementation tasks across the waves use strict
+**Red/Green TDD** (author failing tests first, observe red failure against
+baseline/specs, implement minimal slice to turn green, then refactor and commit).
+
+Before A3, reconcile §2.2's use of AsciiDoctype's template-directory registry
+with the later comment on #37 favoring a Golem hook. The installed
+`asciidoctype` exposes `register_template_directory()` and
+`get_registered_template_directories()`; verify the release/API contract and
+staleness integration before closing that decision.
 
 ---
 
@@ -56,6 +78,15 @@ The pipeline was being moved from "emit AsciiDoc, reparse to nodes" to
 "**take ASG and render it with Chameleon templates**," keeping only lightweight
 AsciiDoc *skeleton stubs* where rendered HTML is included. This was a real (if
 modest) perf win.
+
+**Confirmed bottleneck (2026-10-12):** the biggest cost is AsciiDoctrine
+itself. Earley parsing degrades nonlinearly on large built pages, so removing
+generated pages was mostly a win because the largest built pages stopped being
+parsed — building those pages was not the expensive part. Snippet parsing and
+Griffe extraction remain fast. Exact before/after attribution was not
+preserved, but total clean-build time fell from just under 10 minutes to about
+5 minutes for 60+ pages. Final profiling and exact hotspot attribution resume
+after Wave 7 (§4.1).
 
 ### 2.2 Plugin template discovery → `register_template_directory()` (upstream)
 Golem does **not** need its own registration protocol or a
@@ -239,6 +270,12 @@ rest of the docstring. So the content is not lost; only its *column placement* a
 settled; presumed similar. Note this makes B0's pieces (1)-(4) apply to prose only —
 so B0 splits into **B0a** (apidoc: derived, needs no syntax) and **B0b** (prose:
 needs the syntax decision above).
+**Note — caching was investigated during the lost week** (see §2.1 and §5.9).
+Do not resurrect those sidequests from the issue list alone: no approach or
+result survived. Where these issues have a caching dimension (#34 aggregation,
+#36 DAG deps, #38 asset fingerprints — marginal; #35 none), treat them as
+unmeasured until the post–Wave 7 benchmark (§5.9) says otherwise.
+
 
 > **Two independent axes — do not couple them.**
 > - **Visibility (B8)** — pure CSS in `golem.css`: breakpoint × sidebar-presence.
@@ -269,6 +306,18 @@ State 4  — ≥ BP_wide                          : APPEARS, even with sidebars
 - **State 3 is conditional on sidebars.** A page with no sidebars goes straight
   State 2 → State 4 — no dip, since nothing competes for the right-hand space.
 - **Position is a separate axis** (B9/B10). Appearing in State 2/4 means *visible*,
+
+**5.9 Performance — biggest cost is the parser, and caching notes are pointers only.**
+Total clean-build wall time fell from just under 10 min to ~5 min for 60+
+pages when the parse of large generated AsciiDoc blobs was removed — because
+*parsing* those built pages was the cost, not building them. Earley parse cost
+degrades nonlinearly with page size; snippet parsing and Griffe extraction stay
+fast. The lost week included several caching sidequests whose approaches and
+results did **not** survive. Treat every caching mention in this document (§2.1
+note, §4 table note) as "was investigated here," never as "was tried and
+failed" — re-measure from the post–Wave 7 benchmark before resurrecting any
+of it. The one surviving outcome is the §2.1 apidoc ASG path itself.
+
   not *adjacent* — where it sits is decided independently of whether it shows.
 - **Breakpoint px values are lost** — re-derive against existing `1100px`/`800px`.
 - **State 4 must be checked against four columns, not three.** At the widest
