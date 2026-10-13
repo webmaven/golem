@@ -10,6 +10,38 @@ and this project adheres to https://semver.org/spec/v2.0.0.html[Semantic Version
 
 toc::[]
 
+== Unreleased
+
+=== Added
+
+==== CLI & Scaffolding
+* *Theme and Plugin Scaffolding Commands (Issue #2):* Added `golem new theme <name>` and `golem new plugin <name>` subcommands to generate compliant skeleton directory structures and boilerplate files.
+* *Partial Build Option (Issue #16):* Added `--partial` build option to the CLI, mutually exclusive with `--clean`, enabling targeted compilation workflows.
+
+==== Design Tokens & Theme Architecture (Issue #16)
+* *Three-Layer CSS Design Token System:* Refactored `golem.css` around semantic design tokens (primitive palette, semantic theme variables, and component-level tokens).
+* *Visual Showcase & Accessibility:* Added a visual showcase page (`docs/about/showcase.adoc`), normalized contrast ratios, unified syntax highlighting tokens, and eliminated redundant padding in source drawers and signature blocks.
+
+==== Incremental Builds & Staleness Tracking
+* *Aggregator Page Invalidation (Issue #34):* Added `golem_mark_stale` hook invocation to automatically mark aggregator pages (such as index and glossary) stale on incremental builds when indexed terms or definitions change.
+* *Plugin Template Directory Discovery (Issue #37):* Extended `StalenessTracker._get_template_search_paths()` to query and prioritize template directories registered through `AsciiDoctypeRenderer.get_registered_template_directories()`.
+
+==== Typed Contracts & AST Models
+* *Template Context Contracts (Issue #35):* Added `TypedDict` models (`PageContext`, `TemplateContext`) in `golem.model` defining structural typing and contracts for template contexts.
+* *Predictable Heading Hierarchy (Issue #28):* Enforced consistent absolute heading level propagation (`[absolute-level=N]`) across nested symbol docstrings and sections.
+
+==== API Documentation Generator (Wave 1 / Detour A)
+* *Direct Typed ASG Construction:* Migrated `AsciiDocApi.get_asg_nodes()` to construct typed ASG block nodes directly from Griffe objects, bypassing the Earley parse overhead on generated declarations and signatures.
+
+=== Fixed
+* *Windows Test Portability & Path Separators (PR #39):* Normalized generated stylesheet URLs and asset links to POSIX forward slashes, fixed port collision detection on Windows, and enabled Windows CI test runners.
+* *Page Path Validation for Stylesheet URLs:* Validated and normalized document page paths to guarantee correct relative paths to `golem.css`.
+* *Glossary Definition Clashing:* Added warnings for duplicate or contending glossary term definitions within and across documentation pages.
+* *Glossary and Index Cache Persistence:* Persisted aggregate glossary and index entries into the incremental build cache across compilation runs.
+* *Class Attribute Default Value Retention:* Preserved `Default value: <value>` paragraphs for class attributes documented with docstrings during ASG generation.
+* *Griffe Alias Member Unwrapping:* Resolved Griffe `Alias` references across modules and classes so re-exported symbols are properly documented.
+* *Template Search Path Precedence:* Aligned `StalenessTracker` search path ordering with `AsciiDoctypeRenderer` so registered plugin templates take precedence over fallback directories.
+
 == 0.1.0a3 - 2026-09-19
 
 === Added
