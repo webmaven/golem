@@ -1078,6 +1078,33 @@
             <p style="font-size: 1.05rem; color: var(--text-secondary); margin-bottom: 1rem;">
               Orchestrates incremental Directed Acyclic Graph (DAG) compilation, persistent cache invalidation, and multi-view static site generation for Golem workspaces.
             </p>
+
+            <!-- Class Signature & Example -->
+            <div class="signature-container" aria-label="Class Signature">
+              <span class="ast-keyword">class</span> <span class="ast-name">DagEngine</span><span class="ast-punct">(</span><br>
+              &nbsp;&nbsp;config<span class="ast-punct">:</span> <button class="ast-token" popovertarget="popover-engine-config" style="background: none; border: none; font-size: inherit; font-family: inherit; font-weight: inherit;" title="Click for In-Situ Type Preview">EngineConfig</button> <span class="ast-punct">=</span> <span class="ast-keyword">None</span><span class="ast-punct">,</span><br>
+              &nbsp;&nbsp;cache<span class="ast-punct">:</span> <a href="#golem.cache.BuildCache" class="ast-token" title="Navigate to BuildCache definition">BuildCache</a> <span class="ast-punct">=</span> <span class="ast-keyword">None</span><br>
+              <span class="ast-punct">)</span>
+            </div>
+
+            <!-- Class Usage Example -->
+            <div class="member-card doc-rail" style="margin-top: 1rem; margin-bottom: 1rem;">
+              <div class="doc-title-row" style="margin-bottom: 0.5rem;">
+                <span class="symbol-glyph glyph-function" style="width: 18px; height: 18px; font-size: 0.65rem;" title="Example">E</span>
+                <span style="font-size: 0.875rem; font-family: var(--font-mono); font-weight: 700; color: var(--text-secondary);">Class Usage Example</span>
+                <span class="pill pill-baseline">Python 3.12+</span>
+              </div>
+              <pre class="source-code-block" style="border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-code-panel); padding: 0.75rem 1rem;"><code><span class="code-keyword">from</span> golem.engine <span class="code-keyword">import</span> DagEngine, EngineConfig
+<span class="code-keyword">from</span> pathlib <span class="code-keyword">import</span> Path
+
+<span class="code-comment"># Initialize DagEngine with local workspace configuration</span>
+config = EngineConfig(content_dir=Path(<span class="code-string">"docs"</span>), output_dir=Path(<span class="code-string">"dist"</span>))
+engine = DagEngine(config=config)
+
+<span class="code-comment"># Execute DAG compilation across all discovered views</span>
+result = engine.build()
+print(<span class="code-string">f"Compiled {len(result.compiled_files)} pages."</span>)</code></pre>
+            </div>
           </div>
 
           <h2 id="dag-arch-heading" style="font-size: 1.35rem; font-weight: 700; margin-bottom: 0.75rem; letter-spacing: -0.01em;">
