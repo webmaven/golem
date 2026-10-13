@@ -30,7 +30,7 @@ toc::[]
 * *Template Context Contracts (Issue #35):* Added `TypedDict` models (`PageContext`, `TemplateContext`) in `golem.model` defining structural typing and contracts for template contexts.
 * *Predictable Heading Hierarchy (Issue #28):* Enforced consistent absolute heading level propagation (`[absolute-level=N]`) across nested symbol docstrings and sections.
 
-==== API Documentation Generator (Wave 1 / Detour A)
+==== API Documentation Generator
 * *Direct Typed ASG Construction:* Migrated `AsciiDocApi.get_asg_nodes()` to construct typed ASG block nodes directly from Griffe objects, bypassing the Earley parse overhead on generated declarations and signatures.
 
 === Fixed
