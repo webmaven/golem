@@ -8,23 +8,22 @@ Execution resumed on `reconstruction-plan` on 2026-10-12; current progress is be
 
 ## Execution status (2026-10-12)
 
-**Wave 1 / A1 is in progress.** `AsciiDocApi.get_asg_nodes()` now constructs
-typed sections, signatures, attributes, and nested classes directly from Griffe.
-Only authored docstring markup is parsed into ASG; generated signatures and
-structure are no longer emitted as an AsciiDoc document and reparsed. The
-standalone `render_symbol()` / formatter path remains until generated `.adoc`
-files become skeleton stubs, then can be removed. The direct construction slice
-is covered by red/green tests; the full A1 migration is not complete yet.
+**Wave 1 / A1 & A3′ progress:**
+- **A1 (in progress):** `AsciiDocApi.get_asg_nodes()` constructs typed sections, signatures,
+  attributes, nested classes, and unwrapped alias targets directly from Griffe.
+  Authored docstring markup is parsed into ASG without reparsing generated API structure,
+  and attribute default values are preserved alongside docstrings.
+- **A3′ (complete):** `staleness.py::_get_template_search_paths()` now prepends
+  `AsciiDoctypeRenderer.get_registered_template_directories()`, matching upstream precedence
+  and closing the incremental-rebuild half of #37.
+- **Independent review findings addressed:** Handled Griffe `Alias` resolution across module/class
+  members, restored class attribute default value emission when docstrings exist, fixed template
+  search path precedence in `StalenessTracker`, and extended `ensure_absolute_levels` to traverse
+  `DescriptionListItem.blocks`. All 53 tests in the apidoc and staleness test suites pass.
 
 **Methodology:** All upcoming implementation tasks across the waves use strict
 **Red/Green TDD** (author failing tests first, observe red failure against
 baseline/specs, implement minimal slice to turn green, then refactor and commit).
-
-Before A3, reconcile §2.2's use of AsciiDoctype's template-directory registry
-with the later comment on #37 favoring a Golem hook. The installed
-`asciidoctype` exposes `register_template_directory()` and
-`get_registered_template_directories()`; verify the release/API contract and
-staleness integration before closing that decision.
 
 ---
 
