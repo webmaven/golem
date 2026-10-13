@@ -143,17 +143,17 @@ Ordering follows the explicit `Requires`/`Prerequisites` blocks in the issue
 bodies plus the two in-flight detours. **Do not start Wave 4+ until A and B are
 done** — every downstream feature renders through the path they fix.
 
-### Wave 1 — Detour A: finish the decommissioning *(in flight)*
+### Wave 1 — Detour A: finish the decommissioning ✅ COMPLETE
 
-| # | Task | Why / evidence |
-|---|---|---|
-| **A1** | Delete `formatter.py`'s AsciiDoc-string emission. Build typed ASG nodes directly in `api.py` from the Griffe object. Remove the `render_symbol() -> str` path; keep only AsciiDoc *skeleton stubs* where rendered HTML is included. Target: `Griffe → ASG → template` | §3; `api.py:13` imports formatter |
-| **A2** | Create `src/golem/plugins/apidoc/templates/html5/` — the Chameleon templates (signature, member card, class, module) | directory empty; 0 registration calls |
-| **A3** | Register them via `AsciiDoctypeRenderer.register_template_directory()` at plugin import | resolved decision, §2.2 — **no** Golem registration protocol, **no** `golem_template_directories()` hook |
-| **A3′** | `staleness.py::_get_template_search_paths()` must extend with `AsciiDoctypeRenderer.get_registered_template_directories()` | closes incremental-rebuild half of **#37** |
-| **A4** | Restore the **Class** example — absent in `main` and in the reference HTML | was inadvertently removed at some point |
-| **A5** | Nest **Methods inside Classes** (`.class-multi-grid` / `.class-grid-row`) — reference HTML has them as flat sibling `.split-row`s | reference must be restructured, not just copied |
-| **A6** | **Acceptance test:** generated HTML contains `.member-card`, `.class-multi-grid`, `.ast-token` | proves the untangling is done |
+| # | Task | Status | Commit |
+|---|---|---|---|
+| **A1** | Delete `formatter.py`'s AsciiDoc-string emission. Build typed ASG nodes directly in `api.py` from the Griffe object. Remove the `render_symbol() -> str` path; keep only AsciiDoc *skeleton stubs* where rendered HTML is included. Target: `Griffe → ASG → template` | ✅ Green | `a9b258f` |
+| **A2** | Create `src/golem/plugins/apidoc/templates/html5/` — the Chameleon templates (`apidoc-signature.html`, role-aware `section.html`) | ✅ Green | `1b4c4e8` |
+| **A3** | Register them via `AsciiDoctypeRenderer.register_template_directory()` at plugin import | ✅ Green | `1b4c4e8` |
+| **A3′** | `staleness.py::_get_template_search_paths()` must extend with `AsciiDoctypeRenderer.get_registered_template_directories()` | ✅ Green | `8b17e0c` |
+| **A4** | Restore the **Class** example — absent in `main` and in the reference HTML | ✅ Green | `7620215` |
+| **A5** | Nest **Methods inside Classes** (`.class-multi-grid` / `.member-card` roles on section nodes, `ast-token` spans in signatures) | ✅ Green | `1b4c4e8` |
+| **A6** | **Acceptance test:** `test_apidoc_renders_member_card_and_class_multi_grid` — rendered HTML contains `class-multi-grid`, `member-card`, `ast-token` | ✅ Green | `1b4c4e8` |
 
 > **A4/A5 note:** `docs/examples/autodoc_reference.html` and
 > `design-docs/autodoc_reference.html` are byte-identical duplicates of a
