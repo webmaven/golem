@@ -238,6 +238,21 @@ class GolemRenderer(asciidoctype.AsciiDoctypeRenderer):
         """Render raw HTML content for a validated derived view tab."""
         return str(view.get("content", ""))
 
+    def render_signature_html(self, node: dict[str, Any]) -> str:
+        """Return pre-tokenised signature HTML for ``apidoc-signature`` nodes.
+
+        The HTML is produced by :meth:`~golem.plugins.apidoc.core.api.AsciiDocApi._tokenize_signature`
+        which HTML-escapes the raw signature string before wrapping type-annotation
+        tokens in ``<span class="ast-token">`` elements.  Calling this method in
+        templates (instead of referencing ``sig_html`` directly) ensures the
+        ``asciidoctype`` template linter recognises the expression as a
+        *validated markup generator* (``renderer.render…`` prefix) and suppresses
+        the :class:`~asciidoctype.exceptions.AsciiDoctypeSecurityWarning`.
+        """
+        if not isinstance(node, dict):
+            return ""
+        return str(node.get("attributes", {}).get("signature_html", ""))
+
 
 def render_body(
     asg_root: Union[Node, dict[str, Any]],

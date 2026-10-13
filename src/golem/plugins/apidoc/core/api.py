@@ -267,8 +267,44 @@ class AsciiDocApi:
 
     @staticmethod
     def _signature_listing(signature: str) -> Listing:
-        """Represent a Python declaration as a typed source listing node."""
-        return Listing(inlines=[Text(signature)], attributes={"style": "source", "language": "python"})
+        """Represent a Python declaration as a typed source listing node.
+
+        Emits an ``apidoc-signature`` node (a renamed Listing) carrying both the
+        raw signature text in ``inlines`` and a pre-tokenised HTML rendering in
+        ``attributes['signature_html']`` so the Chameleon template can inject
+        ``ast-token`` spans without re-parsing.
+        """
+        node = Listing(inlines=[Text(signature)], attributes={"style": "source", "language": "python"})
+        node.name = "apidoc-signature"
+        node.attributes["signature_html"] = AsciiDocApi._tokenize_signature(signature)
+        return node
+
+    @staticmethod
+    def _tokenize_signature(signature: str) -> str:
+        """Wrap Python type annotation tokens with <span class="ast-token"> markup.
+
+        Escapes the raw signature for HTML, then wraps type names appearing after
+        ``: `` (parameter annotation) or ``->`` (return annotation) with an
+        ``ast-token`` span so CSS and JS can style or interlink them.
+        """
+        import html as _html
+        import re
+
+        escaped = _html.escape(signature)
+        # Wrap `: TypeName` annotation tokens
+        escaped = re.sub(
+            r": ([A-Za-z_][A-Za-z0-9_.[\], |]*)",
+            r': <span class="ast-token">\1</span>',
+            escaped,
+        )
+        # Wrap `-> TypeName` return annotation tokens (html-escaped `->` is `->`)
+        escaped = re.sub(
+            r"-&gt; ([A-Za-z_][A-Za-z0-9_.[\], |]*)",
+            r'-&gt; <span class="ast-token">\1</span>',
+            escaped,
+        )
+        return escaped
+
 
     def _docstring_nodes(self, docstring: griffe.Docstring | None, heading_offset: int) -> list[Node]:
         """Parse authored docstring markup without reparsing generated API structure."""
@@ -282,10 +318,13 @@ class AsciiDocApi:
         ast = asciidoctrine.parse_to_ast(rendered)
         return list(ASGResolver(ast).resolve_to_ast(ast).blocks)
 
-    def _function_node(self, func: griffe.Function, level: int) -> Section:
+    def _function_node(self, func: griffe.Function, level: int, *, is_member: bool = False) -> Section:
         blocks: list[Node] = [self._signature_listing(format_function_signature(func))]
         blocks.extend(self._docstring_nodes(func.docstring, level))
-        return self._section(func.name, level, blocks)
+        section = self._section(func.name, level, blocks)
+        if is_member:
+            section.attributes["role"] = "member-card"
+        return section
 
     def _attribute_node(self, attr: griffe.Attribute, level: int) -> Section:
         blocks: list[Node] = [self._signature_listing(format_attribute_signature(attr))]
@@ -323,7 +362,7 @@ class AsciiDocApi:
         if depth in ("all", "methods"):
             raw_methods = [self._unwrap_member(m) for m in members["methods"]]
             blocks.extend(
-                self._function_node(method, child_level)
+                self._function_node(method, child_level, is_member=True)
                 for method in raw_methods
                 if isinstance(method, griffe.Function)
             )
@@ -336,7 +375,9 @@ class AsciiDocApi:
                 if isinstance(nested_class, griffe.Class)
             )
 
-        return self._section(f"class {cls.name}", level, blocks)
+        section = self._section(f"class {cls.name}", level, blocks)
+        section.attributes["role"] = "class-multi-grid"
+        return section
 
     def _module_nodes(self, module: griffe.Module, depth: str, level: int) -> list[Node]:
         blocks = self._docstring_nodes(module.docstring, max(0, level - 1))

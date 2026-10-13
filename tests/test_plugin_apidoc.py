@@ -182,6 +182,50 @@ def test_get_asg_nodes_resolves_aliased_members(tmp_path):
         sys.path.remove(str(tmp_path))
 
 
+def test_apidoc_template_directory_registered():
+    from pathlib import Path
+    import asciidoctype
+    import golem.plugins.apidoc
+
+    registered = asciidoctype.AsciiDoctypeRenderer.get_registered_template_directories()
+    apidoc_tpl_dir = Path(golem.plugins.apidoc.__file__).parent / "templates" / "html5"
+    assert apidoc_tpl_dir.resolve() in [p.resolve() for p in registered]
+
+
+def test_apidoc_renders_member_card_and_class_multi_grid(tmp_path):
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "card_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        "class Worker:\n"
+        "    '''A worker service.'''\n"
+        "    def run(self, count: int = 1) -> bool:\n"
+        "        '''Run the worker process.\n"
+        "\n"
+        "        Examples:\n"
+        "            >>> w = Worker()\n"
+        "            >>> w.run()\n"
+        "            True\n"
+        "        '''\n"
+        "        return True\n",
+        encoding="utf-8",
+    )
+    sys.path.insert(0, str(tmp_path))
+    try:
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("card_pkg.Worker")
+        html = render_body(nodes[0])
+
+        assert "class-multi-grid" in html
+        assert "member-card" in html
+        assert "ast-token" in html
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
 def test_on_asg_created_macro_replacement(tmp_path):
     import asciidoctrine
     from asciidoctrine.resolver import ASGResolver

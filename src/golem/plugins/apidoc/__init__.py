@@ -10,7 +10,12 @@ import click
 
 from golem.model import AsgTransformer, Node
 from golem.plugins import hookimpl
+import asciidoctype
 from .core import ApiGenOptions, AsciiDocApi
+
+_TEMPLATES_DIR: Path = Path(__file__).parent / "templates" / "html5"
+if _TEMPLATES_DIR.exists():
+    asciidoctype.AsciiDoctypeRenderer.register_template_directory(_TEMPLATES_DIR)
 
 if TYPE_CHECKING:
     from golem.config import GolemConfig
