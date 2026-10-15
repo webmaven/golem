@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import click
 from click.testing import CliRunner
 
@@ -1050,3 +1052,249 @@ def test_build_engine_strict_mode_raises_when_apidoc_fails(tmp_path, monkeypatch
     engine = BuildEngine(config)
     with pytest.raises(RuntimeError, match="Simulated apidoc failure during build"):
         engine.build_site()
+
+
+def _find_nodes(root, node_type):
+    """Yield every node of *node_type* in the tree rooted at *root*."""
+    if isinstance(root, node_type):
+        yield root
+    if hasattr(root, "get_child_collections"):
+        for collection in root.get_child_collections().values():
+            for child in collection:
+                yield from _find_nodes(child, node_type)
+    else:
+        for collection_name in ("blocks", "items"):
+            for child in getattr(root, collection_name, None) or []:
+                yield from _find_nodes(child, node_type)
+
+
+def test_apidoc_docstring_examples_emit_sidebar(tmp_path):
+    """Verify that docstring Examples sections render as sidebar-column."""
+    from asciidoctrine import parse_to_ast
+    from asciidoctrine.nodes import Sidebar
+    from asciidoctrine.resolver import ASGResolver
+    from golem.plugins import apidoc
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "sidebar_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Sidebar package."""
+def process_data(data: list[str]) -> dict:
+    """Process input data.
+
+    Examples:
+        >>> process_data(["a", "b"])
+        {'count': 2}
+
+    More examples:
+        >>> process_data([])
+        {'count': 0}
+    """
+    return {"count": len(data)}
+''',
+        encoding="utf-8",
+    )
+
+    import sys
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        api = AsciiDocApi(search_paths=[tmp_path])
+        nodes = api.get_asg_nodes("sidebar_pkg.process_data")
+        assert nodes, "expected at least one node"
+
+        sidebars = [n for root in nodes for n in _find_nodes(root, Sidebar)]
+        assert sidebars, "expected at least one Sidebar node"
+        for sidebar in sidebars:
+            assert sidebar.attributes.get("role") == "sidebar-column", sidebar.attributes
+            assert sidebar.blocks, "sidebar should carry content blocks"
+
+        raw_doc = "= Sidebar Test\n\ngolem.apidoc::sidebar_pkg.process_data[depth=all]\n"
+        ast = parse_to_ast(raw_doc)
+        asg = ASGResolver(ast).resolve_to_ast(ast)
+        html = render_body(apidoc.on_asg_created(asg=asg))
+
+        assert 'class="sidebarblock sidebar-column"' in html, html
+        assert "process_data" in html
+        assert "count" in html
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
+def test_apidoc_docstring_params_render_description_list(tmp_path):
+    """Verify that docstring Parameters sections render as DescriptionList."""
+    from asciidoctrine.nodes import DescriptionList
+    from golem.plugins.apidoc import AsciiDocApi
+
+    pkg_dir = tmp_path / "param_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Param package."""
+def compute(x: int, y: float = 1.0) -> float:
+    """Compute a value.
+
+    Args:
+        x: The first parameter.
+        y: The second parameter with default.
+    """
+    return x * y
+''',
+        encoding="utf-8",
+    )
+
+    import sys
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        api = AsciiDocApi(search_paths=[tmp_path])
+        nodes = api.get_asg_nodes("param_pkg.compute")
+        assert nodes, "expected at least one node"
+
+        lists = [n for root in nodes for n in _find_nodes(root, DescriptionList)]
+        assert lists, "expected a DescriptionList for the parameters"
+        terms = [t for dlist in lists for item in dlist.items for t in item.terms]
+        joined = " ".join(_node_text(term) for term in terms)
+        assert "x" in joined, joined
+        assert "y" in joined, joined
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
+def test_apidoc_docstring_returns_raises_render_admonition(tmp_path):
+    """Verify that docstring Returns/Raises sections render as Admonition."""
+    from asciidoctrine.nodes import Admonition
+    from golem.plugins.apidoc import AsciiDocApi
+
+    pkg_dir = tmp_path / "admon_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Admon package."""
+def divide(a: float, b: float) -> float:
+    """Divide two numbers.
+
+    Returns:
+        float: The quotient.
+
+    Raises:
+        ZeroDivisionError: If b is zero.
+    """
+    if b == 0:
+        raise ZeroDivisionError("Cannot divide by zero")
+    return a / b
+''',
+        encoding="utf-8",
+    )
+
+    import sys
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        api = AsciiDocApi(search_paths=[tmp_path])
+        nodes = api.get_asg_nodes("admon_pkg.divide")
+        assert nodes, "expected at least one node"
+
+        admonitions = [n for root in nodes for n in _find_nodes(root, Admonition)]
+        assert admonitions, "expected at least one Admonition"
+        raises_blocks = [a for a in admonitions if a.variant == "warning"]
+        assert raises_blocks, "expected a warning admonition for the raises section"
+
+        text = " ".join(_node_text(block) for admonition in raises_blocks for block in admonition.blocks)
+        assert "ZeroDivisionError" in text, text
+        assert "zero" in text.lower(), text
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
+def _node_text(node):
+    """Return the plain text carried by a node, descending into children."""
+    value = getattr(node, "value", None)
+    if isinstance(value, str):
+        return value
+    parts = [getattr(inline, "value", "") for inline in getattr(node, "inlines", None) or []]
+    parts.extend(_node_text(term) for term in getattr(node, "terms", None) or [])
+    parts.extend(_node_text(block) for block in getattr(node, "blocks", None) or [])
+    return "".join(part for part in parts if isinstance(part, str))
+
+
+def test_apidoc_param_description_keeps_inline_markup(tmp_path):
+    """Parameter descriptions must keep their inline AsciiDoc markup."""
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "markup_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Markup package."""
+def run(mode: str) -> None:
+    """Run in a mode.
+
+    Args:
+        mode: The mode, e.g. ``fast`` or *safe*. See <<limits>>.
+    """
+    pass
+''',
+        encoding="utf-8",
+    )
+
+    import sys
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        api = AsciiDocApi(search_paths=[tmp_path])
+        nodes = api.get_asg_nodes("markup_pkg.run")
+        html = "\n".join(render_body(node) for node in nodes)
+
+        # Inline markup must survive: a flattened-text fallback would have
+        # re-parsed plain text and lost these tags.
+        assert "<code>fast</code>" in html, html
+        assert "<strong>safe</strong>" in html, html
+        assert 'class="xref"' in html, html
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
+def test_apidoc_docstring_heading_survives_param_sections(tmp_path):
+    """An authored sub-heading must render as a heading, not flattened text."""
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "mixed_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Mixed package."""
+def sync(options: dict) -> None:
+    """Sync a config.
+
+    === Sync Options
+    Tune how the sync runs.
+
+    Args:
+        options: Sync options.
+    """
+    pass
+''',
+        encoding="utf-8",
+    )
+
+    import sys
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        api = AsciiDocApi(search_paths=[tmp_path])
+        nodes = api.get_asg_nodes("mixed_pkg.sync")
+        html = "\n".join(render_body(node) for node in nodes)
+
+        # The sub-heading must render as a real heading, not flattened text, and
+        # must nest below the function heading.
+        heading = re.search(r"<h(\d)[^>]*>Sync Options</h\1>", html)
+        assert heading, f"expected a heading for 'Sync Options': {html}"
+        assert heading.group(1) == "3", html
+        assert "Tune how the sync runs." in html
+        # The params list survives after the sub-heading, whichever way the
+        # upstream bridge chooses to wrap the term.
+        assert re.search(r"<dt>\s*(?:<code>)?options(?:</code>)?\s*</dt>", html), html
+        assert "Sync options." in html
+    finally:
+        sys.path.remove(str(tmp_path))

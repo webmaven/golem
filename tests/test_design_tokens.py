@@ -476,9 +476,62 @@ def test_signature_container_and_source_drawer_rules():
     assert "var(--border-color)" in drawer_rule, "details.source-drawer must use var(--border-color)"
     assert "var(--bg-surface)" in drawer_rule, "details.source-drawer must use var(--bg-surface)"
 
+    open_drawer_rule = rules_by_selector.get("details.source-drawer[open]")
+    assert open_drawer_rule is not None, "Missing details.source-drawer[open] rule"
+    assert "max-height: 400px" in open_drawer_rule, "details.source-drawer[open] must cap its height (B7)"
+    assert "overflow-y: auto" in open_drawer_rule, "details.source-drawer[open] must scroll its overflow (B7)"
+
     assert ".theme-toggle" in rules_by_selector, "Missing .theme-toggle rule"
     toggle_rule = rules_by_selector[".theme-toggle"]
     assert "var(--border-color)" in toggle_rule, ".theme-toggle must use var(--border-color)"
+
+
+def test_right_toc_sidebar_is_sticky():
+    """B1: the right-hand TOC must stay in view while the page scrolls."""
+    css = _read_css()
+    rules = _extract_css_rules(css)
+    rules_by_selector = {sel: body for sel, body in rules}
+
+    assert "#golem-sidebar-right" in rules_by_selector, "Missing #golem-sidebar-right rule"
+    rule = rules_by_selector["#golem-sidebar-right"]
+    assert "position: sticky" in rule, "#golem-sidebar-right must be sticky (B1)"
+    assert "overflow-y: auto" in rule, "#golem-sidebar-right must scroll its own TOC overflow (B1)"
+    assert "max-height" in rule or "height: 100vh" in rule, "#golem-sidebar-right must be height-bounded (B1)"
+
+    # Sticky only takes effect once the flex item stops stretching; without this
+    # the TOC still scrolls away.
+    assert "align-self: flex-start" in rule, "#golem-sidebar-right needs align-self to allow sticky (B1)"
+
+    sidebars = {sel: body for sel, body in rules if sel.startswith("#golem-sidebar-")}
+    assert any("position: sticky" in body for body in sidebars.values()), "no golem sidebar is sticky"
+
+
+def test_content_sidebar_and_right_toc_share_sticky_offset():
+    """B0a/B1: both sticky panels must pin to the same offset.
+
+    `#golem-header` is not sticky, so both pin to the viewport top; a mismatch
+    would visibly separate the TOC from a content sidebar.
+    """
+    css = _read_css()
+    rules = _extract_css_rules(css)
+    rules_by_selector = {sel: body for sel, body in rules}
+
+    toc_rule = rules_by_selector.get("#golem-sidebar-right")
+    content_rule = rules_by_selector.get(".sidebar-column")
+    assert toc_rule is not None, "Missing #golem-sidebar-right rule"
+    assert content_rule is not None, "Missing .sidebar-column rule"
+
+    def _offset(rule: str) -> str | None:
+        for prop in rule.split(";"):
+            name, _, value = prop.partition(":")
+            if name.strip() == "top":
+                return value.strip()
+        return None
+
+    assert _offset(toc_rule) == _offset(content_rule), (
+        f"#golem-sidebar-right and .sidebar-column must share a sticky 'top' offset, "
+        f"got {_offset(toc_rule)!r} and {_offset(content_rule)!r}"
+    )
 
 
 def test_skeleton_template_includes_theme_toggle():
