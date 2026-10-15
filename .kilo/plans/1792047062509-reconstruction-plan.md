@@ -1,13 +1,20 @@
 # Reconstruction Plan: Waves 2-8 Implementation
 
-## Status: Wave 1 Complete | Wave 2 Layout Complete (B0-B13 done, B5 remaining)
+## Status: Wave 1 Complete | Wave 2 Layout Complete | Waves 3 & 4 Complete
 
-**Unit suite: 611 passed, 2 xfailed** (full `tests/`). `ruff check`/`format` clean.
+**Waves 3 and 4 shipped 2026-10-15** on `reconstruction-plan` (#16 badge tokens,
+#27 landmark labels, #30 kbd shortcut, #23 signature label, #19 glyph badges, #20
+modifier pills, #24 source drawers, #28 heading-hierarchy verification). Wave 5-8
+work is specified in that wave's plan document when it starts. Full detail:
+`.kilo/plans/1792091844188-wave3-wave4-plan.md`.
+
+**Unit suite: 628 passed, 2 xfailed** (full `tests/`). `ruff check`/`format` clean.
 `mypy src tests` reports only the pre-existing repo-wide `asciidoctype`
 "missing library stubs" errors (also present in untouched `staleness.py` /
 `test_staleness.py`); no new errors introduced.
 
-**E2E: `golem build --clean` completed — 62 pages, zero failures.** All four real
+**E2E: `golem build --clean` completed — 62 pages, zero failures.** Clean-build time
+**measured 2026-10-15 at ~1150s, down from ~1000s**. All four real
 `golem.apidoc::` macro splices (`docs/plugins/source-links.adoc:164`,
 `nav-helpers.adoc:145`, `index-glossary.adoc:213/217`, `reference/apidoc.adoc:48`) resolved:
 - `0` warning admonitions, `0` "Could not resolve" messages
@@ -16,11 +23,11 @@
 - parameters render as `<dl class="dlist">` with `<dt>home_url (str | None)</dt>`
   and inline `<code>` markup preserved
 
-**Handoff state (verified 2026-10-15):** the Session 2 cluster above is complete in
-the working tree but **not yet committed** (last commit `7dc932f`); the next
-increment — commit checkpoint, move of `RECONSTRUCTION.md` into `.kilo/plans/`, B5,
-Wave 3 (#16), Wave 4 (#19/#20/#23/#24/#27/#28/#30) — is specified in
-`.kilo/plans/1792091844188-wave3-wave4-plan.md`.
+**Handoff state (final for Waves 2-4, verified 2026-10-15):** all of Wave 2 through
+Wave 4 is committed on `reconstruction-plan` — Session 2 cluster `03099f7`, B5
+`d1b4e88`, #16 `1189335`, #27 `2f8470a`, #30 `d8b596f`, #23 `2fd0886`, #19 `d4381d4`,
+#20 `7d09334`, #24 `79fe020`. Both tracking documents live in `.kilo/plans/`
+(`RECONSTRUCTION.md` moved there with the user's approval). Next increment: Wave 5.
 
 ### Session 2 additions (B1, B7, B2′ + B3-B13 cluster)
 
@@ -61,8 +68,18 @@ Wave 3 (#16), Wave 4 (#19/#20/#23/#24/#27/#28/#30) — is specified in
 | B3+B4+B6+B11 — `.class-multi-grid` cluster | DONE | uniform h2-h4 sizes, `min-width: 0`, `display: contents` subgrid fix |
 | B8/B9 — nav visibility ladder, adjacency | DONE | CSS-only 4-state ladder at 768/992/1280 |
 | B12/B13 — `member-card` / `.doc-rail` | DONE | card rail + signature accent stripped; no box padding |
-| B5 — table clipping/overflow | PENDING | no `.tableblock` overflow wrapper or test exists; moved to `1792091844188-wave3-wave4-plan.md` Phase 1 |
-| Waves 3-8 | TODO | Wave 3 + Wave 4 now specified in `.kilo/plans/1792091844188-wave3-wave4-plan.md` |
+| B5 — table clipping/overflow | DONE `d1b4e88` | `table.html` override wraps tables in `.table-scroll`; breakout moved off the table |
+| #16 — design tokens | DONE `1189335` | badge tokens (`--badge-radius` = `var(--radius-full)` per Decision #4); last acceptance items verified; issue closed |
+| #27 — landmark aria-labels | DONE `2f8470a` | `aria-label="Table of contents"` on `#golem-sidebar-right`; no explicit roles (narrowed scope) |
+| #30 — kbd shortcut hint | DONE `d8b596f` | `<kbd class="kbd-shortcut">t</kbd>` + guarded keydown theme toggle; token-driven CSS; `t` only |
+| #23 — signature block | DONE `2fd0886` | `aria-label="Method signature"` on `.signature-container`; token spans + scroll verified |
+| #19 — glyph badges | DONE `d4381d4` | `GLYPH_MAP` C/M/F/I/T/X/V in `.doc-title-row`; alias-safe classification |
+| #20 — modifier pills | DONE `7d09334` | Async/Constructor/classmethod/staticmethod/abstract + Stable vN+/Deprecated/Experimental; `--pill-*` tokens |
+| #24 — source drawer | DONE `79fe020` | collapsed `<details>` with Pygments-highlighted source under every function/method |
+| #28 — heading hierarchy | DONE verified | `ensure_absolute_levels` + 6 tests (h2/h3/h4, offset, WCAG no-skip); issue closed |
+| #37 — template staleness | DONE `8b17e0c` | A3′ `_get_template_search_paths` extension; issue closed |
+| #2 — `golem new` scaffolding | DONE `b2279b5` | landed on main; covered by `tests/test_cli_new.py`; issue closed |
+| Waves 5-8 | TODO | API roadmap expansion, CLI navigation, viewer integration; to be specified in a follow-up plan |
 
 Wave 1 (Detour A) is verified complete. Wave 2 (layout) is complete: content
 sidebars (B0) render beside prose in a split row, the in-page nav follows the

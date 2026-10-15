@@ -10,9 +10,10 @@ tracking documents live in one place.
 
 ## Execution status (2026-10-15)
 
-**Wave 1 (Detour A) and Wave 2 (Detour B layout) are complete.** Recorded in
-`.kilo/plans/1792047062509-reconstruction-plan.md`; the next increment (B5, Wave 3,
-Wave 4) is specified in `.kilo/plans/1792091844188-wave3-wave4-plan.md`.
+**Waves 1-4 are complete; remaining Waves 5-8 are specified.** Wave 3 and Wave 4
+landed on 2026-10-15 on branch `reconstruction-plan`; the running record is
+`.kilo/plans/1792047062509-reconstruction-plan.md` and
+`.kilo/plans/1792091844188-wave3-wave4-plan.md`.
 
 - **Wave 1:** typed ASG construction from Griffe in `AsciiDocApi.get_asg_nodes()`
   (A1), apidoc Chameleon templates registered at plugin import (A2/A3), staleness
@@ -22,15 +23,33 @@ Wave 4) is specified in `.kilo/plans/1792091844188-wave3-wave4-plan.md`.
   (B1/B2′), uniform class-grid headings (B3), column containment (B4), collapsed
   source drawers (B7), the CSS-only 4-state nav visibility ladder (B8), adjacent-by-
   default nav position with the `flush_right_nav` opt-in (B9/B10), the `.member-card`
-  rail (B12/B13). B5 (table overflow) is the one remaining item — now planned.
-- **Suite:** 611 passed, 2 xfailed, full `tests/`; `ruff check`/`format` clean;
+  rail (B12/B13), and the `.table-scroll` overflow container for wide tables (B5,
+  `d1b4e88`). Session 2 checkpoint `03099f7`; B5 `d1b4e88`.
+- **Wave 3 — #16 (`1189335`):** the last token category (`--badge-radius` /
+  `-font-size` / `-font-weight`) added to `:root` and consumed by `.symbol-glyph`;
+  `--badge-radius: var(--radius-full)` per Decision #4 (glyph badges are pill-shaped).
+  All other #16 acceptance criteria verified. Issue closed.
+- **Wave 4:** #27 landmark aria-labels (`2f8470a`); #30 `<kbd class="kbd-shortcut">t</kbd>`
+  hint + guarded keydown theme shortcut (`d8b596f`); #23 `aria-label="Method signature"`
+  on the signature container (`2fd0886`); #19 glyph badges C/M/F/I/T/X/V in a
+  `.doc-title-row` (`d4381d4`); #20 semantic modifier pills — Async / Constructor /
+  classmethod / staticmethod / abstract plus Stable vN+ / Deprecated / Experimental
+  (`7d09334`); #24 collapsed source drawers under every function/method (`79fe020`);
+  #28 heading hierarchy verified and closed. Implementation notes worth knowing:
+  Griffe's `.labels`/`.decorators` raise for decorators imported from outside the
+  loaded collection (e.g. `@dataclass`), so glyph/pill classification is alias-safe
+  (bases + decorator names with a source-text fallback); `@property` members are
+  modeled as Attributes by Griffe and render as attribute-list rows, so the property
+  pill is intentionally not emitted (noted on #20); pills share the single
+  `asciidocstring.parse()` result with the docstring block builder.
+- **Suite:** 628 passed, 2 xfailed, full `tests/`; `ruff check`/`format` clean;
   `mypy src tests` reports only the pre-existing repo-wide `asciidoctype`
   missing-stubs errors. Fixed one pre-existing test-isolation defect: tests that mock
   `importlib.metadata.entry_points` now also invalidate `golem.plugins`
   `_CACHED_ENTRY_POINTS` (order-dependent failure of
   `test_source_links_registered_via_plugin_manager`).
 - **E2E:** `golem build --clean` — 62 pages, zero failures. Clean-build time
-  **measured 2026-10-15 at ~700s, down from ~1000s**; this direct measurement
+  **measured 2026-10-15 at ~1150s, down from ~1000s**; this direct measurement
   supersedes the earlier ~5-minute attribution in §2.1/§5.9 below (attribution was
   never preserved; the parse-cost diagnosis still stands).
 
