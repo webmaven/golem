@@ -458,6 +458,33 @@ def test_rules_adopt_semantic_tokens():
     assert "var(--color-primary)" in pre_rule, "pre must use var(--color-primary)"
 
 
+def test_badge_tokens_defined_and_consumed():
+    """Wave 3 / #16: badge tokens exist in :root and the glyph badge consumes them.
+
+    Decision #4 of the reconstruction plan pins --badge-radius to var(--radius-full)
+    (glyph badges are pill-shaped). Typography/geometry tokens are theme-independent,
+    so they live in :root next to the other --radius-* / --font-size-* primitives.
+    """
+    css = _read_css()
+    root_tokens = _extract_root_tokens(css)
+
+    assert "--badge-radius" in root_tokens, "Missing --badge-radius token (#16 category 7)"
+    assert "--badge-font-size" in root_tokens, "Missing --badge-font-size token (#16 category 7)"
+    assert "--badge-font-weight" in root_tokens, "Missing --badge-font-weight token (#16 category 7)"
+    assert root_tokens["--badge-radius"] == "var(--radius-full)", "--badge-radius must be var(--radius-full) (Decision #4)"
+
+    rules = _extract_css_rules(css)
+    rules_by_selector = {sel: body for sel, body in rules}
+
+    # The glyph badge component consumes the tokens instead of literals.
+    glyph_rule = rules_by_selector.get(".symbol-glyph")
+    assert glyph_rule is not None, "Missing .symbol-glyph rule"
+    assert "var(--badge-radius)" in glyph_rule, ".symbol-glyph must use var(--badge-radius)"
+    assert "var(--badge-font-size)" in glyph_rule, ".symbol-glyph must use var(--badge-font-size)"
+    assert "var(--badge-font-weight)" in glyph_rule, ".symbol-glyph must use var(--badge-font-weight)"
+    assert "border-radius: var(--radius-sm)" not in glyph_rule, ".symbol-glyph must not hardcode --radius-sm"
+
+
 def test_table_scroll_container_clips_overflow():
     """B5: .table-scroll is the horizontal scroll container for wide tables.
 
