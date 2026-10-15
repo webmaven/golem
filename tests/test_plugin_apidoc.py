@@ -184,6 +184,36 @@ def test_get_asg_nodes_resolves_aliased_members(tmp_path):
         sys.path.remove(str(tmp_path))
 
 
+def test_signature_block_aria_label_and_token_spans(tmp_path):
+    """#23: signature blocks are labelled, tokenised, and scrollable.
+
+    Acceptance: syntax-highlighted parameter/return tokens (ast-token spans),
+    monospace typography + overflow-x scroll in .signature-container CSS, and an
+    aria-label so screen readers announce the block as a method signature.
+    """
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "sig_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        "def send(url: str, retries: int = 3) -> bool:\n    '''Send the payload.'''\n    return True\n",
+        encoding="utf-8",
+    )
+    sys.path.insert(0, str(tmp_path))
+    try:
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("sig_pkg.send")
+        html = "\n".join(render_body(n) for n in nodes)
+        assert 'class="signature-container' in html, "Missing .signature-container (#23)"
+        assert 'aria-label="Method signature"' in html, "Missing aria-label on .signature-container (#23)"
+        assert '<span class="ast-token">' in html, "Missing tokenised annotation spans (#23)"
+    finally:
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+
+
 def test_apidoc_template_directory_registered():
     from pathlib import Path
     import asciidoctype
