@@ -147,6 +147,9 @@ def test_cli_plugins_with_entry_points(tmp_path, monkeypatch):
         import importlib.metadata
 
         monkeypatch.setattr(importlib.metadata, "entry_points", mock_entry_points)
+        # The discovery cache is module-global; without invalidating it here the
+        # mocked entry points leak into later tests in the same process.
+        monkeypatch.setattr("golem.plugins._CACHED_ENTRY_POINTS", None)
 
         result = runner.invoke(main, ["plugins"])
         assert result.exit_code == 0
@@ -285,6 +288,9 @@ def test_cli_themes_with_entry_points(tmp_path, monkeypatch):
         import importlib.metadata
 
         monkeypatch.setattr(importlib.metadata, "entry_points", mock_entry_points)
+        # The discovery cache is module-global; without invalidating it here the
+        # mocked entry points leak into later tests in the same process.
+        monkeypatch.setattr("golem.plugins._CACHED_ENTRY_POINTS", None)
 
         # 1. Default active theme with entry point theme available
         result = runner.invoke(main, ["themes"])

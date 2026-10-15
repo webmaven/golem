@@ -16,6 +16,7 @@ from asciidoctrine.nodes import (
     DescriptionListTerm,
     Listing,
     Node,
+    Open,
     Paragraph,
     Section,
     Sidebar,
@@ -471,7 +472,30 @@ class AsciiDocApi:
         for block in blocks:
             nodes.extend(self._docstring_block_nodes(block, doc, heading_offset))
         nodes.extend(self._docstring_attribute_nodes(doc, heading_offset))
-        return nodes
+        return self._split_row_nodes(nodes)
+
+    @staticmethod
+    def _split_row_nodes(nodes: list[Node]) -> list[Node]:
+        """Place example sidebars beside the prose in a two-column split row.
+
+        A docstring's examples render as `sidebar-column` sidebars; the remaining
+        blocks go into a `prose-column` beside them so a listing sits next to the
+        text that mentions it instead of below it. Docstrings without examples
+        return their nodes untouched, so prose-only members keep the plain layout.
+        """
+        sidebar_ids = {id(node) for node in nodes if isinstance(node, Sidebar)}
+        if not sidebar_ids:
+            return nodes
+
+        prose = [node for node in nodes if id(node) not in sidebar_ids]
+        if not prose:
+            return nodes
+
+        prose_column = Open(blocks=prose)
+        prose_column.attributes["role"] = "prose-column"
+        split_row = Open(blocks=[prose_column, *(node for node in nodes if isinstance(node, Sidebar))])
+        split_row.attributes["role"] = "split-row"
+        return [split_row]
 
     # ---- docstring parsing -------------------------------------------------
 

@@ -47,6 +47,7 @@ Options can be specified in the `[plugins.nav_helpers]` table in `golem.toml`:
 [plugins.nav_helpers]
 home_title = "Documentation"
 home_url = "/"
+flush_right_nav = false
 ----
 
 .Configuration Options
@@ -63,6 +64,15 @@ home_url = "/"
 | `str \| None`
 | `root_path` or `"/"`
 | Link destination URL for the root breadcrumb entry.
+
+| `flush_right_nav`
+| `bool`
+| `false`
+| Pin the in-page navigation (`#golem-sidebar-right`) flush right instead of
+adjacent to the main column on wide viewports. Affects position only -- nav
+visibility is controlled purely by CSS breakpoints and never by this flag.
+Useful for mixed-layout sites where the adjacent-to-flush-right flip is
+distracting.
 |===
 
 == Template Context Variables
@@ -87,6 +97,12 @@ When active, `nav_helpers` enriches the template context with two variables:
 - `url` (`str`): HTML link URL. +
 - `path` (`str`): Source document path. +
 - `depth` (`int`): Zero-based integer indicating nesting level in hierarchy.
+
+| `nav_position`
+| `str`
+| Only present when `flush_right_nav` is enabled, with the value `"flush-right"`.
+The default `skeleton.pt` folds it into the nav element's class as
+`nav-flush-right`, which the stylesheet uses to push the nav to the right edge.
 |===
 
 == Chameleon Template Integration

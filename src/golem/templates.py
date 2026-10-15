@@ -211,6 +211,7 @@ class PageCompiler:
             "source_view_url": None,
             "source_url": None,
             "source_provider": None,
+            "nav_position": None,
         }
         template_kwargs.update(extra_context)
 

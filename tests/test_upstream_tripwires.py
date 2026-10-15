@@ -28,10 +28,7 @@ import asciidoctrine
 def _top_level_blocks(source: str) -> list:
     """Parse *source* and return its top-level ASG blocks."""
     ast = asciidoctrine.parse_to_ast(source)
-    blocks = getattr(ast, "blocks", None)
-    if blocks is None:
-        blocks = list(ast.resolve_to_ast(ast).blocks)
-    return list(blocks)
+    return list(getattr(ast, "blocks", None) or [])
 
 
 def _block_names(blocks: list) -> list[str]:

@@ -154,10 +154,13 @@ class NavHelpersContext(TypedDict, total=False):
     [attributes]
     `breadcrumbs` (list[dict]):: Hierarchical ancestor trail from root to current page.
     `nav_tree_flat` (list[dict]):: Flattened navigation tree items with depth metadata.
+    `nav_position` (str):: In-page nav position request: `"flush-right"` when the
+        `flush_right_nav` flag is set, absent otherwise. Position only — never visibility.
     """
 
     breadcrumbs: list[BreadcrumbItem]
     nav_tree_flat: list[NavFlatItem]
+    nav_position: str
 
 
 NavHelpersContribution = NavHelpersContext

@@ -744,6 +744,9 @@ body {
 /* ── Main Content Area ─────────────────────────────── */
 #golem-content {
     flex: 1;
+    /* Grid/flex children must be allowed to shrink below their content width,
+       otherwise long signatures and code force the column to overflow. */
+    min-width: 0;
     --content-pad-x: 3.5rem;
     --golem-content-pad-x: var(--content-pad-x);
     padding: 2.5rem var(--content-pad-x);
@@ -826,6 +829,27 @@ body {
 }
 #golem-content a:visited {
     color: var(--color-link-visited);
+}
+
+/* ── API Class Grid (class-multi-grid) ───────────────── */
+/* Nesting already conveys hierarchy on API pages, so headings inside a class
+   grid wear one size. Scoped through #golem-content to out-specify the
+   per-level prose rules above; prose pages keep their variable sizes. */
+#golem-content .class-multi-grid h2,
+#golem-content .class-multi-grid h3,
+#golem-content .class-multi-grid h4 {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--color-text);
+}
+/* AsciiDoctype's section.html wraps child blocks in .adoc-section and
+   .section-blocks elements, which break grid column inheritance. Making them
+   contents-transparent keeps member cards direct children of the grid. */
+.class-multi-grid .adoc-section,
+.class-multi-grid .section-blocks {
+    display: contents;
 }
 
 /* ── Code & Inline Elements ────────────────────────── */
@@ -1209,6 +1233,22 @@ i.conum b {
 }
 .doc-member:hover, .doc-member:focus-within {
     border-left-color: var(--border-rail-active);
+}
+/* The apidoc plugin marks class methods as member-card sections. They wear the
+   same rail as .doc-member and nothing else: the accent border the signature
+   block carries standalone is dropped inside a card, so the rail is the only
+   left border in the hierarchy. */
+.member-card {
+    border-left: 2px solid var(--border-rail);
+    padding-left: var(--rail-indent);
+    margin-left: var(--space-xs);
+    transition: border-color 0.15s ease;
+}
+.member-card:hover, .member-card:focus-within {
+    border-left-color: var(--border-rail-active);
+}
+.member-card .signature-container {
+    border-left: 1px solid var(--border-color);
 }
 
 /* ── Principle 2: Dual Coding (Symbol Kind Badges) ──────── */
@@ -1637,6 +1677,10 @@ details summary:focus-visible,
     border-left: 1px solid var(--border-color);
     font-family: var(--font-ui);
     flex-shrink: 0;
+    /* State 1 of the B8 ladder: hidden until there is room beside the main
+       column. The 4-state ladder below is pure CSS — no config flag may gate
+       visibility. */
+    display: none;
     position: sticky;
     top: 0;
     height: 100vh;
@@ -1644,6 +1688,34 @@ details summary:focus-visible,
     align-self: flex-start;
     overflow-y: auto;
     scrollbar-gutter: stable;
+}
+/* State 2 — at BP_nav the nav appears (position per B9/B10, never visibility). */
+@media (min-width: 768px) {
+    #golem-sidebar-right {
+        display: block;
+    }
+}
+/* State 3 — mid-range the nav dips back out, but only when a content sidebar
+   competes for the right-hand space. A page with no sidebars never dips. */
+@media (min-width: 992px) {
+    body:has(.sidebar-column) #golem-sidebar-right {
+        display: none;
+    }
+}
+/* State 4 — at BP_wide there is room for both columns, so the nav returns.
+   Same selector as State 3 so it wins on source order, not specificity. */
+@media (min-width: 1280px) {
+    body:has(.sidebar-column) #golem-sidebar-right {
+        display: block;
+    }
+}
+/* B9 — the nav hugs the main column by default, leaving the blank expanse to
+   its right rather than between the columns.
+   B10 — escape hatch for mixed-layout sites: `.nav-flush-right` is opted into by
+   the nav_helpers `flush_right_nav` config flag and moves the nav only; it must
+   never affect the visibility ladder above. */
+#golem-sidebar-right.nav-flush-right {
+    margin-left: auto;
 }
 #golem-sidebar-right h4 {
     margin-top: 0;
@@ -1680,6 +1752,17 @@ details summary:focus-visible,
     grid-template-columns: 1fr 320px;
     gap: var(--space-xl);
     align-items: start;
+}
+/* AsciiDoctype's open.html wraps the row's children in an extra `.content`
+   div, which would become the single grid item; make it transparent so the
+   prose column and the sidebar column are the grid items. */
+.split-row > .content {
+    display: contents;
+}
+.prose-column {
+    /* Grid child: must be allowed to shrink below its content width so long
+       code and tables cannot stretch the first column. */
+    min-width: 0;
 }
 
 .sidebar-column {
@@ -1949,7 +2032,8 @@ details summary:focus-visible,
 
 /* ── Responsive Breakdown ──────────────────────────── */
 @media (max-width: 1100px) {
-    #golem-sidebar-right { display: none; }
+    /* Nav visibility below 768px is owned by the B8 ladder above; this query
+       only tightens the content padding as the columns narrow. */
     #golem-content { padding: 2rem 2.5rem; }
 }
 @media (max-width: 800px) {

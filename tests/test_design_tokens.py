@@ -534,6 +534,212 @@ def test_content_sidebar_and_right_toc_share_sticky_offset():
     )
 
 
+def _nested_media_rules(css_text: str, media_fragment: str) -> list[tuple[str, str]]:
+    """Return the rules nested inside @media blocks whose query contains *media_fragment*."""
+    nested: list[tuple[str, str]] = []
+    for selector, body in _extract_css_rules(css_text):
+        if selector.startswith("@media") and media_fragment in selector:
+            nested.extend(_extract_css_rules(body))
+    return nested
+
+
+def _rules_by_selector(css_text: str) -> dict[str, str]:
+    """Map every individual selector (comma lists split) to its declaration block."""
+    by_selector: dict[str, str] = {}
+    for selector, body in _extract_css_rules(css_text):
+        for part in selector.split(","):
+            part = part.strip()
+            if part:
+                by_selector[part] = body
+    return by_selector
+
+
+def test_class_multi_grid_subgrid_display_contents():
+    """B11: section wrappers must stay transparent to the class grid.
+
+    AsciiDoctype's `section.html` injects `.adoc-section` and `.section-blocks`
+    wrappers, which break grid column inheritance under `.class-multi-grid`.
+    """
+    css = _read_css()
+    rules_by_selector = _rules_by_selector(css)
+
+    for selector in (".class-multi-grid .adoc-section", ".class-multi-grid .section-blocks"):
+        assert selector in rules_by_selector, f"Missing {selector} rule (B11)"
+        assert "display: contents" in rules_by_selector[selector], f"{selector} must be display: contents (B11)"
+
+
+def test_class_multi_grid_uniform_heading_sizes():
+    """B3: API pages convey hierarchy by nesting, so headings must share one size.
+
+    The uniform rule must out-specify the per-level prose rules (`#golem-content
+    h2`), which are id-scoped; a plain class selector would lose the cascade.
+    """
+    css = _read_css()
+    rules = _extract_css_rules(css)
+    rules_by_selector = {sel: body for sel, body in rules}
+
+    heading_rules = {sel: body for sel, body in rules if ".class-multi-grid" in sel and re.search(r"\bh[234]\b", sel)}
+    assert heading_rules, "Missing heading rules scoped to .class-multi-grid (B3)"
+
+    sizes: set[str] = set()
+    for selector, body in heading_rules.items():
+        assert "#golem-content" in selector, (
+            f"{selector} lacks id scoping, so #golem-content h2/h3/h4 would win the cascade (B3)"
+        )
+        for prop in body.split(";"):
+            name, _, value = prop.partition(":")
+            if name.strip() == "font-size":
+                sizes.add(value.strip())
+    assert len(sizes) == 1, f"headings inside .class-multi-grid must be uniformly sized, got {sorted(sizes)} (B3)"
+
+    # Prose pages keep their variable per-level sizes.
+    for level in ("h1", "h2", "h3", "h4"):
+        assert f"#golem-content {level}" in rules_by_selector, f"prose {level} rule must survive"
+
+
+def test_content_column_containment():
+    """B4: grid/flex children need min-width:0 or they overflow their column."""
+    css = _read_css()
+    rules_by_selector = {sel: body for sel, body in _extract_css_rules(css)}
+
+    assert "#golem-content" in rules_by_selector, "Missing #golem-content rule"
+    assert "min-width: 0" in rules_by_selector["#golem-content"], "#golem-content must set min-width: 0 (B4)"
+
+    for selector in (".prose-column", ".doc-content-stream"):
+        if selector in rules_by_selector:
+            assert "min-width: 0" in rules_by_selector[selector], f"{selector} must set min-width: 0 (B4)"
+
+
+def test_sidebar_returns_to_main_column_when_narrow():
+    """B6: content sidebars fall back into the main column on narrow viewports."""
+    css = _read_css()
+    sidebar_rules = {sel: body for sel, body in _nested_media_rules(css, "max-width") if ".sidebar-column" in sel}
+    assert sidebar_rules, "Missing a max-width media rule repositioning .sidebar-column (B6)"
+    for selector, body in sidebar_rules.items():
+        assert "position: static" in body, f"{selector} must return the sidebar to the main column (B6)"
+
+
+def test_member_card_keeps_only_rail_border():
+    """B12: a member card wears a single left rail; nothing inside it stacks a second.
+
+    `.member-card` is emitted by the apidoc plugin for class methods, but the
+    `.signature-container` inside it also drew a `--color-primary` left accent,
+    so a card showed two left borders competing with the `.doc-member` rail.
+    """
+    css = _read_css()
+    rules = _extract_css_rules(css)
+    by_selector = _rules_by_selector(css)
+
+    assert ".member-card" in by_selector, "Missing .member-card rule (B12)"
+    rail = by_selector[".member-card"]
+    assert "var(--border-rail)" in rail, ".member-card rail must use var(--border-rail) (B12)"
+
+    inner = {sel: body for sel, body in rules if ".member-card .signature-container" in sel}
+    assert inner, "Missing .member-card .signature-container rule (B12)"
+    for selector, body in inner.items():
+        assert "var(--color-primary)" not in body, (
+            f"{selector} must not draw a second left accent; the card rail is the only one (B12)"
+        )
+
+
+def test_member_card_adds_no_box_padding():
+    """B13: hierarchy comes from the rail indent, never from stacked box padding."""
+    css = _read_css()
+    by_selector = _rules_by_selector(css)
+    rule = by_selector.get(".member-card", "")
+    assert rule, "Missing .member-card rule (B13)"
+    assert "padding:" not in rule, ".member-card must not add box padding (B13)"
+    assert "var(--rail-indent)" in rule, ".member-card must indent by the shared rail indent (B13)"
+
+
+def test_class_multi_grid_children_add_no_padding():
+    """B13: grid children are aligned by the grid gap, not per-child padding."""
+    css = _read_css()
+    for selector in (".class-multi-grid .adoc-section", ".class-multi-grid .section-blocks"):
+        by_selector = _rules_by_selector(css)
+        rule = by_selector.get(selector)
+        assert rule is not None, f"Missing {selector} rule (B13)"
+        assert "padding" not in rule, f"{selector} must not add padding (B13)"
+
+
+def test_split_row_grid_makes_columns_the_grid_items():
+    """B0: the row's `.content` wrapper must not swallow the two-column grid."""
+    css = _read_css()
+    by_selector = _rules_by_selector(css)
+
+    assert ".split-row > .content" in by_selector, "Missing .split-row > .content rule (B0)"
+    assert "display: contents" in by_selector[".split-row > .content"], (
+        ".split-row > .content must be transparent so the columns are the grid items (B0)"
+    )
+
+    assert ".prose-column" in by_selector, "Missing .prose-column rule (B0/B4)"
+    assert "min-width: 0" in by_selector[".prose-column"], ".prose-column must set min-width: 0 (B4)"
+
+
+def test_nav_visibility_4state_ladder():
+    """B8: the in-page nav appears, dips, then reappears — CSS-only.
+
+    The ladder must never reference a config-driven class: visibility is decided
+    purely by breakpoint and the presence of a content sidebar.
+    """
+    css = _read_css()
+    rules = _extract_css_rules(css)
+    by_selector = _rules_by_selector(css)
+
+    # State 1 — narrowest viewports: hidden.
+    base = by_selector.get("#golem-sidebar-right", "")
+    assert "display: none" in base, "#golem-sidebar-right must be hidden by default (B8)"
+
+    # State 2 — at BP_nav it appears regardless of sidebars.
+    state2 = {sel: body for sel, body in _nested_media_rules(css, "min-width: 768") if "golem-sidebar-right" in sel}
+    assert state2, "Missing a min-width:768 media rule showing the nav (B8)"
+    for selector, body in state2.items():
+        assert "display: block" in body or "display: flex" in body, f"{selector} must show the nav (B8)"
+
+    # State 3 — mid-range, only when a content sidebar competes for the space.
+    state3 = {sel: body for sel, body in _nested_media_rules(css, "min-width: 992") if "golem-sidebar-right" in sel}
+    assert state3, "Missing a min-width:992 media rule for the sidebar-present dip (B8)"
+    for selector, body in state3.items():
+        assert ":has(.sidebar-column)" in selector, f"{selector} must be conditional on a content sidebar (B8)"
+        assert "display: none" in body, f"{selector} must hide the nav when a sidebar is present (B8)"
+
+    # State 4 — widest viewport: it returns even with sidebars present.
+    state4 = {sel: body for sel, body in _nested_media_rules(css, "min-width: 1280") if "golem-sidebar-right" in sel}
+    assert state4, "Missing a min-width:1280 media rule restoring the nav (B8)"
+    for selector, body in state4.items():
+        assert ":has(.sidebar-column)" in selector, f"{selector} must out-specify the State 3 rule (B8)"
+        assert "display: block" in body or "display: flex" in body, f"{selector} must show the nav (B8)"
+
+    # Flag-independence: no visibility rule may key off the B10 position class.
+    # (The position rule itself is covered by the B9/B10 test.)
+    visibility_rules = [
+        (selector, body)
+        for selector, body in rules
+        if "golem-sidebar-right" in selector and (selector.startswith("@media") or "display" in body)
+    ]
+    for selector, body in visibility_rules:
+        assert "nav-flush-right" not in selector, "visibility must never depend on the position flag (B8/B10)"
+
+
+def test_nav_position_adjacent_by_default_with_flush_right_opt_in():
+    """B9/B10: the nav hugs the main column by default; flush-right is opt-in.
+
+    The escape hatch may only move the nav — it must never touch its visibility.
+    """
+    css = _read_css()
+    rules = _extract_css_rules(css)
+
+    for selector, body in rules:
+        if selector.strip() == "#golem-sidebar-right" and selector.startswith("#golem-sidebar-right"):
+            assert "margin-left: auto" not in body, "the default nav position must be adjacent (B9)"
+
+    flush = {sel: body for sel, body in rules if "nav-flush-right" in sel}
+    assert flush, "Missing a .nav-flush-right rule (B10)"
+    for selector, body in flush.items():
+        assert "margin-left: auto" in body, f"{selector} must push the nav flush right (B10)"
+        assert "display" not in body, f"{selector} must never affect visibility (B10)"
+
+
 def test_skeleton_template_includes_theme_toggle():
     """Verify skeleton.pt contains the theme toggle button and anti-flicker script."""
     skeleton_text = SKELETON_PATH.read_text(encoding="utf-8")

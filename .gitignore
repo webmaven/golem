@@ -15,6 +15,7 @@ docs/superpowers/
 .mypy_cache/
 .ruff_cache/
 .venv/
+.vs/
 
 # Generated API reference docs — rebuilt fresh from source on every deploy via `golem apidoc`
 docs/api/

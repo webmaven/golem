@@ -256,3 +256,49 @@ def test_find_chain_edge_cases():
 
     assert _find_chain([], "index.adoc", Path("index.adoc")) is None
     assert _find_chain([{"title": "Other", "path": "other.adoc"}], "index.adoc", Path("index.adoc")) is None
+
+
+def test_flush_right_nav_defaults_to_adjacent():
+    """B9/B10: the nav hugs the main column unless flush-right is opted into."""
+    plugin = NavigationHelpersPlugin()
+    assert plugin.flush_right_nav is False
+
+    context: dict[str, Any] = {"title": "Guide", "current_path": "guide.adoc"}
+    result = plugin.on_template_context(context, Path("guide.adoc"))
+    assert result.get("nav_position") is None
+
+
+def test_flush_right_nav_from_config():
+    """B10: `flush_right_nav` is read from the nav_helpers plugin config."""
+    plugin = NavigationHelpersPlugin.from_config({"nav_helpers": {"flush_right_nav": True}})
+    assert plugin.flush_right_nav is True
+
+    default_plugin = NavigationHelpersPlugin.from_config({"nav_helpers": {}})
+    assert default_plugin.flush_right_nav is False
+
+
+def test_flush_right_nav_reaches_template_as_class():
+    """B10: the flag must reach the template as a class on the nav element.
+
+    Position only: the flag must never be able to hide the nav, so the rendered
+    element keeps its id and stays visible.
+    """
+    from golem.templates import PageCompiler
+
+    plugin = NavigationHelpersPlugin(flush_right_nav=True)
+    context: dict[str, Any] = {"title": "Guide", "current_path": "guide.adoc"}
+    result = plugin.on_template_context(context, Path("guide.adoc"))
+    assert result["nav_position"] == "flush-right"
+
+    html = PageCompiler(GolemConfig()).compile_page(
+        title="Guide",
+        toc_html="<ul><li>Section</li></ul>",
+        nav_position=result["nav_position"],
+    )
+    assert 'id="golem-sidebar-right"' in html
+    assert "nav-flush-right" in html
+
+    # Without the flag the class must stay absent (adjacent position).
+    plain = PageCompiler(GolemConfig()).compile_page(title="Guide", toc_html="<ul></ul>")
+    assert 'id="golem-sidebar-right"' in plain
+    assert "nav-flush-right" not in plain

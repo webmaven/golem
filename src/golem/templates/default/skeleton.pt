@@ -203,7 +203,7 @@
             </nav>
         </main>
         <!-- METAL Slot: table-of-contents - On-page TOC sidebar -->
-        <aside id="golem-sidebar-right" class="golem-sidebar-right golem-toc" metal:define-slot="table-of-contents">
+        <aside id="golem-sidebar-right" class="golem-sidebar-right golem-toc" metal:define-slot="table-of-contents" tal:attributes="class 'golem-sidebar-right golem-toc' + (' nav-flush-right' if nav_position == 'flush-right' else '')">
             <h4>On This Page</h4>
             <div tal:content="structure toc_html" />
         </aside>

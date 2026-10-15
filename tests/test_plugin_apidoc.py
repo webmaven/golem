@@ -1117,8 +1117,41 @@ def process_data(data: list[str]) -> dict:
         html = render_body(apidoc.on_asg_created(asg=asg))
 
         assert 'class="sidebarblock sidebar-column"' in html, html
+        # The sidebars must sit beside the prose in a two-column split row, not
+        # stacked below it (B0's split-row layout piece).
+        assert 'class="openblock split-row"' in html, html
+        assert 'class="openblock prose-column"' in html, html
         assert "process_data" in html
         assert "count" in html
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
+def test_apidoc_docstring_without_examples_has_no_split_row(tmp_path):
+    """Prose-only docstrings must keep the plain layout (no empty grid wrappers)."""
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "plain_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Plain package."""
+def plain(text: str) -> str:
+    """Return the text unchanged."""
+    return text
+''',
+        encoding="utf-8",
+    )
+
+    import sys
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        api = AsciiDocApi(search_paths=[tmp_path])
+        nodes = api.get_asg_nodes("plain_pkg.plain")
+        html = "\n".join(render_body(node) for node in nodes)
+        assert "split-row" not in html, html
+        assert "sidebar-column" not in html, html
     finally:
         sys.path.remove(str(tmp_path))
 

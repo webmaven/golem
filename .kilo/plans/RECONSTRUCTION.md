@@ -3,23 +3,36 @@
 Baseline status at HEAD `b2279b5` (2026-09-26), reconstructed from issue bodies,
 issue comments, `git` provenance, and the `asciidoctype`/`asciidoctrine` upstreams.
 Execution resumed on `reconstruction-plan` on 2026-10-12; current progress is below.
+This document moved from the repo root to `.kilo/plans/` on 2026-10-15 so both
+tracking documents live in one place.
 
 ---
 
-## Execution status (2026-10-12)
+## Execution status (2026-10-15)
 
-**Wave 1 / A1 & A3′ progress:**
-- **A1 (in progress):** `AsciiDocApi.get_asg_nodes()` constructs typed sections, signatures,
-  attributes, nested classes, and unwrapped alias targets directly from Griffe.
-  Authored docstring markup is parsed into ASG without reparsing generated API structure,
-  and attribute default values are preserved alongside docstrings.
-- **A3′ (complete):** `staleness.py::_get_template_search_paths()` now prepends
-  `AsciiDoctypeRenderer.get_registered_template_directories()`, matching upstream precedence
-  and closing the incremental-rebuild half of #37.
-- **Independent review findings addressed:** Handled Griffe `Alias` resolution across module/class
-  members, restored class attribute default value emission when docstrings exist, fixed template
-  search path precedence in `StalenessTracker`, and extended `ensure_absolute_levels` to traverse
-  `DescriptionListItem.blocks`. All 53 tests in the apidoc and staleness test suites pass.
+**Wave 1 (Detour A) and Wave 2 (Detour B layout) are complete.** Recorded in
+`.kilo/plans/1792047062509-reconstruction-plan.md`; the next increment (B5, Wave 3,
+Wave 4) is specified in `.kilo/plans/1792091844188-wave3-wave4-plan.md`.
+
+- **Wave 1:** typed ASG construction from Griffe in `AsciiDocApi.get_asg_nodes()`
+  (A1), apidoc Chameleon templates registered at plugin import (A2/A3), staleness
+  tracker extension (A3′), class example restored (A4), methods nested in classes
+  (A5/A6).
+- **Wave 2:** derived example sidebars and the `.split-row` layout (B0a), sticky TOC
+  (B1/B2′), uniform class-grid headings (B3), column containment (B4), collapsed
+  source drawers (B7), the CSS-only 4-state nav visibility ladder (B8), adjacent-by-
+  default nav position with the `flush_right_nav` opt-in (B9/B10), the `.member-card`
+  rail (B12/B13). B5 (table overflow) is the one remaining item — now planned.
+- **Suite:** 611 passed, 2 xfailed, full `tests/`; `ruff check`/`format` clean;
+  `mypy src tests` reports only the pre-existing repo-wide `asciidoctype`
+  missing-stubs errors. Fixed one pre-existing test-isolation defect: tests that mock
+  `importlib.metadata.entry_points` now also invalidate `golem.plugins`
+  `_CACHED_ENTRY_POINTS` (order-dependent failure of
+  `test_source_links_registered_via_plugin_manager`).
+- **E2E:** `golem build --clean` — 62 pages, zero failures. Clean-build time
+  **measured 2026-10-15 at ~700s, down from ~1000s**; this direct measurement
+  supersedes the earlier ~5-minute attribution in §2.1/§5.9 below (attribution was
+  never preserved; the parse-cost diagnosis still stands).
 
 **Methodology:** All upcoming implementation tasks across the waves use strict
 **Red/Green TDD** (author failing tests first, observe red failure against
@@ -304,20 +317,7 @@ State 4  — ≥ BP_wide                          : APPEARS, even with sidebars
   **This ladder is entirely flag-independent.**
 - **State 3 is conditional on sidebars.** A page with no sidebars goes straight
   State 2 → State 4 — no dip, since nothing competes for the right-hand space.
-- **Position is a separate axis** (B9/B10). Appearing in State 2/4 means *visible*,
-
-**5.9 Performance — biggest cost is the parser, and caching notes are pointers only.**
-Total clean-build wall time fell from just under 10 min to ~5 min for 60+
-pages when the parse of large generated AsciiDoc blobs was removed — because
-*parsing* those built pages was the cost, not building them. Earley parse cost
-degrades nonlinearly with page size; snippet parsing and Griffe extraction stay
-fast. The lost week included several caching sidequests whose approaches and
-results did **not** survive. Treat every caching mention in this document (§2.1
-note, §4 table note) as "was investigated here," never as "was tried and
-failed" — re-measure from the post–Wave 7 benchmark before resurrecting any
-of it. The one surviving outcome is the §2.1 apidoc ASG path itself.
-
-  not *adjacent* — where it sits is decided independently of whether it shows.
+- **Position is a separate axis** (B9/B10). Appearing in State 2/4 means *visible*, not *adjacent* — where it sits is decided independently of whether it shows.
 - **Breakpoint px values are lost** — re-derive against existing `1100px`/`800px`.
 - **State 4 must be checked against four columns, not three.** At the widest
   breakpoint with sidebars present the layout carries: (1) left site nav,
@@ -402,6 +402,18 @@ the theme toggle — guarded against `INPUT`/`TEXTAREA`/`SELECT`/`contentEditabl
 - *Conditional columns:* `.class-grid-row { grid-template-columns: minmax(0,1fr) }`
   by default, with `:has(.sidebar-column)` activating the two-column variant —
   so no blank reserved column when there are no examples.
+
+**5.9 Performance — biggest cost is the parser, and caching notes are pointers only.**
+Total clean-build wall time fell from just under 10 min to ~5 min for 60+
+pages when the parse of large generated AsciiDoc blobs was removed — because
+*parsing* those built pages was the cost, not building them. Earley parse cost
+degrades nonlinearly with page size; snippet parsing and Griffe extraction stay
+fast. The lost week included several caching sidequests whose approaches and
+results did **not** survive. Treat every caching mention in this document (§2.1
+note, §4 table note) as "was investigated here," never as "was tried and
+failed" — re-measure from the post–Wave 7 benchmark before resurrecting any
+of it. The one surviving outcome is the §2.1 apidoc ASG path itself.
+
 
 ---
 

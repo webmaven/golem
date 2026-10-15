@@ -207,6 +207,7 @@ class NavigationHelpersPlugin(GolemPlugin):
     [attributes]
     `home_title` (str):: Display title for the root home breadcrumb. Defaults to `"Home"`.
     `home_url` (str | None):: Target URL for the root home breadcrumb. Defaults to context root_path or `"/"`.
+    `flush_right_nav` (bool):: Pin the in-page nav flush right instead of adjacent to the main column. Defaults to `False`.
 
     === Examples
 
@@ -220,17 +221,25 @@ class NavigationHelpersPlugin(GolemPlugin):
 
     name = "nav_helpers"
 
-    def __init__(self, home_title: str = "Home", home_url: str | None = None, **extra: Any) -> None:
+    def __init__(
+        self,
+        home_title: str = "Home",
+        home_url: str | None = None,
+        flush_right_nav: bool = False,
+        **extra: Any,
+    ) -> None:
         """Initialize navigation helpers plugin with home breadcrumb configuration.
 
         [parameters]
         `home_title` (str, optional):: Label for the site root breadcrumb entry. Defaults to `"Home"`.
         `home_url` (str | None, optional):: Link URL for the root breadcrumb entry. Defaults to `None`.
+        `flush_right_nav` (bool, optional):: Force the in-page nav flush right on wide viewports. Defaults to `False`.
         `**extra`:: Additional plugin configuration options.
         """
-        super().__init__(home_title=home_title, home_url=home_url, **extra)
+        super().__init__(home_title=home_title, home_url=home_url, flush_right_nav=flush_right_nav, **extra)
         self.home_title = home_title
         self.home_url = home_url
+        self.flush_right_nav = flush_right_nav
 
     @classmethod
     def from_config(cls, config: Any = None) -> NavigationHelpersPlugin:
@@ -254,7 +263,8 @@ class NavigationHelpersPlugin(GolemPlugin):
             nav_cfg.get("home_title", "Home") if isinstance(nav_cfg, dict) else "Home"
         )
         home_url = getattr(config, "home_url", None) or (nav_cfg.get("home_url", None) if isinstance(nav_cfg, dict) else None)
-        return cls(home_title=home_title, home_url=home_url)
+        flush_right_nav = bool(nav_cfg.get("flush_right_nav", False)) if isinstance(nav_cfg, dict) else False
+        return cls(home_title=home_title, home_url=home_url, flush_right_nav=flush_right_nav)
 
     @hookimpl
     def on_template_context(self, context: PageContext, doc_path: Path) -> PageContext:
@@ -396,6 +406,10 @@ class NavigationHelpersPlugin(GolemPlugin):
             "breadcrumbs": breadcrumbs,
             "nav_tree_flat": nav_tree_flat,
         }
+        if self.flush_right_nav:
+            # Position only. The template turns this into a CSS class; the B8
+            # visibility ladder in golem.css never reads it.
+            injected["nav_position"] = "flush-right"
         # Do not overwrite prev_page / next_page if already present
         context.update(injected)
         return context
