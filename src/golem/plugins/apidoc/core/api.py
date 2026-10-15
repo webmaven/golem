@@ -563,6 +563,28 @@ class AsciiDocApi:
         return None
 
     @staticmethod
+    def _source_drawer(func: Any) -> Open | None:
+        """Represent a member's raw source as a collapsed-by-default drawer (#24).
+
+        Emits a renamed Open node wrapping a syntax-highlighted Python listing; the
+        `source-drawer.html` template supplies the ``<details>``/``<summary>``
+        chrome. Returns None when there is no source to show.
+        """
+        try:
+            source = str(getattr(func, "source", "") or "").strip()
+        except Exception:
+            return None
+        if not source:
+            return None
+        try:
+            listing = Listing(inlines=[Text(source)], attributes={"style": "source", "language": "python"})
+            drawer = Open(blocks=[listing])
+            drawer.name = "source-drawer"
+            return drawer
+        except Exception:
+            return None
+
+    @staticmethod
     def _signature_listing(signature: str) -> Listing:
         """Represent a Python declaration as a typed source listing node.
 
@@ -1028,6 +1050,9 @@ class AsciiDocApi:
         parsed = self._parse_docstring(self._raw_docstring(func.docstring))
         blocks: list[Node] = [self._signature_listing(format_function_signature(func))]
         blocks.extend(self._docstring_nodes(func.docstring, level, parsed=parsed))
+        drawer = self._source_drawer(func)
+        if drawer is not None:
+            blocks.append(drawer)
         section = self._section(func.name, level, blocks)
         if is_member:
             section.attributes["role"] = "member-card"

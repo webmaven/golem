@@ -800,6 +800,19 @@ def test_nav_position_adjacent_by_default_with_flush_right_opt_in():
         assert "display" not in body, f"{selector} must never affect visibility (B10)"
 
 
+def test_source_drawer_rotating_chevron_css():
+    """#24: the drawer chevron rotates when open (CSS exists and is reversible)."""
+    css = _read_css()
+    rules = _extract_css_rules(css)
+    rules_by_selector = {sel: body for sel, body in rules}
+    assert "details.source-drawer" in rules_by_selector, "Missing details.source-drawer rule (#24)"
+    open_rule = rules_by_selector.get("details.source-drawer[open] > summary::before")
+    assert open_rule is not None, "Missing chevron rotation rule for the open drawer (#24)"
+    assert "rotate(45deg)" in open_rule, "Open-drawer chevron must rotate 90 degrees (#24)"
+    closed_rule = rules_by_selector.get("details.source-drawer > summary::before")
+    assert closed_rule is not None and "rotate(-45deg)" in closed_rule, "Closed-drawer chevron must exist (#24)"
+
+
 def test_semantic_modifier_pill_rules():
     """#20: pill styling is fully token-driven (no raw hex in variant rules)."""
     css = _read_css()

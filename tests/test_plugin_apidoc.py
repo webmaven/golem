@@ -184,6 +184,53 @@ def test_get_asg_nodes_resolves_aliased_members(tmp_path):
         sys.path.remove(str(tmp_path))
 
 
+def test_source_drawer_rendered_under_functions(tmp_path):
+    """#24: every function/method carries a collapsed-by-default source drawer."""
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "drawer_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '"""Drawer fixture."""\n\n\ndef start() -> None:\n    """Start it."""\n    return None\n',
+        encoding="utf-8",
+    )
+    sys.path.insert(0, str(tmp_path))
+    try:
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("drawer_pkg")
+        html = "\n".join(render_body(n) for n in nodes)
+
+        assert '<details class="source-drawer">' in html, "Missing source drawer (#24)"
+        assert "<summary>View source</summary>" in html, "Missing 'View source' summary (#24)"
+        assert '<pre class="highlight python">' in html, "Drawer must contain a highlighted Python listing (#24)"
+        assert '<span class="k">def</span>' in html, "Drawer source must carry Pygments token spans (#24)"
+        assert '<span class="nf">start</span>' in html, "Drawer source must contain the function name (#24)"
+
+        # The drawer is the LAST block of the member section: after the docstring.
+        drawer_idx = html.find('<details class="source-drawer">')
+        doc_idx = html.find("<p>Start it.</p>")
+        assert doc_idx != -1 and doc_idx < drawer_idx, "Source drawer must follow the docstring (#24)"
+    finally:
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+
+
+def test_source_drawer_omitted_without_source():
+    """#24: no drawer is emitted when there is no source to show."""
+    from golem.plugins.apidoc import AsciiDocApi
+
+    class _NoSource:
+        source = None
+
+    class _BlankSource:
+        source = "   \n  "
+
+    assert AsciiDocApi._source_drawer(_NoSource()) is None, "None source must yield no drawer (#24)"
+    assert AsciiDocApi._source_drawer(_BlankSource()) is None, "Blank source must yield no drawer (#24)"
+
+
 def test_glyph_classification_all_kinds(tmp_path):
     """#19: every symbol kind maps to its dual-coding glyph badge.
 
