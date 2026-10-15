@@ -794,6 +794,29 @@ def test_nav_position_adjacent_by_default_with_flush_right_opt_in():
         assert "display" not in body, f"{selector} must never affect visibility (B10)"
 
 
+def test_skeleton_landmarks_have_aria_labels():
+    """#27 (narrowed per §5.5): landmark asides carry aria-labels for screen readers.
+
+    Scope is aria-labels only — no explicit role= attributes are added.
+    """
+    skeleton_text = SKELETON_PATH.read_text(encoding="utf-8")
+
+    assert 'aria-label="Table of contents"' in skeleton_text, (
+        "#golem-sidebar-right needs aria-label='Table of contents' (#27)"
+    )
+    assert 'aria-label="Site Navigation"' in skeleton_text, "#golem-sidebar-left keeps its aria-label (#27)"
+
+    # The skip link must be the first focusable element on the page.
+    skip_idx = skeleton_text.find("golem-skip-link")
+    header_idx = skeleton_text.find("golem-header")
+    assert skip_idx != -1, "Missing skip link in skeleton.pt (#27)"
+    assert skip_idx < header_idx, "skip link must precede the header (#27)"
+
+    # No explicit role attributes on landmarks (implicit roles are used).
+    assert 'role="complementary"' not in skeleton_text, "asides must not carry explicit role= (#27 narrowing)"
+    assert 'role="navigation"' not in skeleton_text, "navs must not carry explicit role= (#27 narrowing)"
+
+
 def test_skeleton_template_includes_theme_toggle():
     """Verify skeleton.pt contains the theme toggle button and anti-flicker script."""
     skeleton_text = SKELETON_PATH.read_text(encoding="utf-8")
