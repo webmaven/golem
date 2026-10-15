@@ -1629,13 +1629,24 @@ table.grid-cols th, table.grid-cols td { border-left: 1px solid var(--border-col
 table.grid-rows th, table.grid-rows td { border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
 table.grid-none th, table.grid-none td { border: none; }
 
+/* ── Table Scroll Container (B5) ────────────────────── */
+/* Wrapper emitted by the default table.html override: wide tables clip and
+   scroll here instead of overflowing the column, and the table keeps its box
+   model so the upstream colgroup column widths behave. */
+.table-scroll {
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
 /* ── Full-Bleed Table Breakout ──────────────────────── */
-#golem-content table,
-#golem-content .tableblock {
+/* The scroll container carries the breakout and clips wide tables; the table
+   itself keeps its box model. */
+#golem-content .table-scroll {
     margin-inline: calc(-1 * var(--content-pad-x));
     width: calc(100% + (2 * var(--content-pad-x)));
     max-width: none;
-    display: block;
+    min-width: 0;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
 }

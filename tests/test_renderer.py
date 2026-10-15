@@ -170,6 +170,29 @@ def test_render_tables():
     assert "Row 2 Col 2" in html
 
 
+def test_render_tables_scroll_container():
+    """B5: wide tables must clip/scroll inside a wrapper instead of overflowing the column.
+
+    The wrapper keeps the table's own box model intact (`display: table`), so
+    column widths and border-collapse behave — only the wrapper scrolls.
+    """
+    adoc_source = """
+|===
+| Header 1 | Header 2
+
+| Row 1 Col 1 | Row 1 Col 2
+| Row 2 Col 1 | Row 2 Col 2
+|===
+"""
+    ast = asciidoctrine.parse_to_ast(adoc_source)
+    asg = ASGResolver(ast).resolve(ast)
+    html = render_body(asg)
+    assert '<div class="table-scroll"><table class="tableblock"' in html, "table must be wrapped in .table-scroll (B5)"
+    assert "</table></div>" in html, ".table-scroll must close after the table (B5)"
+    # The table itself must remain a table box — no display:block hack.
+    assert "display: block" not in html, "table must not be forced into a block box (B5)"
+
+
 def test_render_stem_math():
     adoc_source = """
 This is an equation: stem:[E = mc^2]

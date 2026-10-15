@@ -458,6 +458,33 @@ def test_rules_adopt_semantic_tokens():
     assert "var(--color-primary)" in pre_rule, "pre must use var(--color-primary)"
 
 
+def test_table_scroll_container_clips_overflow():
+    """B5: .table-scroll is the horizontal scroll container for wide tables.
+
+    The old full-bleed hack forced `display: block; overflow-x: auto` onto the
+    table itself; the wrapper supersedes it so the table keeps its box model.
+    """
+    css = _read_css()
+    rules = _extract_css_rules(css)
+    rules_by_selector = {sel: body for sel, body in rules}
+
+    assert ".table-scroll" in rules_by_selector, "Missing .table-scroll rule (B5)"
+    rule = rules_by_selector[".table-scroll"]
+    assert "overflow-x: auto" in rule, ".table-scroll must scroll its overflow (B5)"
+    assert "min-width: 0" in rule, ".table-scroll must be allowed to shrink below content width (B5)"
+
+    # The full-bleed breakout now belongs to the wrapper, not the table.
+    breakout = rules_by_selector.get("#golem-content .table-scroll")
+    assert breakout is not None, "Missing #golem-content .table-scroll breakout rule (B5)"
+    assert "margin-inline" in breakout, "full-bleed breakout must survive on the wrapper (B5)"
+
+    # The table itself must not carry the display:block/overflow hack anymore.
+    for selector, body in rules:
+        if selector.startswith("#golem-content table"):
+            assert "display: block" not in body, f"{selector} must not force the table into a block box (B5)"
+            assert "overflow-x" not in body, f"{selector} must not scroll the table itself (B5)"
+
+
 def test_signature_container_and_source_drawer_rules():
     """Verify .signature-container and details.source-drawer rules exist and use design tokens."""
     css = _read_css()
