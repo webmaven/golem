@@ -42,6 +42,21 @@ _HEADING_RE = re.compile(r"^(=+)( )", re.MULTILINE)
 # Block types that always carry an example, regardless of any role.
 _EXAMPLE_BLOCKS = frozenset({"listing", "example"})
 
+# Dual-coding glyph badges (#19): Griffe kind -> (letter, CSS class, aria-label).
+GLYPH_MAP: dict[str, tuple[str, str, str]] = {
+    "class": ("C", "glyph-class", "Class"),
+    "function": ("F", "glyph-function", "Function"),
+    "method": ("M", "glyph-method", "Method"),
+    "attribute": ("V", "glyph-constant", "Variable"),
+}
+
+# Refinements layered on top of the kind map for classes.
+_GLYPH_EXCEPTION = ("X", "glyph-exception", "Exception")
+_GLYPH_INTERFACE = ("I", "glyph-interface", "Interface")
+_GLYPH_TYPE = ("T", "glyph-type", "Type")
+
+_DECORATOR_RE = re.compile(r"^\s*@([A-Za-z_][\w.]*)", re.MULTILINE)
+
 # Docstring styles golem accepts. Everything except `asciidoc` is delegated to
 # asciidocstring's Griffe bridge.
 DocstringStyle = Literal["asciidoc", "auto", "google", "numpy", "sphinx"]
@@ -405,6 +420,76 @@ class AsciiDocApi:
             blocks=blocks,
             absolute_level=level,
         )
+
+    @staticmethod
+    def _decorator_names(obj: Any) -> set[str]:
+        """Best-effort decorator base names.
+
+        ``obj.decorators`` resolves Griffe aliases and raises for decorators
+        imported from modules outside the loaded collection (for example
+        ``@dataclass`` from ``dataclasses``), so the object's source text is
+        used as the fallback.
+        """
+        names: set[str] = set()
+        try:
+            for dec in getattr(obj, "decorators", None) or []:
+                value = getattr(dec, "value", dec)
+                names.add(str(value).rsplit(".", 1)[-1].rstrip("()"))
+        except Exception:
+            names = set()
+        if names:
+            return names
+        try:
+            source = str(getattr(obj, "source", "") or "")
+        except Exception:
+            return names
+        for match in _DECORATOR_RE.finditer(source):
+            names.add(match.group(1).rsplit(".", 1)[-1])
+        return names
+
+    @staticmethod
+    def _base_names(obj: Any) -> set[str]:
+        """Best-effort base-class names; never triggers alias resolution."""
+        names: set[str] = set()
+        try:
+            for base in getattr(obj, "bases", None) or []:
+                names.add(str(base).rsplit(".", 1)[-1])
+        except Exception:
+            pass
+        return names
+
+    @classmethod
+    def _symbol_glyph(cls, obj: Any, *, is_member: bool = False) -> dict[str, str] | None:
+        """Map a Griffe object to its dual-coding glyph badge (#19).
+
+        Returns a ``{"letter", "css_class", "label"}`` mapping for the six
+        supported kinds, or ``None`` for module-like objects. Classification
+        deliberately avoids ``.labels``/``.decorators``: those resolve Griffe
+        aliases and raise ``AliasResolutionError`` for decorators imported from
+        modules outside the loaded collection (``@dataclass`` being the common
+        case).
+        """
+        kind = getattr(obj, "kind", None)
+        kind_value = getattr(kind, "value", str(kind or ""))
+        if kind_value == "class":
+            bases = cls._base_names(obj)
+            decorators = cls._decorator_names(obj)
+            if bases & {"Exception", "BaseException"}:
+                letter, css_class, label = _GLYPH_EXCEPTION
+            elif "Protocol" in bases:
+                letter, css_class, label = _GLYPH_INTERFACE
+            elif "dataclass" in decorators or "TypedDict" in bases:
+                letter, css_class, label = _GLYPH_TYPE
+            else:
+                letter, css_class, label = GLYPH_MAP["class"]
+            return {"letter": letter, "css_class": css_class, "label": label}
+        if kind_value == "function":
+            letter, css_class, label = GLYPH_MAP["method" if is_member else "function"]
+            return {"letter": letter, "css_class": css_class, "label": label}
+        if kind_value == "attribute":
+            letter, css_class, label = GLYPH_MAP["attribute"]
+            return {"letter": letter, "css_class": css_class, "label": label}
+        return None
 
     @staticmethod
     def _signature_listing(signature: str) -> Listing:
@@ -866,6 +951,9 @@ class AsciiDocApi:
         section = self._section(func.name, level, blocks)
         if is_member:
             section.attributes["role"] = "member-card"
+        glyph = self._symbol_glyph(func, is_member=is_member)
+        if glyph is not None:
+            section.attributes["glyph"] = glyph
         return section
 
     def _attribute_node(self, attr: griffe.Attribute, level: int) -> Section:
@@ -873,7 +961,11 @@ class AsciiDocApi:
         blocks.extend(self._docstring_nodes(attr.docstring, level))
         if attr.value is not None:
             blocks.append(Paragraph(inlines=[Text(f"Default value: {_safe_attr_value(attr)}")]))
-        return self._section(attr.name, level, blocks)
+        section = self._section(attr.name, level, blocks)
+        glyph = self._symbol_glyph(attr)
+        if glyph is not None:
+            section.attributes["glyph"] = glyph
+        return section
 
     def _class_node(self, cls: griffe.Class, depth: str, level: int) -> Section:
         blocks: list[Node] = [self._signature_listing(format_class_signature(cls))]
@@ -919,6 +1011,9 @@ class AsciiDocApi:
 
         section = self._section(f"class {cls.name}", level, blocks)
         section.attributes["role"] = "class-multi-grid"
+        glyph = self._symbol_glyph(cls)
+        if glyph is not None:
+            section.attributes["glyph"] = glyph
         return section
 
     def _module_nodes(self, module: griffe.Module, depth: str, level: int) -> list[Node]:

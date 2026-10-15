@@ -371,6 +371,12 @@ def test_symbol_glyph_component_classes():
     for kind in ["c", "m", "f", "i", "t", "x", "v"]:
         assert f".glyph-{kind}" in css, f"Missing .glyph-{kind} class in golem.css"
 
+    # #19: the glyph + heading row wraps glyph, heading, and (with #20) pills.
+    assert ".doc-title-row" in css, "Missing .doc-title-row rule in golem.css (#19)"
+    rules = _extract_css_rules(css)
+    row_rule = dict(rules).get(".doc-title-row")
+    assert row_rule and "display: flex" in row_rule, ".doc-title-row must lay glyph/heading/pills out in a row (#19)"
+
 
 def test_left_rail_doc_member_styling():
     """Verify .doc-member left-rail styling uses hierarchy tokens."""

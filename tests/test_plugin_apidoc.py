@@ -184,6 +184,119 @@ def test_get_asg_nodes_resolves_aliased_members(tmp_path):
         sys.path.remove(str(tmp_path))
 
 
+def test_glyph_classification_all_kinds(tmp_path):
+    """#19: every symbol kind maps to its dual-coding glyph badge.
+
+    The fixture deliberately decorates with an *aliased* import (@dataclass from
+    dataclasses) to prove classification never depends on Griffe's aliases —
+    `.labels`/`.decorators` raise for those, so the mapping must not need them.
+    """
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+
+    pkg_dir = tmp_path / "glyph_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Glyph fixture."""
+from dataclasses import dataclass
+from typing import Protocol
+
+
+@dataclass
+class Point:
+    """A point."""
+    x: int = 0
+
+
+class Shape(Protocol):
+    """A shape."""
+    def area(self) -> float: ...
+
+
+class ConfigError(Exception):
+    """Config failure."""
+
+
+class Engine:
+    """An engine."""
+    def start(self) -> None:
+        """Start it."""
+
+
+async def fetch(url: str) -> bytes:
+    """Fetch bytes."""
+    return b""
+
+
+MAX_SIZE = 10
+''',
+        encoding="utf-8",
+    )
+    sys.path.insert(0, str(tmp_path))
+    try:
+        api = AsciiDocApi(search_paths=[tmp_path])
+        pkg = api.load_package("glyph_pkg")
+
+        point = pkg.members["Point"]
+        assert api._symbol_glyph(point) == {"letter": "T", "css_class": "glyph-type", "label": "Type"}
+
+        shape = pkg.members["Shape"]
+        assert api._symbol_glyph(shape) == {"letter": "I", "css_class": "glyph-interface", "label": "Interface"}
+
+        error = pkg.members["ConfigError"]
+        assert api._symbol_glyph(error) == {"letter": "X", "css_class": "glyph-exception", "label": "Exception"}
+
+        engine = pkg.members["Engine"]
+        assert api._symbol_glyph(engine) == {"letter": "C", "css_class": "glyph-class", "label": "Class"}
+        start = engine.members["start"]
+        assert api._symbol_glyph(start, is_member=True) == {"letter": "M", "css_class": "glyph-method", "label": "Method"}
+
+        fetch_fn = pkg.members["fetch"]
+        assert api._symbol_glyph(fetch_fn) == {"letter": "F", "css_class": "glyph-function", "label": "Function"}
+
+        attr = pkg.members["MAX_SIZE"]
+        assert api._symbol_glyph(attr) == {"letter": "V", "css_class": "glyph-constant", "label": "Variable"}
+    finally:
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+
+
+def test_glyph_badges_render_in_headings(tmp_path):
+    """#19: glyph badges render in a .doc-title-row before the member heading."""
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "glyph_render_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '"""Glyph render fixture."""\n\n\nclass Engine:\n    """An engine."""\n\n    def start(self) -> None:\n        """Start it."""\n\n\nMAX_SIZE = 10\n',
+        encoding="utf-8",
+    )
+    sys.path.insert(0, str(tmp_path))
+    try:
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("glyph_render_pkg", depth="all")
+        html = "\n".join(render_body(n) for n in nodes)
+
+        assert (
+            '<div class="doc-title-row"><span class="symbol-glyph glyph-class" aria-label="Class">C</span><h2>class Engine</h2></div>'
+            in html
+        ), "Class glyph must lead the heading inside .doc-title-row (#19)"
+        assert (
+            '<div class="doc-title-row"><span class="symbol-glyph glyph-method" aria-label="Method">M</span><h3>start</h3></div>'
+            in html
+        ), "Method glyph must lead the heading inside .doc-title-row (#19)"
+        assert (
+            '<div class="doc-title-row"><span class="symbol-glyph glyph-constant" aria-label="Variable">V</span><h2>MAX_SIZE</h2></div>'
+            in html
+        ), "Variable glyph must lead the heading inside .doc-title-row (#19)"
+    finally:
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+
+
 def test_signature_block_aria_label_and_token_spans(tmp_path):
     """#23: signature blocks are labelled, tokenised, and scrollable.
 

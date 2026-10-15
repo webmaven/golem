@@ -1276,6 +1276,13 @@ i.conum b {
 }
 
 /* ── Principle 2: Dual Coding (Symbol Kind Badges) ──────── */
+/* Title row: glyph badge + heading (+ modifier pills, #20) */
+.doc-title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+}
 .symbol-glyph {
     display: inline-flex;
     align-items: center;
