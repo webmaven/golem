@@ -794,6 +794,65 @@ def test_nav_position_adjacent_by_default_with_flush_right_opt_in():
         assert "display" not in body, f"{selector} must never affect visibility (B10)"
 
 
+def test_kbd_shortcut_hint_in_theme_toggle():
+    """#30: the theme toggle carries a <kbd> hint, and the keydown handler is guarded.
+
+    Per §5.6 the scope is the `t` shortcut only — `/`, `s`, `?`, `e` have no
+    target UI in golem yet.
+    """
+    skeleton_text = SKELETON_PATH.read_text(encoding="utf-8")
+
+    kbd_hint = '<kbd class="kbd-shortcut" aria-hidden="true">t</kbd>'
+    assert kbd_hint in skeleton_text, "Missing kbd hint in skeleton.pt (#30)"
+    assert 'aria-keyshortcuts="t"' in skeleton_text, "theme toggle must expose the shortcut via aria-keyshortcuts (#30)"
+    toggle_idx = skeleton_text.find('id="golem-theme-toggle"')
+    kbd_idx = skeleton_text.find(kbd_hint)
+    button_end = skeleton_text.find("</button>", toggle_idx)
+    assert toggle_idx != -1 and button_end != -1, "Missing theme toggle button in skeleton.pt (#30)"
+    assert toggle_idx < kbd_idx < button_end, "the kbd hint must live inside the theme toggle button (#30)"
+
+    # The handler must ignore keystrokes aimed at form fields.
+    assert "keydown" in skeleton_text, "Missing keydown handler in skeleton.pt (#30)"
+    for guard in ("INPUT", "TEXTAREA", "SELECT", "isContentEditable"):
+        assert guard in skeleton_text, f"keydown handler must guard against {guard} (#30)"
+
+
+def test_kbd_shortcut_raised_key_styling():
+    """#30: kbd.kbd-shortcut is a raised key built from design tokens."""
+    css = _read_css()
+    rules = _extract_css_rules(css)
+    rules_by_selector = {sel: body for sel, body in rules}
+
+    assert "kbd.kbd-shortcut" in rules_by_selector, "Missing kbd.kbd-shortcut rule (#30)"
+    rule = rules_by_selector["kbd.kbd-shortcut"]
+    for token in ("var(--font-mono)", "var(--bg-surface-subtle)", "var(--border-subtle)", "var(--radius-sm)"):
+        assert token in rule, f"kbd.kbd-shortcut must use {token} (#30)"
+    assert "var(--color-text-muted)" in rule, "kbd.kbd-shortcut must use var(--color-text-muted) (#30)"
+    assert "box-shadow" in rule, "kbd.kbd-shortcut must have raised-key box-shadow (#30)"
+    assert "min-width" in rule, "kbd.kbd-shortcut must have a min-width (#30)"
+
+
+def test_kbd_shortcut_contrast_aa():
+    """#30: the kbd hint keeps WCAG AA text contrast in both themes."""
+    css = _read_css()
+    root_tokens = _extract_root_tokens(css)
+    dark_tokens = _extract_dark_tokens(css)
+    media_dark_tokens = _extract_media_dark_tokens(css)
+
+    assert "--color-text-muted" in root_tokens and "--bg-surface-subtle" in root_tokens
+    light_fg = _resolve_color(root_tokens["--color-text-muted"], root_tokens)
+    light_bg = _resolve_color(root_tokens["--bg-surface-subtle"], root_tokens)
+    light_ratio = _contrast_ratio(light_fg, light_bg)
+    assert light_ratio >= 4.5, f"kbd hint light-mode contrast {light_ratio:.2f}:1 is below 4.5:1"
+
+    for label, dark_source in (("data-theme", dark_tokens), ("prefers-color-scheme", media_dark_tokens)):
+        if "--color-text-muted" in dark_source and "--bg-surface-subtle" in dark_source:
+            dark_fg = _resolve_color(dark_source["--color-text-muted"], dark_source)
+            dark_bg = _resolve_color(dark_source["--bg-surface-subtle"], dark_source)
+            dark_ratio = _contrast_ratio(dark_fg, dark_bg)
+            assert dark_ratio >= 4.5, f"kbd hint {label} dark contrast {dark_ratio:.2f}:1 is below 4.5:1"
+
+
 def test_skeleton_landmarks_have_aria_labels():
     """#27 (narrowed per §5.5): landmark asides carry aria-labels for screen readers.
 
@@ -801,9 +860,7 @@ def test_skeleton_landmarks_have_aria_labels():
     """
     skeleton_text = SKELETON_PATH.read_text(encoding="utf-8")
 
-    assert 'aria-label="Table of contents"' in skeleton_text, (
-        "#golem-sidebar-right needs aria-label='Table of contents' (#27)"
-    )
+    assert 'aria-label="Table of contents"' in skeleton_text, "#golem-sidebar-right needs aria-label='Table of contents' (#27)"
     assert 'aria-label="Site Navigation"' in skeleton_text, "#golem-sidebar-left keeps its aria-label (#27)"
 
     # The skip link must be the first focusable element on the page.
