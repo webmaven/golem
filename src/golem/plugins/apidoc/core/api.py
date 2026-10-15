@@ -458,6 +458,77 @@ class AsciiDocApi:
             pass
         return names
 
+    @staticmethod
+    def _is_async(obj: Any) -> bool:
+        """Report whether a Griffe function is ``async def``.
+
+        Tries labels first and falls back to the source text: ``labels`` resolves
+        aliases and can raise for decorated members (see `_decorator_names`), and
+        the ``async`` keyword is never aliased.
+        """
+        try:
+            if "async" in set(obj.labels):
+                return True
+        except Exception:
+            pass
+        try:
+            return bool(re.match(r"\s*async\s+def", str(getattr(obj, "source", "") or "")))
+        except Exception:
+            return False
+
+    @classmethod
+    def _runtime_pills(cls, obj: Any, *, is_member: bool) -> list[dict[str, str | None]]:
+        """Runtime qualifier pills from Griffe inspection (#20).
+
+        `@property` is intentionally absent: Griffe models property members as
+        Attributes, which render as attribute-list rows without a title row, so
+        there is no heading for the pill to attach to.
+        """
+        decorators = cls._decorator_names(obj)
+        name = str(getattr(obj, "name", ""))
+        pills: list[dict[str, str | None]] = []
+        if is_member and name == "__init__":
+            pills.append({"text": "Constructor", "css_class": "pill-runtime", "title": None})
+        for label in ("classmethod", "staticmethod"):
+            if label in decorators:
+                pills.append({"text": label, "css_class": "pill-runtime", "title": None})
+        if decorators & {"abstractmethod", "abstractproperty"}:
+            pills.append({"text": "abstract", "css_class": "pill-runtime", "title": None})
+        if cls._is_async(obj):
+            pills.append({"text": "Async", "css_class": "pill-async", "title": None})
+        return pills
+
+    @staticmethod
+    def _docstring_pills(parsed: asciidocstring.AsciiDocStringDocument | None) -> list[dict[str, str | None]]:
+        """Docstring-driven semantic pills from asciidocstring models (#20)."""
+        if parsed is None:
+            return []
+        pills: list[dict[str, str | None]] = []
+
+        version_added = getattr(parsed, "version_added", None)
+        version = str(getattr(version_added, "version", "") or "").strip() if version_added else ""
+        if version:
+            pills.append({"text": f"Stable v{version}+", "css_class": "pill-baseline", "title": None})
+
+        deprecated = getattr(parsed, "deprecated", None)
+        if deprecated:
+            reason = str(getattr(deprecated, "reason", "") or getattr(deprecated, "description", "") or "").strip()
+            pills.append({"text": "Deprecated", "css_class": "pill-deprecated", "title": reason or None})
+
+        if getattr(parsed, "is_experimental", False):
+            pills.append({"text": "Experimental", "css_class": "pill-experimental", "title": None})
+        return pills
+
+    def _member_pills(
+        self,
+        obj: Any,
+        *,
+        is_member: bool,
+        parsed: asciidocstring.AsciiDocStringDocument | None = None,
+    ) -> list[dict[str, str | None]]:
+        """Compute the modifier pills for a function/method member (#20)."""
+        return [*self._runtime_pills(obj, is_member=is_member), *self._docstring_pills(parsed)]
+
     @classmethod
     def _symbol_glyph(cls, obj: Any, *, is_member: bool = False) -> dict[str, str] | None:
         """Map a Griffe object to its dual-coding glyph badge (#19).
@@ -531,7 +602,12 @@ class AsciiDocApi:
         )
         return escaped
 
-    def _docstring_nodes(self, docstring: griffe.Docstring | None, heading_offset: int) -> list[Node]:
+    def _docstring_nodes(
+        self,
+        docstring: griffe.Docstring | None,
+        heading_offset: int,
+        parsed: asciidocstring.AsciiDocStringDocument | None = None,
+    ) -> list[Node]:
         """Convert a Griffe docstring into typed ASG nodes via asciidocstring.
 
         asciidocstring parses the docstring once and produces both the AsciiDoc ASG
@@ -539,12 +615,15 @@ class AsciiDocApi:
         returns, raises, examples, ...) are emitted as typed ASG nodes; every other
         block passes through untouched so authored sub-headings, tables and inline
         markup survive intact.
+
+        `parsed` lets callers that need the semantic models anyway (modifier pills)
+        hand in the single parse instead of paying for a second one.
         """
         raw = self._raw_docstring(docstring)
         if not raw:
             return []
 
-        doc = self._parse_docstring(raw)
+        doc = parsed if parsed is not None else self._parse_docstring(raw)
         if doc is None:
             return []
 
@@ -946,14 +1025,18 @@ class AsciiDocApi:
     }
 
     def _function_node(self, func: griffe.Function, level: int, *, is_member: bool = False) -> Section:
+        parsed = self._parse_docstring(self._raw_docstring(func.docstring))
         blocks: list[Node] = [self._signature_listing(format_function_signature(func))]
-        blocks.extend(self._docstring_nodes(func.docstring, level))
+        blocks.extend(self._docstring_nodes(func.docstring, level, parsed=parsed))
         section = self._section(func.name, level, blocks)
         if is_member:
             section.attributes["role"] = "member-card"
         glyph = self._symbol_glyph(func, is_member=is_member)
         if glyph is not None:
             section.attributes["glyph"] = glyph
+        pills = self._member_pills(func, is_member=is_member, parsed=parsed)
+        if pills:
+            section.attributes["pills"] = pills
         return section
 
     def _attribute_node(self, attr: griffe.Attribute, level: int) -> Section:
@@ -968,8 +1051,9 @@ class AsciiDocApi:
         return section
 
     def _class_node(self, cls: griffe.Class, depth: str, level: int) -> Section:
+        parsed = self._parse_docstring(self._raw_docstring(cls.docstring))
         blocks: list[Node] = [self._signature_listing(format_class_signature(cls))]
-        blocks.extend(self._docstring_nodes(cls.docstring, level))
+        blocks.extend(self._docstring_nodes(cls.docstring, level, parsed=parsed))
         members = get_class_members(
             cls,
             include_private=self.options.include_private,
@@ -1014,6 +1098,9 @@ class AsciiDocApi:
         glyph = self._symbol_glyph(cls)
         if glyph is not None:
             section.attributes["glyph"] = glyph
+        docstring_pills = self._docstring_pills(parsed)
+        if docstring_pills:
+            section.attributes["pills"] = docstring_pills
         return section
 
     def _module_nodes(self, module: griffe.Module, depth: str, level: int) -> list[Node]:

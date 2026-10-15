@@ -119,6 +119,23 @@
     --badge-font-size: 0.6875rem;
     --badge-font-weight: 600;
 
+    /* Semantic modifier pill tokens (#20; light values from the issue spec) */
+    --pill-runtime-bg: var(--bg-surface-muted);
+    --pill-runtime-color: var(--color-text-muted);
+    --pill-runtime-border: var(--border-color);
+    --pill-async-bg: #eff6ff;
+    --pill-async-color: #1d4ed8;
+    --pill-async-border: #bfdbfe;
+    --pill-baseline-bg: #ecfdf5;
+    --pill-baseline-color: #065f46;
+    --pill-baseline-border: #a7f3d0;
+    --pill-deprecated-bg: #fef2f2;
+    --pill-deprecated-color: #991b1b;
+    --pill-deprecated-border: #fecaca;
+    --pill-experimental-bg: #fffbeb;
+    --pill-experimental-color: #92400e;
+    --pill-experimental-border: #fde68a;
+
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
@@ -421,6 +438,23 @@
     --bg-symbol-constant:        var(--bg-symbol-v);
     --color-symbol-constant-bg:  var(--bg-symbol-v);
 
+    /* Semantic modifier pills (#20) — dark overrides, WCAG AA on dark surfaces */
+    --pill-runtime-bg: var(--bg-surface-muted);
+    --pill-runtime-color: #b59c8c;
+    --pill-runtime-border: var(--border-color);
+    --pill-async-bg: #1e3a8a;
+    --pill-async-color: #bfdbfe;
+    --pill-async-border: #1d4ed8;
+    --pill-baseline-bg: #064e3b;
+    --pill-baseline-color: #a7f3d0;
+    --pill-baseline-border: #065f46;
+    --pill-deprecated-bg: #7f1d1d;
+    --pill-deprecated-color: #fecaca;
+    --pill-deprecated-border: #991b1b;
+    --pill-experimental-bg: #78350f;
+    --pill-experimental-color: #fde68a;
+    --pill-experimental-border: #92400e;
+
     --texture-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
     --golem-texture: var(--texture-paper);
 }
@@ -518,6 +552,23 @@
         --color-symbol-constant:     var(--color-symbol-v);
         --bg-symbol-constant:        var(--bg-symbol-v);
         --color-symbol-constant-bg:  var(--bg-symbol-v);
+
+        /* Semantic modifier pills (#20) — dark overrides, WCAG AA on dark surfaces */
+        --pill-runtime-bg: var(--bg-surface-muted);
+        --pill-runtime-color: #b59c8c;
+        --pill-runtime-border: var(--border-color);
+        --pill-async-bg: #1e3a8a;
+        --pill-async-color: #bfdbfe;
+        --pill-async-border: #1d4ed8;
+        --pill-baseline-bg: #064e3b;
+        --pill-baseline-color: #a7f3d0;
+        --pill-baseline-border: #065f46;
+        --pill-deprecated-bg: #7f1d1d;
+        --pill-deprecated-color: #fecaca;
+        --pill-deprecated-border: #991b1b;
+        --pill-experimental-bg: #78350f;
+        --pill-experimental-color: #fde68a;
+        --pill-experimental-border: #92400e;
 
         --texture-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
         --golem-texture: var(--texture-paper);
@@ -1308,6 +1359,27 @@ i.conum b {
 .glyph-t, .glyph-type      { color: var(--color-symbol-t); background-color: var(--bg-symbol-t); }
 .glyph-x, .glyph-exception { color: var(--color-symbol-x); background-color: var(--bg-symbol-x); }
 .glyph-v, .glyph-variable  { color: var(--color-symbol-v); background-color: var(--bg-symbol-v); }
+
+/* ── Principle 3: Semantic Modifier Pills (#20) ───────── */
+.pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--badge-radius);
+    font-family: var(--font-mono);
+    font-size: var(--badge-font-size);
+    font-weight: var(--badge-font-weight);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    border: 1px solid transparent;
+    vertical-align: middle;
+}
+.pill-runtime { background: var(--pill-runtime-bg); color: var(--pill-runtime-color); border-color: var(--pill-runtime-border); }
+.pill-async { background: var(--pill-async-bg); color: var(--pill-async-color); border-color: var(--pill-async-border); }
+.pill-baseline { background: var(--pill-baseline-bg); color: var(--pill-baseline-color); border-color: var(--pill-baseline-border); }
+.pill-deprecated { background: var(--pill-deprecated-bg); color: var(--pill-deprecated-color); border-color: var(--pill-deprecated-border); cursor: help; }
+.pill-experimental { background: var(--pill-experimental-bg); color: var(--pill-experimental-color); border-color: var(--pill-experimental-border); }
 
 /* ── Monospace Signature Blocks ────────────────────── */
 .signature-container {

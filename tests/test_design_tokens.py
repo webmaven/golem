@@ -800,6 +800,53 @@ def test_nav_position_adjacent_by_default_with_flush_right_opt_in():
         assert "display" not in body, f"{selector} must never affect visibility (B10)"
 
 
+def test_semantic_modifier_pill_rules():
+    """#20: pill styling is fully token-driven (no raw hex in variant rules)."""
+    css = _read_css()
+    rules = _extract_css_rules(css)
+    rules_by_selector = {sel: body for sel, body in rules}
+
+    assert ".pill" in rules_by_selector, "Missing .pill base rule (#20)"
+    base = rules_by_selector[".pill"]
+    for token in ("var(--font-mono)", "var(--badge-font-size)", "var(--badge-font-weight)", "var(--badge-radius)"):
+        assert token in base, f".pill must use {token} (#20)"
+    assert "text-transform: uppercase" in base, ".pill must uppercase its label (#20)"
+
+    for variant in ("runtime", "async", "baseline", "deprecated", "experimental"):
+        selector = f".pill-{variant}"
+        assert selector in rules_by_selector, f"Missing {selector} rule (#20)"
+        rule = rules_by_selector[selector]
+        assert "var(--pill-" in rule, f"{selector} must consume --pill-* tokens (#20)"
+        assert "#" not in rule, f"{selector} must not use raw hex values (#20)"
+
+    assert "cursor: help" in rules_by_selector[".pill-deprecated"], "Deprecated pill must be marked as a tooltip (#20)"
+
+
+def test_semantic_modifier_pill_contrast_aa():
+    """#20: every pill keeps WCAG AA 4.5:1 contrast in light and dark themes."""
+    css = _read_css()
+    root_tokens = _extract_root_tokens(css)
+    dark_tokens = _extract_dark_tokens(css)
+    media_dark_tokens = _extract_media_dark_tokens(css)
+
+    variants = ("runtime", "async", "baseline", "deprecated", "experimental")
+    token_maps = {
+        "light": root_tokens,
+        "data-theme=dark": dark_tokens,
+        "prefers-color-scheme": media_dark_tokens,
+    }
+    for variant in variants:
+        for theme_name, token_map in token_maps.items():
+            bg_token = token_map.get(f"--pill-{variant}-bg")
+            color_token = token_map.get(f"--pill-{variant}-color")
+            if not bg_token or not color_token:
+                continue
+            bg = _resolve_color(bg_token, token_map)
+            fg = _resolve_color(color_token, token_map)
+            ratio = _contrast_ratio(bg, fg)
+            assert ratio >= 4.5, f".pill-{variant} {theme_name} contrast {ratio:.2f}:1 is below 4.5:1 (#20)"
+
+
 def test_kbd_shortcut_hint_in_theme_toggle():
     """#30: the theme toggle carries a <kbd> hint, and the keydown handler is guarded.
 

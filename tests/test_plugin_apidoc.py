@@ -297,6 +297,157 @@ def test_glyph_badges_render_in_headings(tmp_path):
             sys.path.remove(str(tmp_path))
 
 
+PILL_FIXTURE = '''"""Pill fixture."""
+from abc import abstractmethod
+
+
+async def fetch(url: str) -> bytes:
+    """Fetch bytes."""
+    return b""
+
+
+def documented(x: int) -> int:
+    """Documented.
+
+    :versionadded: 0.4
+
+    Body.
+    """
+    return x
+
+
+def legacy(x: int) -> int:
+    """Legacy.
+
+    [deprecated]
+    Use modern() instead.
+    """
+    return x
+
+
+def maybe(x: int) -> int:
+    """Maybe.
+
+    :experimental:
+
+    Body.
+    """
+    return x
+
+
+def plain(x: int) -> int:
+    """Plain."""
+    return x
+
+
+class Svc:
+    """A service."""
+
+    def __init__(self) -> None:
+        """Build it."""
+
+    @classmethod
+    def make(cls) -> "Svc":
+        """Make one."""
+
+    @staticmethod
+    def util() -> None:
+        """Utility."""
+
+    @abstractmethod
+    def run(self) -> None:
+        """Run it."""
+'''
+
+
+def _load_pill_pkg(tmp_path):
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+
+    pkg_dir = tmp_path / "pill_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(PILL_FIXTURE, encoding="utf-8")
+    sys.path.insert(0, str(tmp_path))
+    try:
+        return AsciiDocApi(search_paths=[tmp_path]), AsciiDocApi(search_paths=[tmp_path]).load_package("pill_pkg")
+    finally:
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+
+
+def test_modifier_pill_detection(tmp_path):
+    """#20: runtime + docstring semantic pills are detected per condition."""
+    api, pkg = _load_pill_pkg(tmp_path)
+
+    def pills(name, is_member=False):
+        obj = pkg.members[name]
+        parsed = api._parse_docstring(api._raw_docstring(obj.docstring))
+        return api._member_pills(obj, is_member=is_member, parsed=parsed)
+
+    assert pills("fetch") == [{"text": "Async", "css_class": "pill-async", "title": None}]
+
+    assert pills("documented") == [{"text": "Stable v0.4+", "css_class": "pill-baseline", "title": None}]
+
+    legacy = pills("legacy")
+    assert legacy == [{"text": "Deprecated", "css_class": "pill-deprecated", "title": "Use modern() instead."}], legacy
+
+    assert pills("maybe") == [{"text": "Experimental", "css_class": "pill-experimental", "title": None}]
+
+    assert pills("plain") == []
+
+    svc = pkg.members["Svc"]
+
+    def method_pills(name):
+        obj = svc.members[name]
+        parsed = api._parse_docstring(api._raw_docstring(obj.docstring))
+        return api._member_pills(obj, is_member=True, parsed=parsed)
+
+    assert method_pills("__init__") == [{"text": "Constructor", "css_class": "pill-runtime", "title": None}]
+    assert method_pills("make") == [{"text": "classmethod", "css_class": "pill-runtime", "title": None}]
+    assert method_pills("util") == [{"text": "staticmethod", "css_class": "pill-runtime", "title": None}]
+    assert method_pills("run") == [{"text": "abstract", "css_class": "pill-runtime", "title": None}]
+
+
+def test_modifier_pills_render_after_heading(tmp_path):
+    """#20: pills render inside the .doc-title-row, after the heading."""
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "pill_render_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(PILL_FIXTURE, encoding="utf-8")
+    sys.path.insert(0, str(tmp_path))
+    try:
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("pill_render_pkg", depth="all")
+        html = "\n".join(render_body(n) for n in nodes)
+
+        assert '<h2>fetch</h2><span class="pill pill-async">Async</span></div>' in html, (
+            "Async pill must render right after the heading (#20)"
+        )
+        assert '<h2>documented</h2><span class="pill pill-baseline">Stable v0.4+</span></div>' in html, (
+            "Baseline pill must render with the version string (#20)"
+        )
+        assert (
+            '<h2>legacy</h2><span class="pill pill-deprecated" title="Use modern() instead.">Deprecated</span></div>' in html
+        ), "Deprecated pill must carry the replacement note as a tooltip (#20)"
+        assert '<h2>maybe</h2><span class="pill pill-experimental">Experimental</span></div>' in html, (
+            "Experimental pill must render (#20)"
+        )
+        assert "<h2>plain</h2></div>" in html, "Plain members must carry no pills (#20)"
+        assert '<h3>make</h3><span class="pill pill-runtime">classmethod</span></div>' in html, (
+            "Runtime pills must render on methods (#20)"
+        )
+        assert '<h3>__init__</h3><span class="pill pill-runtime">Constructor</span></div>' in html, (
+            "Constructor pill must render (#20)"
+        )
+    finally:
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+
+
 def test_signature_block_aria_label_and_token_spans(tmp_path):
     """#23: signature blocks are labelled, tokenised, and scrollable.
 
