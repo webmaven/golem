@@ -222,11 +222,10 @@ def helper() -> bool:
     docs = api.generate_package_docs("multi_pkg")
     assert isinstance(docs, dict)
     assert len(docs) >= 1
-    # Check that keys are relative paths to adoc files
     assert any("multi_pkg" in k for k in docs.keys())
     for adoc_path, content in docs.items():
         assert adoc_path.endswith(".adoc")
-        assert content.strip().startswith("=")
+        assert content.strip().startswith("golem.apidoc::")
 
 
 def test_parameter_signature_variations(tmp_path):

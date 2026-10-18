@@ -556,22 +556,36 @@ def generate_toc_html(asg_root: Union[Node, dict[str, Any]]) -> str:
         if level < base_level:
             level = base_level
 
+        # Extract glyph if present
+        glyph_html = ""
+        if isinstance(sec, dict):
+            attrs = sec.get("attributes", {})
+        else:
+            attrs = getattr(sec, "attributes", {})
+        glyph = attrs.get("glyph") if isinstance(attrs, dict) else None
+        if glyph:
+            glyph_html = f'<span class="symbol-glyph small {glyph.get("css_class", "")}" aria-label="{glyph.get("label", "")}">{glyph.get("letter", "")}</span> '
+
         if first:
-            toc_parts.append(f'  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>')
+            toc_parts.append(f'  <li class="toc-item level-{level}"><a href="#{anchor_id}">{glyph_html}{title_str}</a>')
             first = False
         else:
             if level > current_level:
                 while current_level < level:
                     toc_parts.append(f'\n  <ul class="toc-level-{current_level + 1}">\n')
                     current_level += 1
-                toc_parts.append(f'  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>')
+                toc_parts.append(f'  <li class="toc-item level-{level}"><a href="#{anchor_id}">{glyph_html}{title_str}</a>')
             elif level < current_level:
                 while current_level > level:
                     toc_parts.append("</li>\n  </ul>\n")
                     current_level -= 1
-                toc_parts.append(f'</li>\n  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>')
+                toc_parts.append(
+                    f'</li>\n  <li class="toc-item level-{level}"><a href="#{anchor_id}">{glyph_html}{title_str}</a>'
+                )
             else:
-                toc_parts.append(f'</li>\n  <li class="toc-item level-{level}"><a href="#{anchor_id}">{title_str}</a>')
+                toc_parts.append(
+                    f'</li>\n  <li class="toc-item level-{level}"><a href="#{anchor_id}">{glyph_html}{title_str}</a>'
+                )
 
     while current_level > base_level:
         toc_parts.append("</li>\n  </ul>\n")

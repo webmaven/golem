@@ -11,6 +11,7 @@ import click
 from golem.model import AsgTransformer, Node
 from golem.plugins import hookimpl
 import asciidoctype
+import griffe
 from .core import ApiGenOptions, AsciiDocApi
 
 _TEMPLATES_DIR: Path = Path(__file__).parent / "templates" / "html5"
@@ -103,10 +104,11 @@ def on_asg_created(asg: Node, doc_path: Path | None = None) -> Node:
 
 
 def generate_api_docs(
-    packages: Sequence[str],
-    output_dir: Path | str,
+    packages: list[str],
+    output_dir: str | Path,
     search_paths: Sequence[str | Path] | None = None,
-    docstring_style: str = "auto",
+    docstring_style: str | griffe.DocstringStyle | griffe.Parser = "auto",
+    format: str = "macro",
 ) -> dict[str, str]:
     """Generate API documentation files on disk for specified packages."""
     out_path = Path(output_dir)
@@ -117,7 +119,7 @@ def generate_api_docs(
 
     all_generated: dict[str, str] = {}
     for pkg in packages:
-        pkg_docs = api.generate_package_docs(pkg)
+        pkg_docs = api.generate_package_docs(pkg, format=format)
         for rel_file, content in pkg_docs.items():
             dest = out_path / rel_file
             dest.parent.mkdir(parents=True, exist_ok=True)

@@ -328,15 +328,15 @@ def test_glyph_badges_render_in_headings(tmp_path):
         html = "\n".join(render_body(n) for n in nodes)
 
         assert (
-            '<div class="doc-title-row"><span class="symbol-glyph glyph-class" aria-label="Class">C</span><h2>class Engine</h2></div>'
+            '<div class="doc-title-row"><h2><span class="symbol-glyph glyph-class" aria-label="Class">C</span>class Engine</h2></div>'
             in html
         ), "Class glyph must lead the heading inside .doc-title-row (#19)"
         assert (
-            '<div class="doc-title-row"><span class="symbol-glyph glyph-method" aria-label="Method">M</span><h3>start</h3></div>'
+            '<div class="doc-title-row"><h3><span class="symbol-glyph glyph-method" aria-label="Method">M</span>start</h3></div>'
             in html
         ), "Method glyph must lead the heading inside .doc-title-row (#19)"
         assert (
-            '<div class="doc-title-row"><span class="symbol-glyph glyph-constant" aria-label="Variable">V</span><h2>MAX_SIZE</h2></div>'
+            '<div class="doc-title-row"><h2><span class="symbol-glyph glyph-constant" aria-label="Variable">V</span>MAX_SIZE</h2></div>'
             in html
         ), "Variable glyph must lead the heading inside .doc-title-row (#19)"
     finally:
@@ -471,25 +471,33 @@ def test_modifier_pills_render_after_heading(tmp_path):
         nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("pill_render_pkg", depth="all")
         html = "\n".join(render_body(n) for n in nodes)
 
-        assert '<h2>fetch</h2><span class="pill pill-async">Async</span></div>' in html, (
-            "Async pill must render right after the heading (#20)"
-        )
-        assert '<h2>documented</h2><span class="pill pill-baseline">Stable v0.4+</span></div>' in html, (
-            "Baseline pill must render with the version string (#20)"
+        assert (
+            '<h2><span class="symbol-glyph glyph-function" aria-label="Function">F</span>fetch</h2><span class="pill pill-async">Async</span></div>'
+            in html
+        ), "Async pill must render right after the heading (#20)"
+        assert (
+            '<h2><span class="symbol-glyph glyph-function" aria-label="Function">F</span>documented</h2><span class="pill pill-baseline">Stable v0.4+</span></div>'
+            in html
+        ), "Baseline pill must render with the version string (#20)"
+        assert (
+            '<h2><span class="symbol-glyph glyph-function" aria-label="Function">F</span>legacy</h2><span class="pill pill-deprecated" title="Use modern() instead.">Deprecated</span></div>'
+            in html
+        ), "Deprecated pill must carry the replacement note as a tooltip (#20)"
+        assert (
+            '<h2><span class="symbol-glyph glyph-function" aria-label="Function">F</span>maybe</h2><span class="pill pill-experimental">Experimental</span></div>'
+            in html
+        ), "Experimental pill must render (#20)"
+        assert '<h2><span class="symbol-glyph glyph-function" aria-label="Function">F</span>plain</h2></div>' in html, (
+            "Plain members must carry no pills (#20)"
         )
         assert (
-            '<h2>legacy</h2><span class="pill pill-deprecated" title="Use modern() instead.">Deprecated</span></div>' in html
-        ), "Deprecated pill must carry the replacement note as a tooltip (#20)"
-        assert '<h2>maybe</h2><span class="pill pill-experimental">Experimental</span></div>' in html, (
-            "Experimental pill must render (#20)"
-        )
-        assert "<h2>plain</h2></div>" in html, "Plain members must carry no pills (#20)"
-        assert '<h3>make</h3><span class="pill pill-runtime">classmethod</span></div>' in html, (
-            "Runtime pills must render on methods (#20)"
-        )
-        assert '<h3>__init__</h3><span class="pill pill-runtime">Constructor</span></div>' in html, (
-            "Constructor pill must render (#20)"
-        )
+            '<h3><span class="symbol-glyph glyph-method" aria-label="Method">M</span>make</h3><span class="pill pill-runtime">classmethod</span></div>'
+            in html
+        ), "Runtime pills must render on methods (#20)"
+        assert (
+            '<h3><span class="symbol-glyph glyph-method" aria-label="Method">M</span>__init__</h3><span class="pill pill-runtime">Constructor</span></div>'
+            in html
+        ), "Constructor pill must render (#20)"
     finally:
         if str(tmp_path) in sys.path:
             sys.path.remove(str(tmp_path))

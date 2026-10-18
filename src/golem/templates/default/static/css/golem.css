@@ -682,6 +682,8 @@ body {
 #golem-wrapper {
     display: flex;
     flex: 1;
+    container-type: inline-size;
+    container-name: golem-wrapper;
 }
 
 /* ── Skip Link (Accessibility) ─────────────────────── */
@@ -806,7 +808,10 @@ body {
     --content-pad-x: 3.5rem;
     --golem-content-pad-x: var(--content-pad-x);
     padding: 2.5rem var(--content-pad-x);
-    max-width: calc(72ch + (2 * var(--content-pad-x)));
+    /* Main column caps at about a comfortable line length (~72ch total). At
+       wide breakpoints the cap is lifted so the example sidebar column can
+       sit beside the prose inside #golem-content. */
+    max-width: 72ch;
 }
 #golem-content h1 {
     font-family: var(--font-display);
@@ -888,9 +893,14 @@ body {
 }
 
 /* ── API Class Grid (class-multi-grid) ───────────────── */
-/* Nesting already conveys hierarchy on API pages, so headings inside a class
-   grid wear one size. Scoped through #golem-content to out-specify the
-   per-level prose rules above; prose pages keep their variable sizes. */
+/* Below 1280px the class card is a normal block flow; `.split-row` is its own
+   two-column grid (prose | example sidebar). At 1280px+ the card becomes a grid
+   container and `.split-row` goes `display: contents`, handing its prose and
+   sidebar columns off as direct grid items so the example sidebar lines up with
+   the card header while the TOC occupies the outer right rail.
+
+   Nesting conveys hierarchy, so headings inside a class grid wear one size,
+   scoped through #golem-content to out-specify the per-level prose rules. */
 #golem-content .class-multi-grid h2,
 #golem-content .class-multi-grid h3,
 #golem-content .class-multi-grid h4 {
@@ -901,11 +911,53 @@ body {
     color: var(--color-text);
 }
 /* AsciiDoctype's section.html wraps child blocks in .adoc-section and
-   .section-blocks elements, which break grid column inheritance. Making them
-   contents-transparent keeps member cards direct children of the grid. */
+   .section-blocks elements. Below 1280px they flow as normal blocks inside the
+   card. At 1280px+ they go `display: contents` so the signature, split-row,
+   and example sidebar become direct children of the class grid. */
 .class-multi-grid .adoc-section,
 .class-multi-grid .section-blocks {
-    display: contents;
+    display: block;
+}
+/* Wide breakpoint: examples pop out to a sidebar column beside the prose card. */
+@media (min-width: 1280px) {
+    #golem-content {
+        max-width: none;
+    }
+    .class-multi-grid:has(.sidebar-column) {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: var(--space-xl);
+        align-items: start;
+    }
+    .class-multi-grid .adoc-section,
+    .class-multi-grid .section-blocks {
+        display: contents;
+    }
+    .class-multi-grid .doc-title-row,
+    .class-multi-grid .signature-container,
+    .class-multi-grid .source-drawer,
+    .class-multi-grid > section.member-card,
+    .class-multi-grid > section.adoc-section,
+    .class-multi-grid .prose-column {
+        grid-column: 1;
+    }
+    .class-multi-grid .sidebar-column {
+        grid-column: 2;
+    }
+    /* The prose column wears the card border/background so the sidebar column
+       beside it stays outside the card's visual boundary. */
+    .class-multi-grid .prose-column {
+        border-left: 2px solid var(--border-rail);
+        padding: var(--space-md);
+        background: var(--bg-surface);
+        border-radius: var(--radius-md);
+        min-width: 0;
+    }
+    /* Make .split-row transparent to the grid so its prose-column and
+       sidebar-column children become direct grid items. */
+    .class-multi-grid .split-row {
+        display: contents;
+    }
 }
 
 /* ── Code & Inline Elements ────────────────────────── */
@@ -1329,10 +1381,17 @@ i.conum b {
 /* ── Principle 2: Dual Coding (Symbol Kind Badges) ──────── */
 /* Title row: glyph badge + heading (+ modifier pills, #20) */
 .doc-title-row {
-    display: flex;
-    align-items: center;
+    display: inline-flex;
+    align-items: baseline;
     gap: var(--space-xs);
     flex-wrap: wrap;
+}
+.doc-title-row h1, .doc-title-row h2, .doc-title-row h3,
+.doc-title-row h4, .doc-title-row h5, .doc-title-row h6 {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-xs);
+    margin: 0;
 }
 .symbol-glyph {
     display: inline-flex;
@@ -1340,7 +1399,8 @@ i.conum b {
     justify-content: center;
     width: 1.35em;
     height: 1.35em;
-    border-radius: var(--badge-radius);
+    min-width: 1.35em;
+    border-radius: var(--radius-sm);
     font-family: var(--font-mono);
     font-size: var(--badge-font-size);
     font-weight: var(--badge-font-weight);
@@ -1385,7 +1445,7 @@ i.conum b {
 .signature-container {
     background-color: var(--bg-code);
     border: 1px solid var(--border-color);
-    border-left: 3px solid var(--color-primary);
+    border-left: none;
     border-radius: var(--radius-sm);
     padding: var(--space-sm) var(--space-md);
     margin: var(--space-sm) 0;
@@ -1786,14 +1846,15 @@ details summary:focus-visible,
 
 /* ── Right Sidebar (TOC) ───────────────────────────── */
 #golem-sidebar-right {
-    width: 230px;
+    /* TOC column: width-based, never grows to steal room from the main column.
+       Caps at a comfortable line length (~72ch). */
+    min-width: 200px;
+    max-width: 72ch;
     padding: var(--space-lg) var(--space-md);
     border-left: 1px solid var(--border-color);
     font-family: var(--font-ui);
-    flex-shrink: 0;
-    /* State 1 of the B8 ladder: hidden until there is room beside the main
-       column. The 4-state ladder below is pure CSS — no config flag may gate
-       visibility. */
+    /* Hidden by default; media queries below decide when there is room
+       for the TOC column beside the main column (+ optional example sidebar). */
     display: none;
     position: sticky;
     top: 0;
@@ -1803,31 +1864,20 @@ details summary:focus-visible,
     overflow-y: auto;
     scrollbar-gutter: stable;
 }
-/* State 2 — at BP_nav the nav appears (position per B9/B10, never visibility). */
+/* State 2 — at BP_nav the TOC appears beside the main column. */
 @media (min-width: 768px) {
-    #golem-sidebar-right {
-        display: block;
-    }
+    #golem-sidebar-right { display: block; }
 }
-/* State 3 — mid-range the nav dips back out, but only when a content sidebar
-   competes for the right-hand space. A page with no sidebars never dips. */
+/* State 3 — mid-range: TOC dips when a content sidebar competes for space. */
 @media (min-width: 992px) {
-    body:has(.sidebar-column) #golem-sidebar-right {
-        display: none;
-    }
+    #golem-wrapper:has(.sidebar-column) #golem-sidebar-right { display: none; }
 }
-/* State 4 — at BP_wide there is room for both columns, so the nav returns.
-   Same selector as State 3 so it wins on source order, not specificity. */
+/* State 4 — widest: TOC returns even with sidebars present. */
 @media (min-width: 1280px) {
-    body:has(.sidebar-column) #golem-sidebar-right {
-        display: block;
-    }
+    #golem-wrapper:has(.sidebar-column) #golem-sidebar-right { display: block; }
 }
-/* B9 — the nav hugs the main column by default, leaving the blank expanse to
-   its right rather than between the columns.
-   B10 — escape hatch for mixed-layout sites: `.nav-flush-right` is opted into by
-   the nav_helpers `flush_right_nav` config flag and moves the nav only; it must
-   never affect the visibility ladder above. */
+/* B10 — opt-in: push the TOC flush right, leaving room for a sidebar column
+   whether or not one is present. This only affects position, never visibility. */
 #golem-sidebar-right.nav-flush-right {
     margin-left: auto;
 }

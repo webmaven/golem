@@ -43,7 +43,7 @@ from __future__ import annotations
 import inspect
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 import asciidoctrine
 from asciidoctrine.nodes import Document, Node
@@ -269,13 +269,13 @@ class BuildEngine:
             self._nav_tree_cache = self.nav_builder.discover_navigation()
         return self._nav_tree_cache
 
-    def build_site(self, partial_target: Path | str | None = None) -> list[Path]:
+    def build_site(self, partial_targets: Sequence[Path | str] | None = None) -> list[Path]:
         """Orchestrate the incremental compilation pipeline for outdated AsciiDoc documents.
 
         Executes the complete documentation compilation lifecycle:
         1. Executes `on_build_start` plugin hooks before stale detection.
         2. Identifies stale or modified documents via `staleness_tracker.get_outdated_files()`,
-           or resolves the forced compilation target if `partial_target` is provided.
+           or resolves the forced compilation targets if `partial_targets` is provided.
         3. Synchronizes static assets into the output directory via `sync_static_assets()`.
         4. Compiles each outdated document through sequential AST parsing (`asciidoctrine`), ASG semantic resolution (`ASGResolver`), body rendering (`render_body`), navigation and TOC generation, and Chameleon template layout compilation (`PageCompiler`).
         5. Executes plugin hooks (`on_pre_parse`, `on_ast_created`, `on_asg_created`, `on_template_context`, `on_post_render`) across each lifecycle phase.
@@ -283,7 +283,7 @@ class BuildEngine:
         7. Executes `on_build_finish` after all documents have been compiled and written to disk.
 
         [parameters]
-        `partial_target` (Path | str | None, optional):: Optional single file or directory path to rebuild without wiping or rebuilding unchanged documents. Defaults to `None`.
+        `partial_targets` (Sequence[Path | str] | None, optional):: Optional sequence of file or directory paths to rebuild without wiping or rebuilding unchanged documents. Defaults to `None`.
 
         [returns]
         `list[Path]`:: List of output `Path` objects for all compiled HTML documents.
@@ -291,7 +291,7 @@ class BuildEngine:
         [raises]
         `GolemBuildAbortError`:: If any `on_build_start` hookimpl raises `GolemBuildAbortError`.
             All pre-flight hooks run before the build halts; individual messages are aggregated.
-        `FileNotFoundError`:: If `partial_target` is provided but does not exist or is outside `content_dir`.
+        `FileNotFoundError`:: If any `partial_targets` is provided but does not exist or is outside `content_dir`.
         `Exception`:: Any document compilation error when `config.strict` is `True`.
 
         === Examples
@@ -334,35 +334,39 @@ class BuildEngine:
             summary = "; ".join(str(e) for e in abort_errors)
             raise GolemBuildAbortError(f"Build aborted: {len(abort_errors)} pre-flight check(s) failed: {summary}")
 
-        if partial_target is not None:
-            raw_target = Path(partial_target)
-            if raw_target.is_absolute():
-                resolved_target = raw_target.resolve()
-            elif (self.content_dir / raw_target).exists():
-                resolved_target = (self.content_dir / raw_target).resolve()
-            elif (Path.cwd() / raw_target).exists():
-                resolved_target = (Path.cwd() / raw_target).resolve()
-            else:
-                resolved_target = (self.content_dir / raw_target).resolve()
+        if partial_targets:
+            to_build: set[Path] = set()
+            for raw_target_str in partial_targets:
+                raw_target = Path(raw_target_str)
+                if raw_target.is_absolute():
+                    resolved_target = raw_target.resolve()
+                elif (self.content_dir / raw_target).exists():
+                    resolved_target = (self.content_dir / raw_target).resolve()
+                elif (Path.cwd() / raw_target).exists():
+                    resolved_target = (Path.cwd() / raw_target).resolve()
+                else:
+                    resolved_target = (self.content_dir / raw_target).resolve()
 
-            if not resolved_target.exists():
-                raise FileNotFoundError(f"Partial build target not found: {partial_target}")
+                if not resolved_target.exists():
+                    raise FileNotFoundError(f"Partial build target not found: {raw_target_str}")
 
-            try:
-                resolved_target.relative_to(self.content_dir)
-            except ValueError:
-                raise FileNotFoundError(
-                    f"Partial build target '{partial_target}' is outside content directory '{self.content_dir}'."
-                )
+                try:
+                    resolved_target.relative_to(self.content_dir)
+                except ValueError:
+                    raise FileNotFoundError(
+                        f"Partial build target '{raw_target_str}' is outside content directory '{self.content_dir}'."
+                    )
 
-            if resolved_target.is_file():
-                if resolved_target.suffix != ".adoc":
-                    raise FileNotFoundError(f"Partial build target is not an AsciiDoc document: {partial_target}")
-                to_build = {resolved_target}
-            elif resolved_target.is_dir():
-                to_build = {f.resolve() for f in resolved_target.glob("**/*.adoc") if not is_partial(f, self.content_dir)}
-            else:
-                raise FileNotFoundError(f"Partial build target not found: {partial_target}")
+                if resolved_target.is_file():
+                    if resolved_target.suffix != ".adoc":
+                        raise FileNotFoundError(f"Partial build target is not an AsciiDoc document: {raw_target_str}")
+                    to_build.add(resolved_target)
+                elif resolved_target.is_dir():
+                    to_build.update(
+                        f.resolve() for f in resolved_target.glob("**/*.adoc") if not is_partial(f, self.content_dir)
+                    )
+                else:
+                    raise FileNotFoundError(f"Partial build target not found: {raw_target_str}")
 
             # Cascade reverse dependencies: if any targeted file is included in another document,
             # that parent document must also be rebuilt.

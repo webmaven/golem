@@ -1041,10 +1041,11 @@ def report_engine_diagnostics(engine: BuildEngine, strict: bool = False) -> None
 @click.option("--clean", is_flag=True, help="Empty output directory before building")
 @click.option(
     "--partial",
-    "partial_target",
+    "partial_targets",
     type=click.Path(),
-    default=None,
-    help="Rebuild only specified file or directory path without wiping other outputs",
+    multiple=True,
+    default=(),
+    help="Rebuild only specified file or directory paths without wiping other outputs (can specify multiple)",
 )
 @click.option(
     "--strict",
@@ -1072,7 +1073,7 @@ def report_engine_diagnostics(engine: BuildEngine, strict: bool = False) -> None
     type=click.Path(file_okay=False, dir_okay=True),
     help="Change working directory before executing",
 )
-def build(config, clean, partial_target, strict, verbose, quiet, directory=None):
+def build(config, clean, partial_targets, strict, verbose, quiet, directory=None):
     """
 
     Run the incremental compiler, building static pages.
@@ -1093,7 +1094,7 @@ def build(config, clean, partial_target, strict, verbose, quiet, directory=None)
     ----
     """
     with change_working_dir(directory):
-        if clean and partial_target:
+        if clean and partial_targets:
             raise click.ClickException("Options --clean and --partial are mutually exclusive.")
 
         import time
@@ -1133,7 +1134,7 @@ def build(config, clean, partial_target, strict, verbose, quiet, directory=None)
 
         try:
             engine = BuildEngine(golem_config)
-            compiled = engine.build_site(partial_target=partial_target)
+            compiled = engine.build_site(partial_targets=partial_targets)
         except click.ClickException:
             raise
         except Exception as e:

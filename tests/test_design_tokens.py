@@ -375,7 +375,9 @@ def test_symbol_glyph_component_classes():
     assert ".doc-title-row" in css, "Missing .doc-title-row rule in golem.css (#19)"
     rules = _extract_css_rules(css)
     row_rule = dict(rules).get(".doc-title-row")
-    assert row_rule and "display: flex" in row_rule, ".doc-title-row must lay glyph/heading/pills out in a row (#19)"
+    assert row_rule and ("display: flex" in row_rule or "display: inline-flex" in row_rule), (
+        ".doc-title-row must lay glyph/heading/pills out in a row (#19)"
+    )
 
 
 def test_left_rail_doc_member_styling():
@@ -485,10 +487,12 @@ def test_badge_tokens_defined_and_consumed():
     # The glyph badge component consumes the tokens instead of literals.
     glyph_rule = rules_by_selector.get(".symbol-glyph")
     assert glyph_rule is not None, "Missing .symbol-glyph rule"
-    assert "var(--badge-radius)" in glyph_rule, ".symbol-glyph must use var(--badge-radius)"
     assert "var(--badge-font-size)" in glyph_rule, ".symbol-glyph must use var(--badge-font-size)"
     assert "var(--badge-font-weight)" in glyph_rule, ".symbol-glyph must use var(--badge-font-weight)"
-    assert "border-radius: var(--radius-sm)" not in glyph_rule, ".symbol-glyph must not hardcode --radius-sm"
+    # Glyphs are square with rounded corners (not pill-shaped): they consume the
+    # small radius token rather than the pill-shaped --badge-radius.
+    assert "border-radius: var(--radius-sm)" in glyph_rule, ".symbol-glyph must use var(--radius-sm)"
+    assert "border-radius: var(--radius-full)" not in glyph_rule, ".symbol-glyph must not be pill-shaped"
 
 
 def test_table_scroll_container_clips_overflow():
@@ -528,8 +532,12 @@ def test_signature_container_and_source_drawer_rules():
     sig_rule = rules_by_selector[".signature-container"]
     assert "var(--bg-code)" in sig_rule or "var(--bg-surface" in sig_rule, ".signature-container must use background token"
     assert "var(--border-color)" in sig_rule, ".signature-container must use var(--border-color)"
-    assert "var(--color-primary)" in sig_rule, ".signature-container must use var(--color-primary)"
     assert "var(--font-mono)" in sig_rule, ".signature-container must use var(--font-mono)"
+    # The heavy left accent is dropped inside cards: the card rail is the only
+    # left border in the hierarchy, so the signature carries no color-primary edge.
+    assert "var(--color-primary)" not in sig_rule, (
+        ".signature-container must not draw a color-primary left accent inside cards"
+    )
 
     assert "details.source-drawer" in rules_by_selector, "Missing details.source-drawer rule"
     drawer_rule = rules_by_selector["details.source-drawer"]
@@ -615,17 +623,34 @@ def _rules_by_selector(css_text: str) -> dict[str, str]:
 
 
 def test_class_multi_grid_subgrid_display_contents():
-    """B11: section wrappers must stay transparent to the class grid.
+    """B11: section wrappers are normal block children at narrow viewports.
 
-    AsciiDoctype's `section.html` injects `.adoc-section` and `.section-blocks`
-    wrappers, which break grid column inheritance under `.class-multi-grid`.
+    Below 1280px the class card is a contained block (not a grid container), so
+    its `.adoc-section`/`.section-blocks` wrappers flow as ordinary blocks; the
+    `.split-row` is its own two-column grid for the example sidebar. At 1280px+
+    the card itself becomes a grid and the wrappers go `display: contents` so
+    the signature and split-row become direct grid items.
     """
     css = _read_css()
-    rules_by_selector = _rules_by_selector(css)
+
+    base: dict[str, str] = {}
+    wide: dict[str, str] = {}
+    for selector, body in _extract_css_rules(css):
+        for part in selector.split(","):
+            part = part.strip()
+            if part in (".class-multi-grid .adoc-section", ".class-multi-grid .section-blocks"):
+                base[part] = body
+    for selector, body in _nested_media_rules(css, "min-width: 1280"):
+        for part in selector.split(","):
+            part = part.strip()
+            if part in (".class-multi-grid .adoc-section", ".class-multi-grid .section-blocks"):
+                wide[part] = body
 
     for selector in (".class-multi-grid .adoc-section", ".class-multi-grid .section-blocks"):
-        assert selector in rules_by_selector, f"Missing {selector} rule (B11)"
-        assert "display: contents" in rules_by_selector[selector], f"{selector} must be display: contents (B11)"
+        assert selector in base, f"Missing base {selector} rule (B11)"
+        assert "display: block" in base[selector], f"{selector} must flow as a normal block at narrow viewports (B11)"
+        assert selector in wide, f"Missing 1280px+ {selector} rule (B11)"
+        assert "display: contents" in wide[selector], f"{selector} must go transparent at 1280px+ so it is a grid item (B11)"
 
 
 def test_class_multi_grid_uniform_heading_sizes():

@@ -228,13 +228,13 @@ def test_engine_partial_build_direct(project_setup):
     assert (project_setup / "dist" / "guide.html").exists()
 
     # Direct call with partial target (single file)
-    compiled = engine.build_site(partial_target="guide.adoc")
+    compiled = engine.build_site(partial_targets=["guide.adoc"])
     assert len(compiled) == 1
     assert compiled[0] == (project_setup / "dist" / "guide.html").resolve()
 
     # Direct call with invalid path raises FileNotFoundError
     with pytest.raises(FileNotFoundError):
-        engine.build_site(partial_target="does_not_exist.adoc")
+        engine.build_site(partial_targets=["does_not_exist.adoc"])
 
 
 def test_cli_partial_cascades_to_reverse_deps(project_setup):

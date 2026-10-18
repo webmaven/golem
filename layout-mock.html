@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layout Prototype — faux-container (v2)</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; font-size: 16px; line-height: 1.5; background: #faf7f2; color: #222; }
+:root { --space-xl: 2rem; --space-lg: 1.5rem; --space-md: 1rem; --content-pad-x: 3.5rem; --border-color: #8b8578; --border-rail: #3d2a20; --bg-surface: #f5efe6; --bg-code: #eae5dd; --radius-md: 6px; --radius-sm: 4px; --sidebar-w: 320px; --sticky-top: 0px; }
+#golem-wrapper { display: flex; min-height: 100vh; }
+#golem-sidebar-left { width: 270px; flex-shrink: 0; background: #f0e9e0; border-right: 1px solid var(--border-color); padding: var(--space-lg) 1.25rem; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+#golem-content { flex: 1; min-width: 0; padding: 2.5rem var(--content-pad-x); background: #fff; }
+#golem-sidebar-right { min-width: 200px; padding: var(--space-lg) var(--space-md); border-left: 1px solid var(--border-color); display: none; position: sticky; top: 0; height: 100vh; align-self: flex-start; overflow-y: auto; background: #f5efe6; }
+.symbol-glyph { display: inline-flex; align-items: center; justify-content: center; width: 1.35em; height: 1.35em; font-family: monospace; font-size: 0.6875rem; font-weight: 600; background: #e2d8ce; border: 1px solid currentColor; border-radius: var(--radius-sm); margin-right: 0.25rem; }
+.doc-title-row { display: flex; align-items: baseline; gap: 0.25rem; flex-wrap: wrap; }
+.doc-title-row h2, .doc-title-row h4 { margin: 0; }
+.signature-container { background: var(--bg-code); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem 1rem; margin: 0.5rem 0; font-family: monospace; font-size: 0.875rem; overflow-x: auto; }
+.filler { background: #eee4d3; border: 1px dashed #999; border-radius: var(--radius-sm); padding: 1rem; margin: 1rem 0; }
+.member-card { border-left: 2px solid var(--border-rail); padding-left: 1.25rem; margin-left: 0.25rem; }
+@media (min-width: 1280px) {
+#golem-content { max-width: none; }
+.faux-outer { position: relative; margin-bottom: 1.5em; }
+.faux-outer > .faux-grid { display: grid; grid-template-columns: minmax(0, 1fr) var(--sidebar-w); gap: var(--space-xl); align-items: start; }
+.faux-card { position: absolute; inset: 0 calc(var(--sidebar-w) + var(--space-xl)) 0 0; background: var(--bg-surface); border: 1px solid var(--border-rail); border-radius: var(--radius-md); z-index: 0; pointer-events: none; }
+.faux-grid > .prose-column { grid-column: 1; min-width: 0; position: relative; z-index: 1; padding: var(--space-lg); }
+.faux-grid > .sidebar-wrap { position: absolute; top: 0; bottom: 0; right: 0; width: var(--sidebar-w); z-index: 1; overflow: visible; }
+.faux-outer:has(.faux-outer .sidebar-column) > .faux-grid > .sidebar-wrap { position: static; grid-column: 2; grid-row: 1; align-self: stretch; }
+/* Nested cards inside parent cards */
+.faux-outer > .faux-outer { margin-left: var(--space-md); margin-right: var(--space-md); margin-bottom: var(--space-md); padding-bottom: var(--space-md); } 
+.faux-grid > .faux-outer { grid-column: 1 / -1; }
+.faux-grid > .sidebar-wrap > .sidebar-column { position: sticky; top: var(--sticky-top); max-height: 100vh; overflow-y: auto; z-index: 1; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: var(--space-md); }
+#golem-content:has(.sidebar-column) .faux-outer > .faux-grid { grid-template-columns: minmax(0, 1fr) var(--sidebar-w); }
+#golem-content:has(.sidebar-column) .faux-outer > .faux-card { inset: 0 calc(var(--sidebar-w) + var(--space-xl)) 0 0; }
+#golem-content:not(:has(.sidebar-column)) { max-width: 72ch; }
+#golem-content:not(:has(.sidebar-column)) .faux-outer > .faux-grid { grid-template-columns: minmax(0, 1fr); }
+#golem-content:not(:has(.sidebar-column)) .faux-outer > .faux-card { inset: 0 0 0 0; }
+#golem-sidebar-right { display: block; }
+}
+@media (max-width: 1279px) {
+.faux-outer {
+ display: block;
+ padding: var(--space-md);
+ margin-top: var(--space-md);
+ background: var(--bg-surface);
+ border: 1px solid var(--border-rail);
+ border-radius: var(--radius-md);
+ z-index: 0;
+}
+#card-module {
+
+ background: none;
+ border: none;
+ z-index: -1;
+}
+.faux-grid > .sidebar-wrap > .sidebar-column { 
+  position: static; 
+  background: var(--bg-surface); 
+  border: 1px solid var(--border-color); 
+  border-radius: var(--radius-md); 
+  padding: var(--space-md);
+  /* margin-bottom: var(--space-md); */
+}
+.faux-outer > .faux-outer {
+ padding-bottom: var(--space-md);
+} 
+/*.prose-column { padding: var(--space-lg); background: var(--bg-surface); border: 1px solid var(--border-rail); border-radius: var(--radius-md);} */
+}
+body.debug-off .dbg { outline: none !important; }
+.dbg { outline-width: 1px; outline-style: dashed; outline-offset: 2px; }
+.dbg-faux   { outline-color: #c0c; outline-offset: 0; }
+.dbg-outer  { outline-color: #777; outline-offset: 8px; }
+.dbg-main   { outline-color: #06b; outline-offset: 4px; }
+.dbg-side   { outline-color: #d20; outline-offset: 0; }
+.dbg-wrap   { outline-color: #080; outline-offset: 2px; }
+.dbg.dbg-module   { outline-color: #c0c; outline-offset: 0; }
+.dbg.dbg-class    { outline-color: #0a0; outline-offset: 4px; }
+.dbg.dbg-method   { outline-color: #f60; outline-offset: 8px; }
+.dbg.dbg-function { outline-color: #0bc; outline-offset: 4px; }
+
+</style>
+</head>
+<body class="debug-on">
+<div id="golem-wrapper">
+  <aside id="golem-sidebar-left"><nav><ul style="list-style:none"><li>Docs</li><li>API Reference</li><li>Plugins</li></ul></nav></aside>
+  <main id="golem-content">
+    <p><label><input type="checkbox" id="dbg-toggle" checked> debug outlines</label>
+    <label>strip sidebars at level
+      <select id="strip-level">
+        <option value="99" selected>None</option>
+        <option value="0">0 and below (all sidebars)</option>
+        <option value="1">1 and below</option>
+        <option value="2">2 and below</option>
+        <option value="3">3 and below</option>
+      </select>
+    </label></p>
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var t = document.getElementById('dbg-toggle');
+        t.addEventListener('change', function () { document.body.classList.toggle('debug-off', !t.checked); });
+        var s = document.getElementById('strip-level');
+        s.addEventListener('change', function () {
+          var level = parseInt(s.value, 10);
+          if (level === 99) { location.reload(); return; }
+          document.querySelectorAll('.faux-outer[data-level]').forEach(function (sec) {
+            var secLevel = parseInt(sec.getAttribute('data-level'), 10);
+            var wrap = sec.querySelector(':scope > .faux-grid > .sidebar-wrap');
+            if (secLevel >= level && wrap) wrap.parentNode.removeChild(wrap);
+          });
+        });
+      });
+    </script>
+    <section class="faux-outer dbg dbg-outer dbg-module" id="card-module" data-level="0">
+      <div class="faux-grid">
+        <div class="prose-column dbg dbg-main">
+          <div class="doc-title-row"><span class="symbol-glyph" aria-label="Module">U</span><h2>module golem.engine</h2></div>
+          <div class="signature-container">golem.engine — module</div>
+          <p>Module prose A — module sidebar should stick to page bottom when no nested sidebars exist.</p>
+          <div class="filler">module prose B</div>
+        </div>
+        <div class="sidebar-wrap dbg dbg-wrap">
+          <div class="sidebar-column dbg dbg-side">
+            <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">module sidebar</div>
+            <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">golem build --clean</pre>
+          </div>
+        </div>
+        <!-- Card A — level 1: class with nested class, both with sidebars -->
+        <section class="faux-outer dbg dbg-outer dbg-class" id="card-a-class" data-level="1">
+          <div class="faux-card dbg dbg-faux"></div>
+          <div class="faux-grid">
+            <div class="prose-column dbg dbg-main">
+              <div class="doc-title-row"><span class="symbol-glyph" aria-label="Class">C</span><h2>class OuterA</h2></div>
+              <div class="signature-container">class OuterA(GolemPlugin):</div>
+              <p>Outer class A prose — class A sidebar sticks during class A prose.</p>
+              <div class="filler">outer class A prose filler A</div>
+            </div>
+            <div class="sidebar-wrap dbg dbg-wrap">
+              <div class="sidebar-column dbg dbg-side">
+                <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">outer class A sidebar</div>
+                <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">class OuterA(GolemPlugin): ...</pre>
+              </div>
+            </div>
+          </div>
+          <!-- level 2: nested class inside A, also has sidebar -->
+          <section class="faux-outer dbg dbg-outer dbg-class" id="card-a-nested" data-level="2">
+            <div class="faux-card dbg dbg-faux"></div>
+            <div class="faux-grid">
+              <div class="prose-column dbg dbg-main">
+                <div class="doc-title-row"><span class="symbol-glyph" aria-label="Class">C</span><h2>class NestedA</h2></div>
+                <div class="signature-container">class OuterA.NestedA:</div>
+                <p>Nested class A prose — nested class A sidebar displaces outer class A sidebar.</p>
+                <div class="filler">nested class A prose filler A</div>
+              </div>
+              <div class="sidebar-wrap dbg dbg-wrap">
+                <div class="sidebar-column dbg dbg-side">
+                  <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">nested class A sidebar</div>
+                  <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">class OuterA.NestedA: ...</pre>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+        <!-- Card B — level 1: class with NO sidebar, method WITH sidebar -->
+        <section class="faux-outer dbg dbg-outer dbg-class no-sidebar" id="card-b-class" data-level="1">
+          <div class="faux-card dbg dbg-faux"></div>
+          <div class="faux-grid">
+            <div class="prose-column dbg dbg-main">
+              <div class="doc-title-row"><span class="symbol-glyph" aria-label="Class">C</span><h2>class PlainB</h2></div>
+              <div class="signature-container">class PlainB(GolemPlugin):</div>
+              <p>Class B has no sidebar of its own.</p>
+              <div class="filler">class PlainB prose filler A</div>
+            </div>
+          </div>
+          <!-- level 2: method inside B, has sidebar -->
+          <section class="faux-outer dbg dbg-outer dbg-method" id="card-b-method" data-level="2">
+            <div class="faux-card dbg dbg-faux"></div>
+            <div class="faux-grid">
+              <div class="prose-column dbg dbg-main">
+                <div class="doc-title-row"><span class="symbol-glyph" aria-label="Method">M</span><h2>def method_b</h2></div>
+                <div class="signature-container">def method_b(self):</div>
+                <p>Method B has a sidebar — displaces module sidebar since class B has none.</p>
+                <div class="filler">method B prose filler A</div>
+              </div>
+              <div class="sidebar-wrap dbg dbg-wrap">
+                <div class="sidebar-column dbg dbg-side">
+                  <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">method B sidebar</div>
+                  <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">def method_b(self): ...</pre>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </div>
+        <!-- Card C — level 1: class → level 2: nested class → level 3: method, only method has sidebar -->
+        <section class="faux-outer dbg dbg-outer dbg-class no-sidebar" id="card-c-outer" data-level="1">
+          <div class="faux-card dbg dbg-faux"></div>
+          <div class="faux-grid">
+            <div class="prose-column dbg dbg-main">
+              <div class="doc-title-row"><span class="symbol-glyph" aria-label="Class">C</span><h2>class OuterC</h2></div>
+              <div class="signature-container">class OuterC(GolemPlugin):</div>
+              <p>Class C outer — no sidebar.</p>
+              <div class="filler">class OuterC prose filler A</div>
+            </div>
+          </div>
+          <!-- level 2: nested class inside C, no sidebar -->
+          <section class="faux-outer dbg dbg-outer dbg-class no-sidebar" id="card-c-mid" data-level="2">
+            <div class="faux-card dbg dbg-faux"></div>
+            <div class="faux-grid">
+              <div class="prose-column dbg dbg-main">
+                <div class="doc-title-row"><span class="symbol-glyph" aria-label="Class">C</span><h2>class MidC</h2></div>
+                <div class="signature-container">class OuterC.MidC:</div>
+                <p>Mid class C — no sidebar.</p>
+                <div class="filler">class MidC prose filler A</div>
+              </div>
+            </div>
+            <!-- level 3: nested method inside MidC, has sidebar -->
+            <section class="faux-outer dbg dbg-outer dbg-method" id="card-c-inner" data-level="3">
+              <div class="faux-card dbg dbg-faux"></div>
+              <div class="faux-grid">
+                <div class="prose-column dbg dbg-main">
+                  <div class="doc-title-row"><span class="symbol-glyph" aria-label="Method">M</span><h2>def method_c</h2></div>
+                  <div class="signature-container">def method_c(self):</div>
+                  <p>Method C has sidebar — only level-3 object with sidebar.</p>
+                  <div class="filler">method C prose filler A</div>
+                </div>
+                <div class="sidebar-wrap dbg dbg-wrap">
+                  <div class="sidebar-column dbg dbg-side">
+                    <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">method C sidebar</div>
+                    <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">def method_c(self): ...</pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </section>
+        </section>
+        <!-- Card D — level 1: class (has sidebar) → level 2: nested class (no sidebar) → level 3: method (has sidebar) -->
+        <section class="faux-outer dbg dbg-outer dbg-class" id="card-d-outer" data-level="1">
+          <div class="faux-card dbg dbg-faux"></div>
+          <div class="faux-grid">
+            <div class="prose-column dbg dbg-main">
+              <div class="doc-title-row"><span class="symbol-glyph" aria-label="Class">C</span><h2>class OuterD</h2></div>
+              <div class="signature-container">class OuterD(GolemPlugin):</div>
+              <p>Class D outer — has sidebar.</p>
+              <div class="filler">class OuterD prose filler A</div>
+            </div>
+            <div class="sidebar-wrap dbg dbg-wrap">
+              <div class="sidebar-column dbg dbg-side">
+                <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">outer class D sidebar</div>
+                <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">class OuterD(GolemPlugin): ...</pre>
+              </div>
+            </div>
+          </div>
+          <!-- level 2: nested class inside D, no sidebar -->
+          <section class="faux-outer dbg dbg-outer dbg-class no-sidebar" id="card-d-mid" data-level="2">
+            <div class="faux-card dbg dbg-faux"></div>
+            <div class="faux-grid">
+              <div class="prose-column dbg dbg-main">
+                <div class="doc-title-row"><span class="symbol-glyph" aria-label="Class">C</span><h2>class MidD</h2></div>
+                <div class="signature-container">class OuterD.MidD:</div>
+                <p>Mid class D — no sidebar.</p>
+                <div class="filler">class MidD prose filler A</div>
+              </div>
+            </div>
+            <!-- level 3: nested method inside MidD, has sidebar -->
+            <section class="faux-outer dbg dbg-outer dbg-method" id="card-d-inner-method" data-level="3">
+              <div class="faux-card dbg dbg-faux"></div>
+              <div class="faux-grid">
+                <div class="prose-column dbg dbg-main">
+                  <div class="doc-title-row"><span class="symbol-glyph" aria-label="Method">M</span><h2>def method_d</h2></div>
+                  <div class="signature-container">def method_d(self):</div>
+                  <p>Method D has sidebar — outer class D sidebar displaces module sidebar, then method D displaces class D.</p>
+                  <div class="filler">method D prose filler A</div>
+                </div>
+                <div class="sidebar-wrap dbg dbg-wrap">
+                  <div class="sidebar-column dbg dbg-side">
+                    <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">method D sidebar</div>
+                    <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">def method_d(self): ...</pre>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </section>
+        </section>
+        <!-- Card E — level 1: class with sidebar (simple) -->
+        <section class="faux-outer dbg dbg-outer dbg-class" id="card-e-simple-sidebar" data-level="1">
+          <div class="faux-card dbg dbg-faux"></div>
+          <div class="faux-grid">
+            <div class="prose-column dbg dbg-main">
+              <div class="doc-title-row"><span class="symbol-glyph" aria-label="Class">C</span><h2>class SimpleWithSidebar</h2></div>
+              <div class="signature-container">class SimpleWithSidebar(GolemPlugin):</div>
+              <p>Simple class with sidebar — class sidebar sticks during its own prose.</p>
+              <div class="filler">simple class with sidebar filler A</div>
+            </div>
+            <div class="sidebar-wrap dbg dbg-wrap">
+              <div class="sidebar-column dbg dbg-side">
+                <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">simple class with sidebar</div>
+                <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">class SimpleWithSidebar: ...</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+        <!-- Card F — level 1: class without sidebar -->
+        <section class="faux-outer dbg dbg-outer dbg-class no-sidebar" id="card-f-simple-no-sidebar" data-level="1">
+          <div class="faux-card dbg dbg-faux"></div>
+          <div class="faux-grid">
+            <div class="prose-column dbg dbg-main">
+              <div class="doc-title-row"><span class="symbol-glyph" aria-label="Class">C</span><h2>class SimpleNoSidebar</h2></div>
+              <div class="signature-container">class SimpleNoSidebar(GolemPlugin):</div>
+              <p>Simple class without sidebar — nothing sticks from class F itself.</p>
+              <div class="filler">simple class without sidebar filler A</div>
+              <div class="filler">simple class without sidebar filler B</div>
+            </div>
+          </div>
+        </section>
+        <!-- Card G — level 1: class with sidebar + method with sidebar -->
+        <section class="faux-outer dbg dbg-outer dbg-class" id="card-g-class-sidebar" data-level="1">
+          <div class="faux-card dbg dbg-faux"></div>
+          <div class="faux-grid">
+            <div class="prose-column dbg dbg-main">
+              <div class="doc-title-row"><span class="symbol-glyph" aria-label="Class">C</span><h2>class WithMethodSidebar</h2></div>
+              <div class="signature-container">class WithMethodSidebar(GolemPlugin):</div>
+              <p>Class G has a sidebar — class G sidebar sticks during class G prose.</p>
+              <div class="filler">class with method sidebar filler A</div>
+            </div>
+            <div class="sidebar-wrap dbg dbg-wrap">
+              <div class="sidebar-column dbg dbg-side">
+                <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">class with method sidebar</div>
+                <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">class WithMethodSidebar: ...</pre>
+              </div>
+            </div>
+          </div>
+          <!-- level 2: method inside G, has sidebar -->
+          <section class="faux-outer dbg dbg-outer dbg-method" id="card-g-method" data-level="2">
+            <div class="faux-card dbg dbg-faux"></div>
+            <div class="faux-grid">
+              <div class="prose-column dbg dbg-main">
+                <div class="doc-title-row"><span class="symbol-glyph" aria-label="Method">M</span><h2>def method_g</h2></div>
+                <div class="signature-container">def method_g(self):</div>
+                <p>Method G has sidebar — displaces class G sidebar.</p>
+                <div class="filler">method G prose filler A</div>
+              </div>
+              <div class="sidebar-wrap dbg dbg-wrap">
+                <div class="sidebar-column dbg dbg-side">
+                  <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">method G sidebar</div>
+                  <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">def method_g(self): ...</pre>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+        <!-- Card H — level 1: helper function without sidebar -->
+        <section class="faux-outer dbg dbg-outer dbg-function no-sidebar" id="card-h-helper-no-sidebar" data-level="1">
+          <div class="faux-card dbg dbg-faux"></div>
+          <div class="faux-grid">
+            <div class="prose-column dbg dbg-main">
+              <div class="doc-title-row"><span class="symbol-glyph" aria-label="Function">F</span><h2>def helper_no_sidebar</h2></div>
+              <div class="signature-container">def helper_no_sidebar() -> str:</div>
+              <p>Helper function without sidebar — nothing sticks from function H itself.</p>
+              <div class="filler">helper function without sidebar filler A</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Card I — level 1: function with sidebar -->
+        <section class="faux-outer dbg dbg-outer dbg-function" id="card-i-func-sidebar" data-level="1">
+          <div class="faux-card dbg dbg-faux"></div>
+          <div class="faux-grid">
+            <div class="prose-column dbg dbg-main">
+              <div class="doc-title-row"><span class="symbol-glyph" aria-label="Function">F</span><h2>def func_with_sidebar</h2></div>
+              <div class="signature-container">def func_with_sidebar() -> str:</div>
+              <p>Function with sidebar — function sidebar sticks to page bottom when it is the last sidebar.</p>
+              <div class="filler">function with sidebar filler A</div>
+              <div class="filler">function with sidebar filler B</div>
+            </div>
+            <div class="sidebar-wrap dbg dbg-wrap">
+              <div class="sidebar-column dbg dbg-side">
+                <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">function with sidebar</div>
+                <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">def func_with_sidebar(): ...</pre>
+              </div>
+            </div>
+          </div>
+        </section>
+        <!-- Card J — level 1: class with sidebar + two methods, only second method has sidebar -->
+        <section class="faux-outer dbg dbg-outer dbg-class" id="card-j-class-two-methods" data-level="1">
+          <div class="faux-card dbg dbg-faux"></div>
+          <div class="faux-grid">
+            <div class="prose-column dbg dbg-main">
+              <div class="doc-title-row"><span class="symbol-glyph" aria-label="Class">C</span><h2>class TwoMethods</h2></div>
+              <div class="signature-container">class TwoMethods(GolemPlugin):</div>
+              <p>Class J has sidebar — class J sidebar sticks during class J prose.</p>
+              <div class="filler">class with two methods filler A</div>
+            </div>
+            <div class="sidebar-wrap dbg dbg-wrap">
+              <div class="sidebar-column dbg dbg-side">
+                <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">class with two methods</div>
+                <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">class TwoMethods: ...</pre>
+              </div>
+            </div>
+          </div>
+          <!-- level 2: first method inside J, NO sidebar -->
+          <section class="faux-outer dbg dbg-outer dbg-method no-sidebar" id="card-j-method-1" data-level="2">
+            <div class="faux-card dbg dbg-faux"></div>
+            <div class="faux-grid">
+              <div class="prose-column dbg dbg-main">
+                <div class="doc-title-row"><span class="symbol-glyph" aria-label="Method">M</span><h2>def first_method</h2></div>
+                <div class="signature-container">def first_method(self):</div>
+                <p>First method — no sidebar. Class J sidebar keeps sticking.</p>
+                <div class="filler">first method filler A</div>
+              </div>
+            </div>
+          </section>
+          <!-- level 2: second method inside J, has sidebar -->
+          <section class="faux-outer dbg dbg-outer dbg-method" id="card-j-method-2" data-level="2">
+            <div class="faux-card dbg dbg-faux"></div>
+            <div class="faux-grid">
+              <div class="prose-column dbg dbg-main">
+                <div class="doc-title-row"><span class="symbol-glyph" aria-label="Method">M</span><h2>def second_method</h2></div>
+                <div class="signature-container">def second_method(self):</div>
+                <p>Second method has sidebar — displaces class J sidebar.</p>
+                <div class="filler">second method filler A</div>
+              </div>
+              <div class="sidebar-wrap dbg dbg-wrap">
+                <div class="sidebar-column dbg dbg-side">
+                  <div style="font:0.7rem/1 monospace;text-transform:uppercase;letter-spacing:0.08em;color:#666;margin-bottom:0.5rem;border-bottom:1px solid #c9b8a8;padding-bottom:0.25rem">second method sidebar</div>
+                  <pre style="background:#eae5dd;padding:0.5rem;border-radius:4px;font-size:0.8rem;overflow:auto">def second_method(self): ...</pre>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </section><!-- /#card-module -->
+    </main>
+    <aside id="golem-sidebar-right"><h4>On This Page</h4><ul style="list-style:none"><li>module golem.engine</li><li>class OuterA</li><li>class NestedA</li><li>class PlainB</li><li>def method_b</li><li>class OuterC</li><li>class MidC</li><li>def method_c</li><li>class OuterD</li><li>class MidD</li><li>def method_d</li></ul></aside>
+  </div>
+</body>
+</html>

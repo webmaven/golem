@@ -306,24 +306,45 @@ class AsciiDocApi:
             docstring_style=self.options.docstring_style,
         )
 
-    def generate_package_docs(self, package_name: str) -> dict[str, str]:
+    def generate_package_docs(
+        self,
+        package_name: str,
+        format: str = "macro",
+    ) -> dict[str, str]:
         """Generate full API documentation for a package and all of its submodules.
 
-        Returns a dictionary mapping relative `.adoc` file paths to formatted AsciiDoc document strings.
+        Returns a dictionary mapping relative `.adoc` file paths to AsciiDoc
+        strings. `format` controls the output:
+        - "macro" (default): emits a `golem.apidoc::` macro call per module,
+          which the ASG pipeline expands (glyphs, pills, source drawers, etc.).
+        - "full": emits hand-rolled AsciiDoc with headings/signatures/docstrings,
+          suitable for doctests and other tools that don't expand the macro.
         """
         root_module = self.load_package(package_name)
         docs: dict[str, str] = {}
 
-        def _walk(mod: griffe.Module) -> None:
+        if format == "macro":
+
+            def _walk_macro(mod: griffe.Module) -> None:
+                rel_name = mod.path.replace(".", "/")
+                adoc_path = f"{rel_name}.adoc"
+                docs[adoc_path] = f"golem.apidoc::{mod.path}[depth=all]\n"
+                for submod in mod.modules.values():
+                    if isinstance(submod, griffe.Module):
+                        _walk_macro(submod)
+
+            _walk_macro(root_module)
+            return docs
+
+        def _walk_full(mod: griffe.Module) -> None:
             rel_name = mod.path.replace(".", "/")
             adoc_path = f"{rel_name}.adoc"
             docs[adoc_path] = self.render_module(mod, heading_level=1)
-
             for submod in mod.modules.values():
                 if isinstance(submod, griffe.Module):
-                    _walk(submod)
+                    _walk_full(submod)
 
-        _walk(root_module)
+        _walk_full(root_module)
         return docs
 
     @staticmethod

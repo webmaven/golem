@@ -226,6 +226,7 @@ def test_e2e_doctest_on_generated_api_docs(tmp_path: Path, sample_package: dict[
     generated = generate_api_docs(
         packages=["sample_pkg"],
         output_dir=docs_dir / "api",
+        format="full",
     )
     assert len(generated) >= 1
 
@@ -254,6 +255,7 @@ def test_e2e_doctest_on_generated_api_docs_failing(tmp_path: Path, broken_packag
     generate_api_docs(
         packages=["broken_pkg"],
         output_dir=docs_dir / "api",
+        format="full",
     )
 
     exit_code = run_doctests(paths=[docs_dir], mode="explicit")
