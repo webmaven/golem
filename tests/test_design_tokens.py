@@ -585,9 +585,9 @@ def test_content_sidebar_and_right_toc_share_sticky_offset():
     rules_by_selector = {sel: body for sel, body in rules}
 
     toc_rule = rules_by_selector.get("#golem-sidebar-right")
-    content_rule = rules_by_selector.get(".sidebar-column")
+    content_rule = rules_by_selector.get(".sidebar-content")
     assert toc_rule is not None, "Missing #golem-sidebar-right rule"
-    assert content_rule is not None, "Missing .sidebar-column rule"
+    assert content_rule is not None, "Missing .sidebar-content rule"
 
     def _offset(rule: str) -> str | None:
         for prop in rule.split(";"):
@@ -597,7 +597,7 @@ def test_content_sidebar_and_right_toc_share_sticky_offset():
         return None
 
     assert _offset(toc_rule) == _offset(content_rule), (
-        f"#golem-sidebar-right and .sidebar-column must share a sticky 'top' offset, "
+        f"#golem-sidebar-right and .sidebar-content must share a sticky 'top' offset, "
         f"got {_offset(toc_rule)!r} and {_offset(content_rule)!r}"
     )
 
@@ -623,13 +623,11 @@ def _rules_by_selector(css_text: str) -> dict[str, str]:
 
 
 def test_class_multi_grid_subgrid_display_contents():
-    """B11: section wrappers are normal block children at narrow viewports.
+    """B11: doc-grid is a normal block at narrow viewports, a two-column grid at 1400px+.
 
-    Below 1280px the class card is a contained block (not a grid container), so
-    its `.adoc-section`/`.section-blocks` wrappers flow as ordinary blocks; the
-    `.split-row` is its own two-column grid for the example sidebar. At 1280px+
-    the card itself becomes a grid and the wrappers go `display: contents` so
-    the signature and split-row become direct grid items.
+    Below 1400px the doc-card is a contained block (not a grid container), so
+    .doc-grid flows as an ordinary block. At 1400px+ .doc-grid becomes a CSS grid
+    with prose-column and sidebar-track as direct grid items.
     """
     css = _read_css()
 
@@ -638,19 +636,18 @@ def test_class_multi_grid_subgrid_display_contents():
     for selector, body in _extract_css_rules(css):
         for part in selector.split(","):
             part = part.strip()
-            if part in (".class-multi-grid .adoc-section", ".class-multi-grid .section-blocks"):
+            if part == ".doc-grid":
                 base[part] = body
-    for selector, body in _nested_media_rules(css, "min-width: 1280"):
+    for selector, body in _nested_media_rules(css, "min-width: 1400"):
         for part in selector.split(","):
             part = part.strip()
-            if part in (".class-multi-grid .adoc-section", ".class-multi-grid .section-blocks"):
+            if part == ".doc-grid":
                 wide[part] = body
 
-    for selector in (".class-multi-grid .adoc-section", ".class-multi-grid .section-blocks"):
-        assert selector in base, f"Missing base {selector} rule (B11)"
-        assert "display: block" in base[selector], f"{selector} must flow as a normal block at narrow viewports (B11)"
-        assert selector in wide, f"Missing 1280px+ {selector} rule (B11)"
-        assert "display: contents" in wide[selector], f"{selector} must go transparent at 1280px+ so it is a grid item (B11)"
+    assert ".doc-grid" in base, "Missing base .doc-grid rule (B11)"
+    assert "display: block" in base[".doc-grid"], ".doc-grid must flow as a normal block at narrow viewports (B11)"
+    assert ".doc-grid" in wide, "Missing 1400px+ .doc-grid rule (B11)"
+    assert "display: grid" in wide[".doc-grid"], ".doc-grid must become a CSS grid at 1400px+ (B11)"
 
 
 def test_class_multi_grid_uniform_heading_sizes():
@@ -698,8 +695,8 @@ def test_content_column_containment():
 def test_sidebar_returns_to_main_column_when_narrow():
     """B6: content sidebars fall back into the main column on narrow viewports."""
     css = _read_css()
-    sidebar_rules = {sel: body for sel, body in _nested_media_rules(css, "max-width") if ".sidebar-column" in sel}
-    assert sidebar_rules, "Missing a max-width media rule repositioning .sidebar-column (B6)"
+    sidebar_rules = {sel: body for sel, body in _nested_media_rules(css, "max-width") if ".sidebar-track" in sel}
+    assert sidebar_rules, "Missing a max-width media rule repositioning .sidebar-track (B6)"
     for selector, body in sidebar_rules.items():
         assert "position: static" in body, f"{selector} must return the sidebar to the main column (B6)"
 
@@ -738,27 +735,38 @@ def test_member_card_adds_no_box_padding():
 
 
 def test_class_multi_grid_children_add_no_padding():
-    """B13: grid children are aligned by the grid gap, not per-child padding."""
+    """B13: grid children are aligned by the grid gap, not per-child padding.
+
+    The base .doc-grid and .prose-column rules must not add padding at narrow
+    viewports; padding is only added inside the 1400px+ media rule.
+    """
     css = _read_css()
-    for selector in (".class-multi-grid .adoc-section", ".class-multi-grid .section-blocks"):
-        by_selector = _rules_by_selector(css)
+    by_selector = _rules_by_selector(css)
+    for selector in (".doc-grid", ".prose-column"):
         rule = by_selector.get(selector)
         assert rule is not None, f"Missing {selector} rule (B13)"
-        assert "padding" not in rule, f"{selector} must not add padding (B13)"
+        assert "padding" not in rule, f"{selector} must not add padding at base (B13)"
 
 
 def test_split_row_grid_makes_columns_the_grid_items():
-    """B0: the row's `.content` wrapper must not swallow the two-column grid."""
+    """B0: sidebar-content must be sticky and prose-column must contain its width."""
     css = _read_css()
     by_selector = _rules_by_selector(css)
 
+    # .split-row > .content is kept for backwards compat but the real layout uses
+    # .doc-card / .doc-grid / .sidebar-track / .sidebar-content
     assert ".split-row > .content" in by_selector, "Missing .split-row > .content rule (B0)"
     assert "display: contents" in by_selector[".split-row > .content"], (
         ".split-row > .content must be transparent so the columns are the grid items (B0)"
     )
 
+    # .prose-column carries min-width: 0 so it can shrink inside the grid column
     assert ".prose-column" in by_selector, "Missing .prose-column rule (B0/B4)"
     assert "min-width: 0" in by_selector[".prose-column"], ".prose-column must set min-width: 0 (B4)"
+
+    # .sidebar-content is the sticky inner panel
+    assert ".sidebar-content" in by_selector, "Missing .sidebar-content rule (B0)"
+    assert "top: var(--sticky-top)" in by_selector[".sidebar-content"], ".sidebar-content must pin to --sticky-top (B0)"
 
 
 def test_nav_visibility_4state_ladder():
@@ -775,24 +783,24 @@ def test_nav_visibility_4state_ladder():
     base = by_selector.get("#golem-sidebar-right", "")
     assert "display: none" in base, "#golem-sidebar-right must be hidden by default (B8)"
 
-    # State 2 — at BP_nav it appears regardless of sidebars.
-    state2 = {sel: body for sel, body in _nested_media_rules(css, "min-width: 768") if "golem-sidebar-right" in sel}
-    assert state2, "Missing a min-width:768 media rule showing the nav (B8)"
+    # State 2 — at Tier 3 (1080px) it appears regardless of sidebars.
+    state2 = {sel: body for sel, body in _nested_media_rules(css, "min-width: 1080") if "golem-sidebar-right" in sel}
+    assert state2, "Missing a min-width:1080 media rule showing the nav (B8)"
     for selector, body in state2.items():
         assert "display: block" in body or "display: flex" in body, f"{selector} must show the nav (B8)"
 
-    # State 3 — mid-range, only when a content sidebar competes for the space.
-    state3 = {sel: body for sel, body in _nested_media_rules(css, "min-width: 992") if "golem-sidebar-right" in sel}
-    assert state3, "Missing a min-width:992 media rule for the sidebar-present dip (B8)"
+    # State 3 — Tier 4 (1400px): only when a content sidebar competes for the space.
+    state3 = {sel: body for sel, body in _nested_media_rules(css, "min-width: 1400") if "golem-sidebar-right" in sel}
+    assert state3, "Missing a min-width:1400 media rule for the sidebar-present dip (B8)"
     for selector, body in state3.items():
-        assert ":has(.sidebar-column)" in selector, f"{selector} must be conditional on a content sidebar (B8)"
+        assert ":has(.sidebar-track)" in selector, f"{selector} must be conditional on a content sidebar (B8)"
         assert "display: none" in body, f"{selector} must hide the nav when a sidebar is present (B8)"
 
-    # State 4 — widest viewport: it returns even with sidebars present.
-    state4 = {sel: body for sel, body in _nested_media_rules(css, "min-width: 1280") if "golem-sidebar-right" in sel}
-    assert state4, "Missing a min-width:1280 media rule restoring the nav (B8)"
+    # State 4 — Tier 5 (1720px): widest viewport: it returns even with sidebars present.
+    state4 = {sel: body for sel, body in _nested_media_rules(css, "min-width: 1720") if "golem-sidebar-right" in sel}
+    assert state4, "Missing a min-width:1720 media rule restoring the nav (B8)"
     for selector, body in state4.items():
-        assert ":has(.sidebar-column)" in selector, f"{selector} must out-specify the State 3 rule (B8)"
+        assert ":has(.sidebar-track)" in selector, f"{selector} must out-specify the State 3 rule (B8)"
         assert "display: block" in body or "display: flex" in body, f"{selector} must show the nav (B8)"
 
     # Flag-independence: no visibility rule may key off the B10 position class.

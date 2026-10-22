@@ -328,7 +328,7 @@ def test_glyph_badges_render_in_headings(tmp_path):
         html = "\n".join(render_body(n) for n in nodes)
 
         assert (
-            '<div class="doc-title-row"><h2><span class="symbol-glyph glyph-class" aria-label="Class">C</span>class Engine</h2></div>'
+            '<div class="doc-title-row"><h2><span class="symbol-glyph glyph-class" aria-label="Class">C</span>Engine</h2></div>'
             in html
         ), "Class glyph must lead the heading inside .doc-title-row (#19)"
         assert (
@@ -1457,7 +1457,7 @@ def process_data(data: list[str]) -> dict:
         sidebars = [n for root in nodes for n in _find_nodes(root, Sidebar)]
         assert sidebars, "expected at least one Sidebar node"
         for sidebar in sidebars:
-            assert sidebar.attributes.get("role") == "sidebar-column", sidebar.attributes
+            assert sidebar.attributes.get("role") == "sidebar-track", sidebar.attributes
             assert sidebar.blocks, "sidebar should carry content blocks"
 
         raw_doc = "= Sidebar Test\n\ngolem.apidoc::sidebar_pkg.process_data[depth=all]\n"
@@ -1465,11 +1465,11 @@ def process_data(data: list[str]) -> dict:
         asg = ASGResolver(ast).resolve_to_ast(ast)
         html = render_body(apidoc.on_asg_created(asg=asg))
 
-        assert 'class="sidebarblock sidebar-column"' in html, html
-        # The sidebars must sit beside the prose in a two-column split row, not
-        # stacked below it (B0's split-row layout piece).
-        assert 'class="openblock split-row"' in html, html
-        assert 'class="openblock prose-column"' in html, html
+        assert 'class="sidebarblock sidebar-track"' in html, html
+        # The sidebars must sit beside the prose in the doc-grid two-column layout,
+        # rendered inside aside.sidebar-track > div.sidebar-content (B0's faux-container piece).
+        assert 'class="sidebar-track"' in html, html
+        assert 'class="sidebar-content"' in html, html
         assert "process_data" in html
         assert "count" in html
     finally:
@@ -1500,6 +1500,7 @@ def plain(text: str) -> str:
         nodes = api.get_asg_nodes("plain_pkg.plain")
         html = "\n".join(render_body(node) for node in nodes)
         assert "split-row" not in html, html
+        assert "sidebar-track" not in html, html
         assert "sidebar-column" not in html, html
     finally:
         sys.path.remove(str(tmp_path))

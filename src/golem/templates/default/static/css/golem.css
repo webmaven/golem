@@ -114,6 +114,18 @@
     --radius-lg: 8px;
     --radius-full: 9999px;
 
+    /* Content & Sidebar Layout Dimensions */
+    --measure-min: 60ch;
+    --measure-max: 76ch;
+    --sidebar-w: var(--measure-max);
+    --sticky-top: 1rem;
+
+    /* Shared documentation column geometry (see "Doc Grid Overlay" below).
+       --doc-col  = M  — the prose column width; also the sidebar column width.
+       --doc-gap  = G  — the gap between the prose and sidebar columns. */
+    --doc-col: clamp(var(--measure-min), 34vw, var(--measure-max));
+    --doc-gap: var(--space-xl);
+
     /* Badge tokens (glyph badges; Decision #4 — pill-shaped) */
     --badge-radius: var(--radius-full);
     --badge-font-size: 0.6875rem;
@@ -198,7 +210,7 @@
     /* Left-Rail Hierarchy (Principle 3: Structural Containment) */
     --border-rail:        var(--border-color);
     --border-rail-active: var(--color-primary);
-    --rail-indent:        1.25rem;
+    --rail-indent:        1rem;
 
     /* ----------------------------------------------------------------------
        3. COMPONENT TOKENS
@@ -805,14 +817,14 @@ body {
     /* Grid/flex children must be allowed to shrink below their content width,
        otherwise long signatures and code force the column to overflow. */
     min-width: 0;
-    --content-pad-x: 3.5rem;
+    --content-pad-x: 2rem;
     --golem-content-pad-x: var(--content-pad-x);
-    padding: 2.5rem var(--content-pad-x);
-    /* Main column caps at about a comfortable line length (~72ch total). At
-       wide breakpoints the cap is lifted so the example sidebar column can
-       sit beside the prose inside #golem-content. */
-    max-width: 72ch;
+    padding: 2rem var(--content-pad-x);
 }
+
+    #golem-content section:not(.doc-card) {
+        max-width: var(--doc-col);
+    }
 #golem-content h1 {
     font-family: var(--font-display);
     font-size: var(--font-size-2xl);
@@ -893,74 +905,217 @@ body {
 }
 
 /* ── API Class Grid (class-multi-grid) ───────────────── */
-/* Below 1280px the class card is a normal block flow; `.split-row` is its own
-   two-column grid (prose | example sidebar). At 1280px+ the card becomes a grid
-   container and `.split-row` goes `display: contents`, handing its prose and
-   sidebar columns off as direct grid items so the example sidebar lines up with
-   the card header while the TOC occupies the outer right rail.
+/* Below 1400px the class card is a normal block flow. At 1400px+ a two-column
+   doc-grid activates with prose-column on the left and sidebar-track on the right.
 
    Nesting conveys hierarchy, so headings inside a class grid wear one size,
    scoped through #golem-content to out-specify the per-level prose rules. */
 #golem-content .class-multi-grid h2,
 #golem-content .class-multi-grid h3,
 #golem-content .class-multi-grid h4 {
-    font-family: var(--font-display);
+    font-family: var(--font-mono);
     font-size: 1.35rem;
     font-weight: 700;
     line-height: 1.3;
+    margin-top: 0;
     color: var(--color-text);
 }
-/* AsciiDoctype's section.html wraps child blocks in .adoc-section and
-   .section-blocks elements. Below 1280px they flow as normal blocks inside the
-   card. At 1280px+ they go `display: contents` so the signature, split-row,
-   and example sidebar become direct children of the class grid. */
-.class-multi-grid .adoc-section,
-.class-multi-grid .section-blocks {
+
+/* ── API Class Card Layout (doc-card / doc-grid) ─────── */
+/* Base styles (< 1400px): doc-cards are normal contained blocks.
+   .doc-grid is a single-column block flow; the sidebar falls below prose. */
+.doc-card {
+    position: relative;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-left: 2px solid var(--border-rail);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+    transition: border-left-color 0.15s ease;
+}
+
+.doc-card:hover,
+.doc-card:focus-within {
+    border-left-color: var(--border-rail-active);
+}
+
+.doc-grid {
     display: block;
 }
-/* Wide breakpoint: examples pop out to a sidebar column beside the prose card. */
-@media (min-width: 1280px) {
-    #golem-content {
-        max-width: none;
+
+.prose-column {
+    display: block;
+    min-width: 0;
+    max-width: var(--measure-max);
+}
+.doc-card .prose-column {
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+}
+.doc-card .doc-card .prose-column {
+    padding-left: calc(var(--space-md) * 2);
+    padding-right: calc(var(--space-md) * 2);
+}
+.member-card .prose-column {
+    padding-left: calc(var(--space-md) * 3);
+    padding-right: calc(var(--space-md) * 3);
+}
+.doc-card .doc-card .doc-card .prose-column {
+    padding-left: calc(var(--space-md) * 3);
+    padding-right: calc(var(--space-md) * 3);
+}
+
+.sidebar-track {
+    display: block;
+    width: 100%;
+}
+
+.sidebar-content {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    top: var(--sticky-top);
+}
+
+.sidebar-content .sidebarblock,
+.sidebar-content .listingblock,
+.sidebar-content .exampleblock {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    margin: 0;
+}
+
+/* Type-agnostic panel: any block inside the sidebar inherits the panel chrome
+   (the .sidebar-content box itself), neutralizing its standalone box model so
+   listings, examples, tables, and future playground blocks all sit flat. */
+.sidebar-content > :first-child {
+    margin-top: 0;
+}
+.sidebar-content > :last-child {
+    margin-bottom: 0;
+}
+
+.sidebar-content .title {
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-sm);
+    padding-bottom: var(--space-xs);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-content .listingblock {
+    margin: 0;
+}
+
+.sidebar-content .listingblock pre {
+    margin: 0;
+    border-radius: var(--radius-sm);
+    background: var(--bg-code);
+}
+
+.sidebar-content .listingblock code {
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+/* Nested cards inside parent cards */
+.doc-card > .doc-card {
+    margin-left: var(--space-sm);
+    margin-right: var(--space-sm);
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-md);
+}
+
+/* ── Wide breakpoint (>= 1400px) — overlay model ── */
+@media (min-width: 1400px) {
+    .doc-card {
+        position: relative;
+        width: var(--doc-col);
+        margin-left: 0;
+        margin-right: 0;
+        margin-bottom: var(--space-lg);
+        overflow-x: visible;
     }
-    .class-multi-grid:has(.sidebar-column) {
+
+    .doc-card .doc-card {
+        width: calc(var(--doc-col) - 2 * var(--space-md));
+        margin-left: var(--space-md);
+        margin-right: var(--space-md);
+    }
+
+    .doc-grid {
         display: grid;
-        grid-template-columns: 1fr 320px;
-        gap: var(--space-xl);
+        grid-template-columns: var(--doc-col) var(--doc-col);
+        grid-template-rows: auto 1fr;
+        gap: var(--space-lg) var(--doc-gap);
         align-items: start;
+        width: calc(2 * var(--doc-col) + var(--doc-gap));
+        max-width: none;
+        position: relative;
+        left: 50%;
+        transform: translateX(calc(var(--doc-col) / -2));
+        overflow: visible;
+        z-index: 0;
     }
-    .class-multi-grid .adoc-section,
-    .class-multi-grid .section-blocks {
-        display: contents;
-    }
-    .class-multi-grid .doc-title-row,
-    .class-multi-grid .signature-container,
-    .class-multi-grid .source-drawer,
-    .class-multi-grid > section.member-card,
-    .class-multi-grid > section.adoc-section,
-    .class-multi-grid .prose-column {
+
+    .doc-grid > .prose-column {
         grid-column: 1;
+        grid-row: 1;
+        min-width: 0;
+        max-width: var(--doc-col);
+        position: relative;
+        z-index: 1;
     }
-    .class-multi-grid .sidebar-column {
+
+    .doc-grid > .sidebar-track {
         grid-column: 2;
+        grid-row: 1;
+        align-self: stretch;
+        position: relative;
+        z-index: 2;
+        scrollbar-gutter: stable;
     }
-    /* The prose column wears the card border/background so the sidebar column
-       beside it stays outside the card's visual boundary. */
-    .class-multi-grid .prose-column {
-        border-left: 2px solid var(--border-rail);
-        padding: var(--space-md);
-        background: var(--bg-surface);
-        border-radius: var(--radius-md);
+
+    .doc-grid > .sidebar-track { grid-row: 1 / 3; }
+    .doc-grid:has(.child-slot .sidebar-track) > .sidebar-track { grid-row: 1 / 2; }
+
+    .doc-grid > .child-slot {
+        grid-column: 1 / -1;
+        grid-row: 2;
         min-width: 0;
     }
-    /* Make .split-row transparent to the grid so its prose-column and
-       sidebar-column children become direct grid items. */
-    .class-multi-grid .split-row {
-        display: contents;
+
+
+    .prose-column {
+        max-width: var(--doc-col);
+        min-width: 0;
+        position: relative;
+        z-index: 1;
+    }
+
+    .sidebar-content {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        padding: 0 var(--space-md) var(--space-md);
+        position: sticky;
+        top: var(--sticky-top);
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
+        scrollbar-gutter: stable;
     }
 }
 
 /* ── Code & Inline Elements ────────────────────────── */
+
 code, samp {
     font-family: var(--font-mono);
     font-size: 0.875em;
@@ -1397,16 +1552,16 @@ i.conum b {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 1.35em;
-    height: 1.35em;
-    min-width: 1.35em;
+    width: 1.6em;
+    height: 1.6em;
+    min-width: 1.6em;
     border-radius: var(--radius-sm);
     font-family: var(--font-mono);
     font-size: var(--badge-font-size);
     font-weight: var(--badge-font-weight);
     line-height: 1;
     text-align: center;
-    vertical-align: middle;
+    vertical-align: baseline;
     margin-right: var(--space-xs);
     border: 1px solid currentColor;
     box-shadow: var(--shadow-sm);
@@ -1853,28 +2008,43 @@ details summary:focus-visible,
     padding: var(--space-lg) var(--space-md);
     border-left: 1px solid var(--border-color);
     font-family: var(--font-ui);
-    /* Hidden by default; media queries below decide when there is room
-       for the TOC column beside the main column (+ optional example sidebar). */
+    /* Hidden by default below 1080px (Tier 1 & 2) to guarantee >= 45ch for main prose. */
     display: none;
     position: sticky;
-    top: 0;
+    top: var(--sticky-top);
     height: 100vh;
     /* `#golem-header` is not sticky, so the TOC pins to the viewport top. */
     align-self: flex-start;
     overflow-y: auto;
     scrollbar-gutter: stable;
 }
-/* State 2 — at BP_nav the TOC appears beside the main column. */
-@media (min-width: 768px) {
-    #golem-sidebar-right { display: block; }
+
+/* Tier 3 (>= 1080px):
+   At 1080px+, there is room for Left Nav (270px) + Main Content (>= 55ch) + TOC (220px).
+   The TOC appears and stays sticky. */
+@media (min-width: 1080px) {
+    #golem-sidebar-right {
+        display: block;
+    }
 }
-/* State 3 — mid-range: TOC dips when a content sidebar competes for space. */
-@media (min-width: 992px) {
-    #golem-wrapper:has(.sidebar-column) #golem-sidebar-right { display: none; }
+
+/* Tier 4 (1400px):
+   When example sidebars pop out to form a two-column layout beside the prose,
+   the in-page TOC dips (display: none) to prevent squeezing prose or sidebars below 45ch.
+   If there are NO example sidebars on the page, the TOC stays visible! */
+@media (min-width: 1400px) {
+    #golem-wrapper:has(.sidebar-track) #golem-sidebar-right {
+        display: none;
+    }
 }
-/* State 4 — widest: TOC returns even with sidebars present. */
-@media (min-width: 1280px) {
-    #golem-wrapper:has(.sidebar-column) #golem-sidebar-right { display: block; }
+
+/* Tier 5 (>= 1720px):
+   Ultra-wide viewport. Space permits all 4 columns simultaneously:
+   Left Nav (270px) + Prose (65ch) + Sidebar (45ch-65ch) + TOC (220px). */
+@media (min-width: 1720px) {
+    #golem-wrapper:has(.sidebar-track) #golem-sidebar-right {
+        display: block;
+    }
 }
 /* B10 — opt-in: push the TOC flush right, leaving room for a sidebar column
    whether or not one is present. This only affects position, never visibility. */
@@ -1911,78 +2081,25 @@ details summary:focus-visible,
 }
 
 /* ── Content Sidebar (API Doc Examples) ───────────────── */
+/* Sidebar layout is now handled by .doc-card / .doc-grid / .sidebar-track /
+   .sidebar-content (see the API Class Card Layout block above).
+   The .split-row > .content and .sidebar-column rules are retired. */
 .split-row {
-    display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: var(--space-xl);
-    align-items: start;
+    display: block;
 }
-/* AsciiDoctype's open.html wraps the row's children in an extra `.content`
-   div, which would become the single grid item; make it transparent so the
-   prose column and the sidebar column are the grid items. */
 .split-row > .content {
     display: contents;
 }
-.prose-column {
-    /* Grid child: must be allowed to shrink below its content width so long
-       code and tables cannot stretch the first column. */
-    min-width: 0;
-}
 
-.sidebar-column {
-    /* Rendered by sidebar.html as .sidebarblock.sidebar-column. The header is not
-       sticky, so this pins to the viewport top like #golem-sidebar-right does. */
-    position: sticky;
-    top: 0;
-    max-height: 100vh;
-    overflow-y: auto;
-    scrollbar-gutter: stable;
-}
-
-.sidebarblock.sidebar-column {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: var(--space-md);
-}
-
-.sidebarblock.sidebar-column .title {
-    font-family: var(--font-ui);
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--color-text-muted);
-    margin-bottom: var(--space-sm);
-    padding-bottom: var(--space-xs);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.sidebarblock.sidebar-column .listingblock {
-    margin: 0;
-}
-
-.sidebarblock.sidebar-column .listingblock pre {
-    margin: 0;
-    border-radius: var(--radius-sm);
-    background: var(--bg-code);
-}
-
-.sidebarblock.sidebar-column .listingblock code {
-    font-size: 0.8rem;
-    line-height: 1.5;
-}
-
-@media (max-width: 1100px) {
-    .split-row {
-        grid-template-columns: 1fr;
-    }
-    .sidebar-column {
+@media (max-width: 1399px) {
+    .sidebar-track {
         position: static;
         height: auto;
         width: 100%;
+        margin-top: var(--space-md);
     }
 }
+
 
 /* ── Footer ────────────────────────────────────────── */
 #golem-footer {
@@ -2200,7 +2317,7 @@ details summary:focus-visible,
        only tightens the content padding as the columns narrow. */
     #golem-content { padding: 2rem 2.5rem; }
 }
-@media (max-width: 800px) {
+@media (max-width: 859px) {
     #golem-wrapper { flex-direction: column; }
     #golem-sidebar-left {
         position: static;

@@ -5,7 +5,40 @@
     hlevel python:hlevel if hlevel >= 1 else 1;
     sec_level python:node.get('level', 1);
     role python:node.get('attributes', {}).get('role', '');
-    sec_class python:'adoc-section level-' + str(sec_level) + (' ' + role if role else '');
     glyph python:node.get('attributes', {}).get('glyph');
     pills python:node.get('attributes', {}).get('pills') or [];
-"><section tal:attributes="id node.get('attributes', {}).get('id'); class sec_class"><tal:block tal:define="t node.get('title', [])"><div class="doc-title-row" tal:omit-tag="python:not glyph and not pills"><h1 tal:condition="python: hlevel == 1"><span class="symbol-glyph" tal:condition="python:glyph" tal:attributes="class python:'symbol-glyph ' + glyph['css_class']; aria-label glyph['label']" tal:content="glyph['letter']" /><tal:block tal:repeat="inline t" tal:replace="structure renderer.render(inline, ctx)" /></h1><h2 tal:condition="python: hlevel == 2"><span class="symbol-glyph" tal:condition="python:glyph" tal:attributes="class python:'symbol-glyph ' + glyph['css_class']; aria-label glyph['label']" tal:content="glyph['letter']" /><tal:block tal:repeat="inline t" tal:replace="structure renderer.render(inline, ctx)" /></h2><h3 tal:condition="python: hlevel == 3"><span class="symbol-glyph" tal:condition="python:glyph" tal:attributes="class python:'symbol-glyph ' + glyph['css_class']; aria-label glyph['label']" tal:content="glyph['letter']" /><tal:block tal:repeat="inline t" tal:replace="structure renderer.render(inline, ctx)" /></h3><h4 tal:condition="python: hlevel == 4"><span class="symbol-glyph" tal:condition="python:glyph" tal:attributes="class python:'symbol-glyph ' + glyph['css_class']; aria-label glyph['label']" tal:content="glyph['letter']" /><tal:block tal:repeat="inline t" tal:replace="structure renderer.render(inline, ctx)" /></h4><h5 tal:condition="python: hlevel == 5"><span class="symbol-glyph" tal:condition="python:glyph" tal:attributes="class python:'symbol-glyph ' + glyph['css_class']; aria-label glyph['label']" tal:content="glyph['letter']" /><tal:block tal:repeat="inline t" tal:replace="structure renderer.render(inline, ctx)" /></h5><h6 tal:condition="python: hlevel >= 6"><span class="symbol-glyph" tal:condition="python:glyph" tal:attributes="class python:'symbol-glyph ' + glyph['css_class']; aria-label glyph['label']" tal:content="glyph['letter']" /><tal:block tal:repeat="inline t" tal:replace="structure renderer.render(inline, ctx)" /></h6><span class="pill" tal:condition="python:pills" tal:repeat="pill pills" tal:attributes="class python:'pill ' + pill['css_class']; title pill['title']" tal:content="pill['text']" /></div></tal:block><div class="section-blocks" tal:condition="node.get('blocks')"><tal:block tal:repeat="block node.get('blocks', [])" tal:replace="structure renderer.render(block, ctx)" /></div></section></tal:block>
+    is_card python:bool(role in ('class-multi-grid', 'member-card', 'doc-card') or glyph);
+    sec_class python:(('doc-card ' if is_card else '') + role).strip();
+    flow_blocks python:[b for b in node.get('blocks', []) if not (isinstance(b, dict) and b.get('name') == 'sidebar' and (b.get('attributes') or {}).get('role') == 'sidebar-track')];
+    sidebar_blocks python:[b for b in node.get('blocks', []) if isinstance(b, dict) and b.get('name') == 'sidebar' and (b.get('attributes') or {}).get('role') == 'sidebar-track'];
+    first_child python:next((i for i, b in enumerate(flow_blocks) if b.get('name') == 'section'), len(flow_blocks));
+    pre_blocks python:flow_blocks[:first_child];
+    rest_blocks python:flow_blocks[first_child:];
+    child_blocks python:[b for b in rest_blocks if b.get('name') == 'section'];
+    prose_blocks python:pre_blocks + [b for b in rest_blocks if b.get('name') != 'section'];
+    has_grid python:bool(sidebar_blocks) or bool(child_blocks);
+">
+<section tal:attributes="id node.get('attributes', {}).get('id'); class sec_class; data-level sec_level">
+  <tal:block tal:define="t node.get('title', [])"><div class="doc-title-row" tal:omit-tag="python:not glyph and not pills"><h1 tal:condition="python: hlevel == 1"><span class="symbol-glyph" tal:condition="python:glyph" tal:attributes="class python:'symbol-glyph ' + glyph['css_class']; aria-label glyph['label']; title glyph['label']" tal:content="glyph['letter']" /><tal:block tal:repeat="inline t" tal:replace="structure renderer.render(inline, ctx)" /></h1><h2 tal:condition="python: hlevel == 2"><span class="symbol-glyph" tal:condition="python:glyph" tal:attributes="class python:'symbol-glyph ' + glyph['css_class']; aria-label glyph['label']; title glyph['label']" tal:content="glyph['letter']" /><tal:block tal:repeat="inline t" tal:replace="structure renderer.render(inline, ctx)" /></h2><h3 tal:condition="python: hlevel == 3"><span class="symbol-glyph" tal:condition="python:glyph" tal:attributes="class python:'symbol-glyph ' + glyph['css_class']; aria-label glyph['label']; title glyph['label']" tal:content="glyph['letter']" /><tal:block tal:repeat="inline t" tal:replace="structure renderer.render(inline, ctx)" /></h3><h4 tal:condition="python: hlevel == 4"><span class="symbol-glyph" tal:condition="python:glyph" tal:attributes="class python:'symbol-glyph ' + glyph['css_class']; aria-label glyph['label']; title glyph['label']" tal:content="glyph['letter']" /><tal:block tal:repeat="inline t" tal:replace="structure renderer.render(inline, ctx)" /></h4><h5 tal:condition="python: hlevel == 5"><span class="symbol-glyph" tal:condition="python:glyph" tal:attributes="class python:'symbol-glyph ' + glyph['css_class']; aria-label glyph['label']; title glyph['label']" tal:content="glyph['letter']" /><tal:block tal:repeat="inline t" tal:replace="structure renderer.render(inline, ctx)" /></h5><h6 tal:condition="python: hlevel >= 6"><span class="symbol-glyph" tal:condition="python:glyph" tal:attributes="class python:'symbol-glyph ' + glyph['css_class']; aria-label glyph['label']; title glyph['label']" tal:content="glyph['letter']" /><tal:block tal:repeat="inline t" tal:replace="structure renderer.render(inline, ctx)" /></h6><span class="pill" tal:condition="python:pills" tal:repeat="pill pills" tal:attributes="class python:'pill ' + pill['css_class']; title pill['title']" tal:content="pill['text']" /></div></tal:block>
+  <div class="doc-grid" tal:condition="python:has_grid">
+    <div class="prose-column">
+      <tal:block tal:repeat="block prose_blocks">
+        <tal:block tal:replace="structure renderer.render(block, ctx)" />
+      </tal:block>
+    </div>
+    <aside class="sidebar-track" tal:condition="python:bool(sidebar_blocks)">
+      <div class="sidebar-content"><tal:block tal:repeat="block sidebar_blocks" tal:replace="structure renderer.render(block, ctx)" /></div>
+    </aside>
+    <div class="child-slot" tal:condition="python:bool(child_blocks)">
+      <tal:block tal:repeat="block child_blocks">
+        <tal:block tal:replace="structure renderer.render(block, ctx)" />
+      </tal:block>
+    </div>
+  </div>
+  <tal:block tal:condition="python:not has_grid">
+    <tal:block tal:repeat="block prose_blocks">
+      <tal:block tal:replace="structure renderer.render(block, ctx)" />
+    </tal:block>
+  </tal:block>
+</section>
+</tal:block>

@@ -683,26 +683,13 @@ class AsciiDocApi:
 
     @staticmethod
     def _split_row_nodes(nodes: list[Node]) -> list[Node]:
-        """Place example sidebars beside the prose in a two-column split row.
+        """Return nodes unchanged.
 
-        A docstring's examples render as `sidebar-column` sidebars; the remaining
-        blocks go into a `prose-column` beside them so a listing sits next to the
-        text that mentions it instead of below it. Docstrings without examples
-        return their nodes untouched, so prose-only members keep the plain layout.
+        Layout partitioning (prose vs. sidebar-track) is now handled entirely by
+        the section.html template, which filters blocks by role at render time.
+        This method is kept to avoid breaking any call sites, but is a no-op.
         """
-        sidebar_ids = {id(node) for node in nodes if isinstance(node, Sidebar)}
-        if not sidebar_ids:
-            return nodes
-
-        prose = [node for node in nodes if id(node) not in sidebar_ids]
-        if not prose:
-            return nodes
-
-        prose_column = Open(blocks=prose)
-        prose_column.attributes["role"] = "prose-column"
-        split_row = Open(blocks=[prose_column, *(node for node in nodes if isinstance(node, Sidebar))])
-        split_row.attributes["role"] = "split-row"
-        return [split_row]
+        return nodes
 
     # ---- docstring parsing -------------------------------------------------
 
@@ -934,14 +921,14 @@ class AsciiDocApi:
 
     @classmethod
     def _build_example_sidebars(cls, examples: Sequence[Any], heading_offset: int) -> list[Node]:
-        """Build sidebar-column Sidebar nodes, one per parsed example."""
+        """Build sidebar-track Sidebar nodes, one per parsed example."""
         sidebars: list[Node] = []
         for example in examples:
             blocks = cls._build_source_nodes(getattr(example, "content", ""), example)
             if not blocks:
                 continue
             sidebar = Sidebar(blocks=blocks)
-            sidebar.attributes["role"] = "sidebar-column"
+            sidebar.attributes["role"] = "sidebar-track"
             sidebars.append(sidebar)
         return sidebars
 
@@ -1121,7 +1108,9 @@ class AsciiDocApi:
                 elif not description:
                     description = [Paragraph(inlines=[Text("(no description)")])]
                 items.append(DescriptionListItem(terms=[term], blocks=description))
-            blocks.append(self._section("Attributes", child_level, [DescriptionList(items=items)]))
+            attributes_section = self._section("Attributes", child_level, [DescriptionList(items=items)])
+            attributes_section.attributes["role"] = "member-card"
+            blocks.append(attributes_section)
 
         if depth in ("all", "methods"):
             raw_methods = [self._unwrap_member(m) for m in members["methods"]]
@@ -1139,7 +1128,7 @@ class AsciiDocApi:
                 if isinstance(nested_class, griffe.Class)
             )
 
-        section = self._section(f"class {cls.name}", level, blocks)
+        section = self._section(cls.name, level, blocks)
         section.attributes["role"] = "class-multi-grid"
         glyph = self._symbol_glyph(cls)
         if glyph is not None:
@@ -1182,6 +1171,8 @@ class AsciiDocApi:
                             blocks=[Paragraph(inlines=[Text(description)])] if description else [],
                         )
                     )
-                blocks.append(self._section("Submodules", level, [DescriptionList(items=items)]))
+                submodules_section = self._section("Submodules", level, [DescriptionList(items=items)])
+                submodules_section.attributes["role"] = "member-card"
+                blocks.append(submodules_section)
 
         return blocks

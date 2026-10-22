@@ -129,7 +129,7 @@
     <div id="golem-wrapper">
         <!-- METAL Slot: navigation - Sidebar navigation layout, tree vs. custom HTML -->
         <aside id="golem-sidebar-left" class="golem-sidebar-left" aria-label="Site Navigation" metal:define-slot="navigation">
-            <details class="golem-nav-details" open="open">
+            <details class="golem-nav-details">
                 <summary class="golem-nav-summary"><h3>Navigation</h3></summary>
                 <div class="golem-nav-content">
                     <div tal:condition="nav_html" tal:replace="structure nav_html" />
@@ -345,6 +345,21 @@
                 if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) return;
                 if (themeToggle) themeToggle.click();
             });
+
+            // Tier-1 nav: the <details> ships closed; open it at Tier 2+ so the
+            // side-by-side nav is visible without a click. matchMedia keeps the
+            // breakpoint in sync with the CSS ladder (860px).
+            var navDetails = document.querySelector(".golem-nav-details");
+            if (navDetails && window.matchMedia) {
+                var wideNav = window.matchMedia("(min-width: 860px)");
+                function syncNav() { navDetails.open = wideNav.matches; }
+                syncNav();
+                if (wideNav.addEventListener) {
+                    wideNav.addEventListener("change", syncNav);
+                } else if (wideNav.addListener) {
+                    wideNav.addListener(syncNav);
+                }
+            }
         })();
     </script>
     <tal:block tal:repeat="js_file custom_js">
