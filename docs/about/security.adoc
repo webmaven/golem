@@ -1,4 +1,3 @@
-= Security Policy
 :nav_order: 30
 :idprefix:
 :idseparator: -
