@@ -42,10 +42,18 @@ class ApidocMacroTransformer(AsgTransformer):
         self.search_paths: list[str | Path] = list(search_paths) if search_paths is not None else list(sys.path)
 
     def transform(self, asg: Node) -> Node:
+        """Visit the ASG tree, expanding any ``golem.apidoc`` macro nodes.
+
+        Returns the transformed node, or the original if the result is not a Node.
+        """
         result = self.visit(asg)
         return result if isinstance(result, Node) else asg
 
     def generic_visit(self, node: Node, **kwargs: Any) -> Any:
+        """Dispatch to macro expansion for ``golem.apidoc`` nodes, else default traversal.
+
+        Escaped macro nodes (``\\golem.apidoc``) are unescaped back to literal text.
+        """
         if getattr(node, "name", None) == "golem.apidoc":
             return self._expand_macro_node(node)
         if getattr(node, "name", None) in (r"\golem.apidoc", "\\golem.apidoc"):
@@ -53,6 +61,7 @@ class ApidocMacroTransformer(AsgTransformer):
         return super().generic_visit(node, **kwargs)
 
     def visit_text(self, node: Node, **kwargs: Any) -> Any:
+        """Unescape escaped ``\\golem.apidoc::`` sequences inside text nodes."""
         if isinstance(node, Text) and r"\golem.apidoc::" in node.value:
             node.value = node.value.replace(r"\golem.apidoc::", "golem.apidoc::")
         return node

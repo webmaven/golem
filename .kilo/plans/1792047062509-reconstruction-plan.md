@@ -65,7 +65,7 @@ Wave 4 is committed on `reconstruction-plan` — Session 2 cluster `03099f7`, B5
 | B1 — sticky right TOC sidebar | DONE | `position: sticky` + `align-self: flex-start` + `overflow-y` |
 | B2′ — API page sidebar alignment | DONE | both sticky panels pin to viewport top; see note below |
 | B7 — source drawer max-height | DONE | `max-height: 400px` + `overflow-y: auto` on `[open]` |
-| B3+B4+B6+B11 — `.class-multi-grid` cluster | DONE | uniform h2-h4 sizes, `min-width: 0`, `display: contents` subgrid fix |
+| B3+B4+B6+B11 — `.doc-card` cluster | DONE | uniform h2-h4 sizes, `min-width: 0`, `display: contents` subgrid fix |
 | B8/B9 — nav visibility ladder, adjacency | DONE | CSS-only 4-state ladder at 768/992/1280 |
 | B12/B13 — `member-card` / `.doc-rail` | DONE | card rail + signature accent stripped; no box padding |
 | B5 — table clipping/overflow | DONE `d1b4e88` | `table.html` override wraps tables in `.table-scroll`; breakout moved off the table |
@@ -171,7 +171,7 @@ so the TOC scrolls away. `#golem-sidebar-left` already has it.
 
 1. Measure actual `#golem-header` height: `padding: var(--space-md) var(--space-lg)` = `1rem 1.5rem`, plus h1 font-size `1.35rem` → total ~3.5rem
 2. Set `#golem-sidebar-right` `top` to match header height + small gap (~4.5rem)
-3. For API pages, `.class-multi-grid .sidebar-column` gets `position: sticky; top: 2.5rem` to align with the class header
+3. For API pages, `.doc-card .sidebar-column` gets `position: sticky; top: 2.5rem` to align with the class header
 
 > **Resolution:** the reference's `3.5rem`/`4.5rem` values assume a sticky global
 > nav. Golem's header scrolls away, so pinning to the viewport top (`top: 0`) on
@@ -179,16 +179,16 @@ so the TOC scrolls away. `#golem-sidebar-left` already has it.
 
 #### B3: Uniform Heading Size on API Pages — DONE
 
-**Verified gap:** `.class-multi-grid` has **0 rules in `golem.css`**. It is emitted by
-`api.py:897` (`section.attributes["role"] = "class-multi-grid"`), and the apidoc
-`section.html:7-8` folds the role into the CSS class, so the class reaches the HTML —
+**Verified gap:** `.doc-card` has **0 rules in `golem.css`**. It is emitted by
+`api.py:1135` (`section.attributes["role"] = "doc-card"`), and the apidoc
+`section.html:10-11` folds the role into the CSS class, so the class reaches the HTML —
 but nothing styles it.
 
-1. Add `.class-multi-grid h2, .class-multi-grid h3, .class-multi-grid h4 { font-size: 1.35rem; font-weight: 700 }` to `golem.css`
-2. This overrides per-level sizing only within `.class-multi-grid` containers, leaving prose headings (`golem.css:752-790`) untouched
+1. Add `#golem-content .doc-card h2, #golem-content .doc-card h3, #golem-content .doc-card h4 { font-size: 1.35rem; font-weight: 700 }` to `golem.css`
+2. This overrides per-level sizing only within `.doc-card` containers, leaving prose headings (`golem.css:752-790`) untouched
 
 > **As implemented:** the uniform rule must be scoped through `#golem-content`
-> (`#golem-content .class-multi-grid h2/3/4`), because the per-level prose rules
+> (`#golem-content .doc-card h2/3/4`), because the per-level prose rules
 > are id-scoped and a plain class selector would lose the cascade.
 
 #### B4: Column Containment — DONE
@@ -198,8 +198,8 @@ emitted in HTML but have **0 rules in `golem.css`** — grid children have no
 containment.
 
 1. **Issue:** `.prose-column` and `.doc-content-stream` don't exist in the codebase yet. Verify in `skeleton.pt` — the main content is in `main#golem-content` with `<div tal:content="structure body_html" />`
-2. Add `min-width: 0` to `main#golem-content` and to `.section-blocks` within `.class-multi-grid` to enable grid column containment
-3. The `.class-multi-grid .adoc-section { display: contents }` (B11) handles the sub-grid aspect
+2. Add `min-width: 0` to `main#golem-content` and to `.section-blocks` within `.doc-card` to enable grid column containment
+3. The `.doc-card .adoc-section { display: contents }` (B11) handles the sub-grid aspect
 
 > **As implemented:** `min-width: 0` on `#golem-content`, and `.prose-column` gets
 > `min-width: 0` now that B0a-8 emits it. `.doc-content-stream` still does not
@@ -270,8 +270,8 @@ See Decision #2 above. Implementation is CSS-only.
 
 1. Add to `golem.css`:
     ```css
-    .class-multi-grid .adoc-section { display: contents }
-    .class-multi-grid .section-blocks { display: contents }
+    .doc-card .adoc-section { display: contents }
+    .doc-card .section-blocks { display: contents }
     ```
 2. **Rationale:** `section.html:8` injects `.section-blocks` div around child blocks, breaking CSS grid column inheritance under `.class-multi-grid`. `display: contents` makes the wrapper transparent to grid.
 
@@ -294,7 +294,7 @@ and the rail became visible.
 
 #### B13: Avoid Unnecessary Padding — DONE
 
-1. Audit padding on `.class-multi-grid` children
+1. Audit padding on `.doc-card` children
 2. Ensure no redundant padding is added
 
 > **As implemented:** the cluster adds no padding at all; the only indent is the

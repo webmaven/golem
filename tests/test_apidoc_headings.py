@@ -78,10 +78,10 @@ golem.apidoc::sample_worker_pkg.Worker[]
                 s
                 for s in sections
                 if s.title
-                and "class Worker"
-                in "".join(
+                and "".join(
                     str(getattr(t, "value", t)) for t in (s.title.inlines if hasattr(s.title, "inlines") else [s.title])
                 )
+                == "Worker"
             ),
             None,
         )
@@ -254,7 +254,7 @@ golem.apidoc::sample_offset_pkg.Service[heading_level_offset=1]
                 s
                 for s in sections
                 if s.title
-                and "class Service"
+                and "Service"
                 in "".join(
                     str(getattr(t, "value", t)) for t in (s.title.inlines if hasattr(s.title, "inlines") else [s.title])
                 )

@@ -163,12 +163,7 @@ toc::[]
 * *Repository Cleanliness:* Removed internal review artifacts from tracking; added pattern ignores to `.gitignore`.
 * *Dev Server Disconnects:* Client socket disconnect exceptions downgraded to debug-level logging.
 * *Pygments HTML-Escaped Quotes:* Derived-view assertions accept both raw (`"`) and HTML-escaped (`&quot;`) JSON output.
-
-=== Fixed
-
-==== CSS / API Docs
-
-* Fixed CSS layout for API doc pages: flush-left top-level cards, nested-grid alignment, sidebar visibility, reading measure on prose/module-docstring sections, sticky sidebar, fluid column widths, sidebar/card alignment, header glyph sizing/alignment, removed redundant "class" prefix.
+* *CSS Layout for API Doc Pages:* Fixed CSS layout for API doc pages: flush-left top-level cards, nested-grid alignment, sidebar visibility, reading measure on prose/module-docstring sections, sticky sidebar, fluid column widths, sidebar/card alignment, header glyph sizing/alignment, removed redundant "class" prefix.
 
 == 0.1.0a2 - 2026-08-24
 

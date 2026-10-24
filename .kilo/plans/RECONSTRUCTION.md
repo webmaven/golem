@@ -184,8 +184,8 @@ done** — every downstream feature renders through the path they fix.
 | **A3** | Register them via `AsciiDoctypeRenderer.register_template_directory()` at plugin import | ✅ Green | `1b4c4e8` |
 | **A3′** | `staleness.py::_get_template_search_paths()` must extend with `AsciiDoctypeRenderer.get_registered_template_directories()` | ✅ Green | `8b17e0c` |
 | **A4** | Restore the **Class** example — absent in `main` and in the reference HTML | ✅ Green | `7620215` |
-| **A5** | Nest **Methods inside Classes** (`.class-multi-grid` / `.member-card` roles on section nodes, `ast-token` spans in signatures) | ✅ Green | `1b4c4e8` |
-| **A6** | **Acceptance test:** `test_apidoc_renders_member_card_and_class_multi_grid` — rendered HTML contains `class-multi-grid`, `member-card`, `ast-token` | ✅ Green | `1b4c4e8` |
+| **A5** | Nest **Methods inside Classes** (`.doc-card` / `.member-card` roles on section nodes, `ast-token` spans in signatures) | ✅ Green | `1b4c4e8` |
+| **A6** | **Acceptance test:** `test_apidoc_renders_member_card_and_doc_card` — rendered HTML contains `doc-card`, `member-card`, `ast-token` | ✅ Green | `1b4c4e8` |
 
 > **A4/A5 note:** `docs/examples/autodoc_reference.html` and
 > `design-docs/autodoc_reference.html` are byte-identical duplicates of a
@@ -227,7 +227,7 @@ including interactive examples — but **anything illustrative** may go in a sid
 | **B8** | **In-page nav visibility — 4-state non-monotonic ladder** (see §4.1) |
 | **B9** | **Position default:** when the nav is visible and there are **no sidebars**, sit it **adjacent to the main column** (width permitting) rather than flush right, so the blank expanse is not wasted |
 | **B10** | **New `nav_helpers` config flag to force flush-right** *whenever the nav is visible* — the escape hatch for mixed-layout sites where the adjacent↔flush-right flip is distracting. **Affects position only; never visibility** |
-| **B11** | `.display: contents` on `.class-multi-grid .adoc-section` / `.section-blocks` — pre-approved subgrid fix from #26's review comment |
+| **B11** | `.display: contents` on `.doc-card .adoc-section` / `.section-blocks` — pre-approved subgrid fix from #26's review comment |
 | **B12** | **Strip non-rail left borders** to reduce visual clutter; keep only `.doc-rail` |
 | **B13** | **Do not re-introduce unnecessary padding** (avoid, not fix) |
 
@@ -359,7 +359,7 @@ Effectively complete. Tick acceptance criteria, add any missing token
 ### Wave 5 — #21 → #17
 `#21` structural containment (member cards, left rail), then `#17` tiered
 parameter disclosure — its nested-class `format_class()` loop prescribes
-`.class-multi-grid` markup, so it **must follow #21**.
+`.doc-card` markup, so it **must follow #21**.
 
 ### Wave 6 — interlinking
 `#22` atomic token interlinking → then `#18` Returns/Raises and `#25` type
@@ -414,8 +414,8 @@ inline `<script>` so the `<kbd class="kbd-shortcut">t</kbd>` hint actually fires
 the theme toggle — guarded against `INPUT`/`TEXTAREA`/`SELECT`/`contentEditable`.
 
 **5.7 #26 — two pre-approved CSS resolutions.**
-- *Subgrid:* `.class-multi-grid .adoc-section { display: contents }` and
-  `.class-multi-grid .section-blocks { display: contents }` (AsciiDoctype's
+- *Subgrid:* `.doc-card .adoc-section { display: contents }` and
+  `.doc-card .section-blocks { display: contents }` (AsciiDoctype's
   `section.html` injects `.section-blocks`, breaking column inheritance). Option B
   (monolithic passthrough) was rejected — it would hide content from the ASG.
 - *Conditional columns:* `.class-grid-row { grid-template-columns: minmax(0,1fr) }`

@@ -650,7 +650,7 @@ def test_class_multi_grid_subgrid_display_contents():
     assert "display: grid" in wide[".doc-grid"], ".doc-grid must become a CSS grid at 1400px+ (B11)"
 
 
-def test_class_multi_grid_uniform_heading_sizes():
+def test_doc_card_uniform_heading_sizes():
     """B3: API pages convey hierarchy by nesting, so headings must share one size.
 
     The uniform rule must out-specify the per-level prose rules (`#golem-content
@@ -660,8 +660,8 @@ def test_class_multi_grid_uniform_heading_sizes():
     rules = _extract_css_rules(css)
     rules_by_selector = {sel: body for sel, body in rules}
 
-    heading_rules = {sel: body for sel, body in rules if ".class-multi-grid" in sel and re.search(r"\bh[234]\b", sel)}
-    assert heading_rules, "Missing heading rules scoped to .class-multi-grid (B3)"
+    heading_rules = {sel: body for sel, body in rules if ".doc-card" in sel and re.search(r"\bh[234]\b", sel)}
+    assert heading_rules, "Missing heading rules scoped to .doc-card (B3)"
 
     sizes: set[str] = set()
     for selector, body in heading_rules.items():
@@ -672,7 +672,7 @@ def test_class_multi_grid_uniform_heading_sizes():
             name, _, value = prop.partition(":")
             if name.strip() == "font-size":
                 sizes.add(value.strip())
-    assert len(sizes) == 1, f"headings inside .class-multi-grid must be uniformly sized, got {sorted(sizes)} (B3)"
+    assert len(sizes) == 1, f"headings inside .doc-card must be uniformly sized, got {sorted(sizes)} (B3)"
 
     # Prose pages keep their variable per-level sizes.
     for level in ("h1", "h2", "h3", "h4"):

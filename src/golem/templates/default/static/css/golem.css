@@ -904,15 +904,15 @@ body {
     color: var(--color-link-visited);
 }
 
-/* ── API Class Grid (class-multi-grid) ───────────────── */
+/* ── API Class Card (doc-card) ───────────────── */
 /* Below 1400px the class card is a normal block flow. At 1400px+ a two-column
    doc-grid activates with prose-column on the left and sidebar-track on the right.
 
    Nesting conveys hierarchy, so headings inside a class grid wear one size,
    scoped through #golem-content to out-specify the per-level prose rules. */
-#golem-content .class-multi-grid h2,
-#golem-content .class-multi-grid h3,
-#golem-content .class-multi-grid h4 {
+#golem-content .doc-card h2,
+#golem-content .doc-card h3,
+#golem-content .doc-card h4 {
     font-family: var(--font-mono);
     font-size: 1.35rem;
     font-weight: 700;

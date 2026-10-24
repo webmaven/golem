@@ -416,9 +416,9 @@ class AsciiDocApi:
             elif isinstance(obj, griffe.Class):
                 blocks = [self._class_node(obj, target_depth, level)]
             elif isinstance(obj, griffe.Function):
-                blocks = [self._function_node(obj, level)]
+                blocks = [self._function_node(obj, target_depth, level)]
             elif isinstance(obj, griffe.Attribute):
-                blocks = [self._attribute_node(obj, level)]
+                blocks = [self._attribute_node(obj, target_depth, level)]
             else:
                 raise TypeError(f"Unsupported symbol type for ASG construction: {type(obj).__name__}")
 
@@ -606,44 +606,88 @@ class AsciiDocApi:
             return None
 
     @staticmethod
-    def _signature_listing(signature: str) -> Listing:
+    def _signature_listing(signature: str, *, aria_label: str = "Method signature") -> Listing:
         """Represent a Python declaration as a typed source listing node.
 
         Emits an ``apidoc-signature`` node (a renamed Listing) carrying both the
         raw signature text in ``inlines`` and a pre-tokenised HTML rendering in
         ``attributes['signature_html']`` so the Chameleon template can inject
-        ``ast-token`` spans without re-parsing.
+        ``ast-token`` spans without re-parsing. ``aria_label`` is stored on the
+        node so the template can emit a symbol-type-specific label (e.g.
+        "Class signature" for classes, "Attribute signature" for attributes).
         """
         node = Listing(inlines=[Text(signature)], attributes={"style": "source", "language": "python"})
         node.name = "apidoc-signature"
         node.attributes["signature_html"] = AsciiDocApi._tokenize_signature(signature)
+        node.attributes["aria-label"] = aria_label
         return node
 
     @staticmethod
     def _tokenize_signature(signature: str) -> str:
         """Wrap Python type annotation tokens with <span class="ast-token"> markup.
 
-        Escapes the raw signature for HTML, then wraps type names appearing after
-        ``: `` (parameter annotation) or ``->`` (return annotation) with an
-        ``ast-token`` span so CSS and JS can style or interlink them.
+        Escapes the raw signature for HTML, then walks the string tracking bracket
+        depth so that nested generics (List[Dict[str, int]]), callables
+        (Callable[[int], str]), and unions (str | None | int) are captured in full
+        rather than truncated at the first closing bracket.
         """
         import html as _html
-        import re
 
         escaped = _html.escape(signature)
-        # Wrap `: TypeName` annotation tokens
-        escaped = re.sub(
-            r": ([A-Za-z_][A-Za-z0-9_.[\], |]*)",
-            r': <span class="ast-token">\1</span>',
-            escaped,
-        )
-        # Wrap `-> TypeName` return annotation tokens (html-escaped `->` is `->`)
-        escaped = re.sub(
-            r"-&gt; ([A-Za-z_][A-Za-z0-9_.[\], |]*)",
-            r'-&gt; <span class="ast-token">\1</span>',
-            escaped,
-        )
-        return escaped
+        result: list[str] = []
+        i = 0
+        n = len(escaped)
+
+        while i < n:
+            c = escaped[i]
+
+            # Parameter/return type annotation marker ": " at top level.
+            if c == ":" and i + 1 < n and escaped[i + 1] == " ":
+                j = i + 2  # skip past ": "
+                start = j
+                inner_depth = 0
+                while j < n:
+                    cc = escaped[j]
+                    if cc in "([{":
+                        inner_depth += 1
+                    elif cc in ")]}":
+                        inner_depth = max(0, inner_depth - 1)
+                    elif cc in ",)= " and inner_depth == 0:
+                        break
+                    j += 1
+                type_name = escaped[start:j].strip()
+                if type_name:
+                    result.append(': <span class="ast-token">' + type_name + "</span>")
+                else:
+                    result.append(": ")
+                i = j
+                continue
+
+            # Return annotation marker "-> " at top level (HTML-escaped as "-&gt; ").
+            if c == "-" and escaped[i : i + 5] == "-&gt;" and i + 5 < n and escaped[i + 5] == " ":
+                j = i + 6  # skip past "-&gt; "
+                start = j
+                inner_depth = 0
+                while j < n:
+                    cc = escaped[j]
+                    if cc in "([{":
+                        inner_depth += 1
+                    elif cc in ")]}":
+                        inner_depth = max(0, inner_depth - 1)
+                    j += 1
+                type_name = escaped[start:j].strip()
+                if type_name:
+                    result.append('-&gt; <span class="ast-token">' + type_name + "</span>")
+                else:
+                    result.append("-&gt; ")
+                i = j
+                continue
+
+            # Regular character — pass through unchanged.
+            result.append(c)
+            i += 1
+
+        return "".join(result)
 
     def _docstring_nodes(
         self,
@@ -679,16 +723,6 @@ class AsciiDocApi:
         for block in blocks:
             nodes.extend(self._docstring_block_nodes(block, doc, heading_offset))
         nodes.extend(self._docstring_attribute_nodes(doc, heading_offset))
-        return self._split_row_nodes(nodes)
-
-    @staticmethod
-    def _split_row_nodes(nodes: list[Node]) -> list[Node]:
-        """Return nodes unchanged.
-
-        Layout partitioning (prose vs. sidebar-track) is now handled entirely by
-        the section.html template, which filters blocks by role at render time.
-        This method is kept to avoid breaking any call sites, but is a no-op.
-        """
         return nodes
 
     # ---- docstring parsing -------------------------------------------------
@@ -801,7 +835,7 @@ class AsciiDocApi:
             example = asciidocstring.DocstringExample(
                 content=content,
                 language=language,
-                is_interactive=">>> " in content,
+                is_interactive=content.lstrip().startswith(">>> "),
             )
             sidebars.extend(cls._build_example_sidebars([example], heading_offset))
         return sidebars
@@ -1054,7 +1088,7 @@ class AsciiDocApi:
         "deprecated": "_deprecated_block_nodes",
     }
 
-    def _function_node(self, func: griffe.Function, level: int, *, is_member: bool = False) -> Section:
+    def _function_node(self, func: griffe.Function, depth: str, level: int, *, is_member: bool = False) -> Section:
         parsed = self._parse_docstring(self._raw_docstring(func.docstring))
         blocks: list[Node] = [self._signature_listing(format_function_signature(func))]
         blocks.extend(self._docstring_nodes(func.docstring, level, parsed=parsed))
@@ -1072,8 +1106,8 @@ class AsciiDocApi:
             section.attributes["pills"] = pills
         return section
 
-    def _attribute_node(self, attr: griffe.Attribute, level: int) -> Section:
-        blocks: list[Node] = [self._signature_listing(format_attribute_signature(attr))]
+    def _attribute_node(self, attr: griffe.Attribute, depth: str, level: int) -> Section:
+        blocks: list[Node] = [self._signature_listing(format_attribute_signature(attr), aria_label="Attribute signature")]
         blocks.extend(self._docstring_nodes(attr.docstring, level))
         if attr.value is not None:
             blocks.append(Paragraph(inlines=[Text(f"Default value: {_safe_attr_value(attr)}")]))
@@ -1085,7 +1119,7 @@ class AsciiDocApi:
 
     def _class_node(self, cls: griffe.Class, depth: str, level: int) -> Section:
         parsed = self._parse_docstring(self._raw_docstring(cls.docstring))
-        blocks: list[Node] = [self._signature_listing(format_class_signature(cls))]
+        blocks: list[Node] = [self._signature_listing(format_class_signature(cls), aria_label="Class signature")]
         blocks.extend(self._docstring_nodes(cls.docstring, level, parsed=parsed))
         members = get_class_members(
             cls,
@@ -1115,21 +1149,25 @@ class AsciiDocApi:
         if depth in ("all", "methods"):
             raw_methods = [self._unwrap_member(m) for m in members["methods"]]
             blocks.extend(
-                self._function_node(method, child_level, is_member=True)
+                self._function_node(method, depth, child_level, is_member=True)
                 for method in raw_methods
                 if isinstance(method, griffe.Function)
             )
 
         if depth != "summary":
             raw_nested = [self._unwrap_member(m) for m in members["nested_classes"]]
+            # Attenuate depth for nested classes to prevent runaway recursion:
+            # "all" -> "classes" (show structure, not full recursive detail),
+            # anything else -> "summary" (just the signature).
+            nested_depth = "classes" if depth == "all" else "summary"
             blocks.extend(
-                self._class_node(nested_class, depth, child_level)
+                self._class_node(nested_class, nested_depth, child_level)
                 for nested_class in raw_nested
                 if isinstance(nested_class, griffe.Class)
             )
 
         section = self._section(cls.name, level, blocks)
-        section.attributes["role"] = "class-multi-grid"
+        section.attributes["role"] = "doc-card"
         glyph = self._symbol_glyph(cls)
         if glyph is not None:
             section.attributes["glyph"] = glyph
@@ -1148,13 +1186,17 @@ class AsciiDocApi:
 
         raw_attributes = [self._unwrap_member(m) for m in members["attributes"]]
         if depth != "summary":
-            blocks.extend(self._attribute_node(attr, level) for attr in raw_attributes if isinstance(attr, griffe.Attribute))
+            blocks.extend(
+                self._attribute_node(attr, depth, level) for attr in raw_attributes if isinstance(attr, griffe.Attribute)
+            )
         if depth in ("all", "classes"):
             raw_classes = [self._unwrap_member(m) for m in members["classes"]]
             blocks.extend(self._class_node(cls, depth, level) for cls in raw_classes if isinstance(cls, griffe.Class))
         if depth in ("all", "functions"):
             raw_functions = [self._unwrap_member(m) for m in members["functions"]]
-            blocks.extend(self._function_node(func, level) for func in raw_functions if isinstance(func, griffe.Function))
+            blocks.extend(
+                self._function_node(func, depth, level) for func in raw_functions if isinstance(func, griffe.Function)
+            )
 
         if depth == "all":
             raw_submodules = [self._unwrap_member(m) for m in members["submodules"]]
