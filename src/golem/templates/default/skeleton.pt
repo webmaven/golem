@@ -153,7 +153,7 @@
                     </ol>
                 </nav>
             </tal:block>
-            <h1 tal:condition="python: title and not ('class=&quot;adoc-section level-0&quot;' in (body_html or '') and '&lt;h1' in (body_html or ''))">${title}</h1>
+            <h1 tal:condition="python: title and not ('data-level=&quot;0&quot;' in (body_html or '') and '&lt;h1' in (body_html or ''))">${title}</h1>
             <div tal:content="structure body_html" />
             <div tal:condition="site_index | nothing" class="site-index">
                 <div tal:repeat="letter site_index" class="index-section">
