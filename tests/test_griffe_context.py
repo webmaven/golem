@@ -577,3 +577,106 @@ def test_resolve_symbol_child_of_non_container_raises(tmp_path):
     finally:
         if sys_path_inserted:
             sys.path.remove(str(tmp_path))
+
+
+def test_get_asg_nodes_sets_context(tmp_path):
+    """get_asg_nodes sets griffe context during node construction.
+
+    This is the entry point used by the golem.apidoc:: macro during docs
+    builds; context must be active while format_class/format_function/etc.
+    call griffe.parse() so warnings carry module/object context.
+    """
+    pkg_dir = tmp_path / "asg_ctx_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""ASG context package."""
+
+
+def greet(name: str) -> str:
+    """Say hello to a name."""
+
+    return f"Hello, {name}!"
+''',
+        encoding="utf-8",
+    )
+
+    sys_path_inserted = False
+    if str(tmp_path) not in sys.path:
+        sys.path.insert(0, str(tmp_path))
+        sys_path_inserted = True
+
+    try:
+        api = AsciiDocApi(search_paths=[str(tmp_path)])
+
+        # Context clear before get_asg_nodes.
+        assert _griffe_context.get() is None
+
+        nodes = api.get_asg_nodes("asg_ctx_pkg.greet")
+        assert len(nodes) >= 1
+
+        # Context cleared after get_asg_nodes completes.
+        assert _griffe_context.get() is None
+    finally:
+        if sys_path_inserted:
+            sys.path.remove(str(tmp_path))
+
+
+def test_get_asg_nodes_warnings_carry_context(tmp_path):
+    """get_asg_nodes warnings include module/object context from griffe.
+
+    Uses a function whose docstring Parameters section entries lack type
+    annotations, which triggers griffe "No type or annotation" warnings
+    during docstring parsing in _class_node/_function_node → format_docstring
+    → griffe.parse().
+    """
+    pkg_dir = tmp_path / "asg_warn_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""ASG warn package."""
+
+
+def documented(x, y):
+    """Documented function.
+
+    Parameters:
+        x: The first value.
+        y: The second value.
+    """
+
+    return x + y
+''',
+        encoding="utf-8",
+    )
+
+    sys_path_inserted = False
+    if str(tmp_path) not in sys.path:
+        sys.path.insert(0, str(tmp_path))
+        sys_path_inserted = True
+
+    try:
+        api = AsciiDocApi(search_paths=[str(tmp_path)])
+
+        captured: list[str] = []
+
+        class Handler(logging.Handler):
+            def emit(self, record: logging.LogRecord) -> None:
+                captured.append(record.getMessage())
+
+        handler = Handler()
+        handler.setLevel(logging.WARNING)
+        griffe_logger = logging.getLogger("griffe")
+        griffe_logger.addHandler(handler)
+        griffe_logger.setLevel(logging.WARNING)
+
+        try:
+            nodes = api.get_asg_nodes("asg_warn_pkg.documented")
+            assert len(nodes) >= 1
+        finally:
+            griffe_logger.removeHandler(handler)
+
+        # At least one warning should carry context (module path or object name).
+        contextful = [m for m in captured if "documented" in m or "asg_warn_pkg" in m]
+        assert contextful, f"No contextful griffe warnings captured. Got: {captured}"
+    finally:
+        if sys_path_inserted:
+            sys.path.remove(str(tmp_path))

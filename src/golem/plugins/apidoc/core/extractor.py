@@ -99,19 +99,21 @@ def resolve_symbol(
         raise ValueError(f"Could not load or resolve module for symbol path: '{symbol_path}'")
 
     current: griffe.Object | griffe.Alias = loaded_mod
-    for part in remaining_parts:
-        if isinstance(current, (griffe.Module, griffe.Class)):
-            if part in current.members:
-                set_griffe_context(
-                    module_path=getattr(current, "path", None),
-                    object_name=f"{current.path}.{part}" if hasattr(current, "path") else part,
-                )
-                current = current.members[part]
+    try:
+        for part in remaining_parts:
+            if isinstance(current, (griffe.Module, griffe.Class)):
+                if part in current.members:
+                    set_griffe_context(
+                        module_path=getattr(current, "path", None),
+                        object_name=f"{current.path}.{part}" if hasattr(current, "path") else part,
+                    )
+                    current = current.members[part]
+                else:
+                    raise ValueError(f"Symbol '{part}' not found in '{current.path}'")
             else:
-                raise ValueError(f"Symbol '{part}' not found in '{current.path}'")
-        else:
-            raise ValueError(f"Cannot resolve child member '{part}' from '{current.path}' ({type(current).__name__})")
-    clear_griffe_context()
+                raise ValueError(f"Cannot resolve child member '{part}' from '{current.path}' ({type(current).__name__})")
+    finally:
+        clear_griffe_context()
 
     return current
 

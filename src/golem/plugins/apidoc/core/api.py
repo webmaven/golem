@@ -438,19 +438,26 @@ class AsciiDocApi:
             obj = self._unwrap_member(obj)
 
             level = max(1, min(6, 2 + heading_level_offset + self.options.heading_level_offset))
-            if isinstance(obj, griffe.Module):
-                blocks = self._module_nodes(obj, target_depth, level)
-            elif isinstance(obj, griffe.Class):
-                blocks = [self._class_node(obj, target_depth, level)]
-            elif isinstance(obj, griffe.Function):
-                blocks = [self._function_node(obj, target_depth, level)]
-            elif isinstance(obj, griffe.Attribute):
-                blocks = [self._attribute_node(obj, target_depth, level)]
-            else:
-                raise TypeError(f"Unsupported symbol type for ASG construction: {type(obj).__name__}")
+            set_griffe_context(
+                module_path=getattr(obj, "path", None),
+                object_name=getattr(obj, "name", symbol),
+            )
+            try:
+                if isinstance(obj, griffe.Module):
+                    blocks = self._module_nodes(obj, target_depth, level)
+                elif isinstance(obj, griffe.Class):
+                    blocks = [self._class_node(obj, target_depth, level)]
+                elif isinstance(obj, griffe.Function):
+                    blocks = [self._function_node(obj, target_depth, level)]
+                elif isinstance(obj, griffe.Attribute):
+                    blocks = [self._attribute_node(obj, target_depth, level)]
+                else:
+                    raise TypeError(f"Unsupported symbol type for ASG construction: {type(obj).__name__}")
 
-            self.ensure_absolute_levels(blocks, base_level=level)
-            return blocks
+                self.ensure_absolute_levels(blocks, base_level=level)
+                return blocks
+            finally:
+                clear_griffe_context()
         except Exception as e:
             return [
                 Admonition(
