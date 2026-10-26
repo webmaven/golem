@@ -1,9 +1,59 @@
 from __future__ import annotations
 
+import contextvars
+import logging
 from pathlib import Path
 from typing import Sequence
 
 import griffe
+
+
+# ---------------------------------------------------------------------------
+# Griffe warning context tracking
+# ---------------------------------------------------------------------------
+# Griffe emits logging warnings (e.g. "No type or annotation for parameter ...")
+# with a bare ``<module>`` context because it parses docstrings/source in
+# isolation.  Golem tracks the current module/object being processed so these
+# warnings can be augmented with useful context.
+_griffe_context: contextvars.ContextVar[dict | None] = contextvars.ContextVar("_griffe_context", default=None)
+
+
+def set_griffe_context(module_path: str | None = None, object_name: str | None = None) -> None:
+    """Record the module/object currently being processed by griffe.
+
+    Called before griffe calls so that any warnings griffe emits can be
+    annotated with the module/object/line context.
+    """
+    _griffe_context.set({"module_path": module_path, "object_name": object_name})
+
+
+def clear_griffe_context() -> None:
+    """Clear the griffe context."""
+    _griffe_context.set(None)
+
+
+class GriffeContextFilter(logging.Filter):
+    """Augment griffe log records with module/object context from Golem."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        ctx = _griffe_context.get()
+        if ctx is None:
+            return True
+        module_path = ctx.get("module_path")
+        object_name = ctx.get("object_name")
+        if module_path:
+            record.module = module_path
+        if object_name:
+            # Prepend object context to the message so it is visible in output.
+            if object_name not in str(record.getMessage()):
+                record.msg = f"[{object_name}] " + str(record.msg)
+        return True
+
+
+# Install the filter once at import time so all griffe warnings are augmented.
+_griffe_logger = logging.getLogger("griffe")
+if not any(isinstance(f, GriffeContextFilter) for f in _griffe_logger.filters):
+    _griffe_logger.addFilter(GriffeContextFilter())
 
 
 def create_griffe_loader(
@@ -34,6 +84,7 @@ def resolve_symbol(
     for i in range(len(parts), 0, -1):
         mod_name = ".".join(parts[:i])
         try:
+            set_griffe_context(module_path=mod_name, object_name=mod_name)
             mod = loader.load(mod_name)
             if isinstance(mod, griffe.Module):
                 loaded_mod = mod
@@ -41,6 +92,8 @@ def resolve_symbol(
                 break
         except Exception:
             continue
+        finally:
+            clear_griffe_context()
 
     if loaded_mod is None:
         raise ValueError(f"Could not load or resolve module for symbol path: '{symbol_path}'")
@@ -49,11 +102,16 @@ def resolve_symbol(
     for part in remaining_parts:
         if isinstance(current, (griffe.Module, griffe.Class)):
             if part in current.members:
+                set_griffe_context(
+                    module_path=getattr(current, "path", None),
+                    object_name=f"{current.path}.{part}" if hasattr(current, "path") else part,
+                )
                 current = current.members[part]
             else:
                 raise ValueError(f"Symbol '{part}' not found in '{current.path}'")
         else:
             raise ValueError(f"Cannot resolve child member '{part}' from '{current.path}' ({type(current).__name__})")
+    clear_griffe_context()
 
     return current
 

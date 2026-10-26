@@ -25,7 +25,14 @@ from asciidoctrine.nodes import (
 )
 import griffe
 
-from .extractor import create_griffe_loader, get_class_members, get_module_members, resolve_symbol
+from .extractor import (
+    create_griffe_loader,
+    get_class_members,
+    get_module_members,
+    resolve_symbol,
+    set_griffe_context,
+    clear_griffe_context,
+)
 from .formatter import (
     _safe_attr_value,
     format_attribute,
@@ -253,14 +260,18 @@ class AsciiDocApi:
         """Render a Griffe Module object to AsciiDoc markup."""
         target_depth = depth if depth is not None else self.options.depth
         level = heading_level + self.options.heading_level_offset
-        return format_module(
-            module=module,
-            depth=target_depth,
-            heading_level=level,
-            docstring_style=self.options.docstring_style,
-            include_private=self.options.include_private,
-            include_special=self.options.include_special,
-        )
+        set_griffe_context(module_path=getattr(module, "path", None), object_name=module.name)
+        try:
+            return format_module(
+                module=module,
+                depth=target_depth,
+                heading_level=level,
+                docstring_style=self.options.docstring_style,
+                include_private=self.options.include_private,
+                include_special=self.options.include_special,
+            )
+        finally:
+            clear_griffe_context()
 
     def render_class(
         self,
@@ -271,14 +282,18 @@ class AsciiDocApi:
         """Render a Griffe Class object to AsciiDoc markup."""
         target_depth = depth if depth is not None else self.options.depth
         level = heading_level + self.options.heading_level_offset
-        return format_class(
-            cls=cls,
-            depth=target_depth,
-            heading_level=level,
-            docstring_style=self.options.docstring_style,
-            include_private=self.options.include_private,
-            include_special=self.options.include_special,
-        )
+        set_griffe_context(module_path=getattr(cls, "path", None), object_name=cls.name)
+        try:
+            return format_class(
+                cls=cls,
+                depth=target_depth,
+                heading_level=level,
+                docstring_style=self.options.docstring_style,
+                include_private=self.options.include_private,
+                include_special=self.options.include_special,
+            )
+        finally:
+            clear_griffe_context()
 
     def render_function(
         self,
@@ -287,11 +302,15 @@ class AsciiDocApi:
     ) -> str:
         """Render a Griffe Function object to AsciiDoc markup."""
         level = heading_level + self.options.heading_level_offset
-        return format_function(
-            func=func,
-            heading_level=level,
-            docstring_style=self.options.docstring_style,
-        )
+        set_griffe_context(module_path=getattr(func, "path", None), object_name=func.name)
+        try:
+            return format_function(
+                func=func,
+                heading_level=level,
+                docstring_style=self.options.docstring_style,
+            )
+        finally:
+            clear_griffe_context()
 
     def render_attribute(
         self,
@@ -300,11 +319,15 @@ class AsciiDocApi:
     ) -> str:
         """Render a Griffe Attribute object to AsciiDoc markup."""
         level = heading_level + self.options.heading_level_offset
-        return format_attribute(
-            attr=attr,
-            heading_level=level,
-            docstring_style=self.options.docstring_style,
-        )
+        set_griffe_context(module_path=getattr(attr, "path", None), object_name=attr.name)
+        try:
+            return format_attribute(
+                attr=attr,
+                heading_level=level,
+                docstring_style=self.options.docstring_style,
+            )
+        finally:
+            clear_griffe_context()
 
     def generate_package_docs(
         self,

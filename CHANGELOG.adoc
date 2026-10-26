@@ -45,6 +45,7 @@ toc::[]
 * *Click `isolated_filesystem` Deprecation:* Replaced `runner.isolated_filesystem()` with `monkeypatch.chdir(tmp_path)` in tests to avoid Click 9.0 removal path; suppressed transitional `DeprecationWarning` via `pytest filterwarnings`.
 * *MyPy Missing-Stubs Suppression:* Added `[tool.mypy]` override ignoring missing imports for `asciidoctype.*` (external alpha dependency ships no `py.typed` marker).
 * *Apidoc Test Assertions:* Fixed stale `test_modifier_pills_render_after_heading` assertions missing `title="Method"` on glyph spans; fixed `test_apidoc_class_headings_nested_in_level_3` and `test_apidoc_headings_with_heading_level_offset` section title lookups to match actual rendered titles instead of substring-matching parent sections.
+* *Griffe Warning Context:* Augmented `griffe` logging warnings with module path and object name context (instead of bare `<module>`) so build warnings identify which module, object, and line the issue is in. Griffe `ContextVar`-based tracking is set before all `loader.load()` and render calls; a `logging.Filter` on the `griffe` logger injects context into each warning record.
 
 == 0.1.0a3 - 2026-09-19
 
