@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from golem.plugins import get_plugin_manager
 
 
@@ -162,18 +164,18 @@ def test_config_plugins_nonexistent_handled_gracefully():
     assert pm is not None
 
 
-def test_dynamic_subcommand_attached_to_click_main():
+def test_dynamic_subcommand_attached_to_click_main(tmp_path: Path, monkeypatch):
     from pathlib import Path
     from click.testing import CliRunner
     from golem.cli import main
 
     runner = CliRunner()
-    with runner.isolated_filesystem():
-        plugins_dir = Path("plugins")
-        plugins_dir.mkdir()
-        plugin_file = plugins_dir / "custom_cli_plugin.py"
-        plugin_file.write_text(
-            """\
+    monkeypatch.chdir(tmp_path)
+    plugins_dir = Path("plugins")
+    plugins_dir.mkdir()
+    plugin_file = plugins_dir / "custom_cli_plugin.py"
+    plugin_file.write_text(
+        """\
 import click
 from golem.plugins import hookimpl
 
@@ -183,23 +185,23 @@ def golem_add_subcommands(cli: click.Group) -> None:
     def plugin_status():
         click.echo("Plugin CLI is active!")
 """,
-            encoding="utf-8",
-        )
-        Path("golem.toml").write_text(
-            """\
+        encoding="utf-8",
+    )
+    Path("golem.toml").write_text(
+        """\
 [plugins]
 plugins = ["custom_cli_plugin"]
 """,
-            encoding="utf-8",
-        )
+        encoding="utf-8",
+    )
 
-        help_result = runner.invoke(main, ["--help"])
-        assert help_result.exit_code == 0
-        assert "plugin-status" in help_result.output
+    help_result = runner.invoke(main, ["--help"])
+    assert help_result.exit_code == 0
+    assert "plugin-status" in help_result.output
 
-        cmd_result = runner.invoke(main, ["plugin-status"])
-        assert cmd_result.exit_code == 0
-        assert "Plugin CLI is active!" in cmd_result.output
+    cmd_result = runner.invoke(main, ["plugin-status"])
+    assert cmd_result.exit_code == 0
+    assert "Plugin CLI is active!" in cmd_result.output
 
 
 def test_dynamic_subcommand_from_config_plugins(tmp_path, monkeypatch):
@@ -225,11 +227,11 @@ def golem_add_subcommands(cli: click.Group) -> None:
     monkeypatch.syspath_prepend(str(tmp_path))
 
     runner = CliRunner()
-    with runner.isolated_filesystem():
-        from pathlib import Path
+    monkeypatch.chdir(tmp_path)
+    from pathlib import Path
 
-        Path("golem.toml").write_text(
-            """\
+    Path("golem.toml").write_text(
+        """\
 [site]
 title = "Test Site"
 author = "Test Author"
@@ -237,16 +239,16 @@ author = "Test Author"
 [plugins]
 plugins = ["custom_cli_pkg.plugin"]
 """,
-            encoding="utf-8",
-        )
+        encoding="utf-8",
+    )
 
-        help_result = runner.invoke(main, ["--help"])
-        assert help_result.exit_code == 0
-        assert "package-cmd" in help_result.output
+    help_result = runner.invoke(main, ["--help"])
+    assert help_result.exit_code == 0
+    assert "package-cmd" in help_result.output
 
-        cmd_result = runner.invoke(main, ["package-cmd"])
-        assert cmd_result.exit_code == 0
-        assert "Executed package subcommand!" in cmd_result.output
+    cmd_result = runner.invoke(main, ["package-cmd"])
+    assert cmd_result.exit_code == 0
+    assert "Executed package subcommand!" in cmd_result.output
 
 
 def test_unconfigured_local_plugin_is_not_registered(tmp_path):
