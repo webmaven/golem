@@ -223,10 +223,14 @@ class AsciiDocApi:
 
     def load_package(self, package_name: str) -> griffe.Module:
         """Load a Python package or module using Griffe."""
-        obj = self._loader.load(package_name)
-        if not isinstance(obj, griffe.Module):
-            raise TypeError(f"Loaded object for '{package_name}' is not a Module: {type(obj).__name__}")
-        return obj
+        set_griffe_context(module_path=package_name, object_name=package_name)
+        try:
+            obj = self._loader.load(package_name)
+            if not isinstance(obj, griffe.Module):
+                raise TypeError(f"Loaded object for '{package_name}' is not a Module: {type(obj).__name__}")
+            return obj
+        finally:
+            clear_griffe_context()
 
     def resolve_symbol(self, symbol_path: str) -> griffe.Object | griffe.Alias:
         """Resolve a fully qualified symbol path to a Griffe object or alias."""
