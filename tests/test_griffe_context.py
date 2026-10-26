@@ -4,11 +4,16 @@ import logging
 import sys
 from pathlib import Path
 
+import pytest
+
 from golem.plugins.apidoc.core.api import AsciiDocApi
 from golem.plugins.apidoc.core.extractor import (
     GriffeContextFilter,
     _griffe_context,
     clear_griffe_context,
+    create_griffe_loader,
+    is_symbol_visible,
+    resolve_symbol,
     set_griffe_context,
 )
 
@@ -267,3 +272,308 @@ def test_griffe_context_isolated_between_calls():
 
     clear_griffe_context()
     assert _griffe_context.get() is None
+
+
+# ---------------------------------------------------------------------------
+# Extractor error paths and edge cases
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_symbol_empty_path_raises():
+    """resolve_symbol raises ValueError for an empty symbol path."""
+    loader = create_griffe_loader(search_paths=[])
+    with pytest.raises(ValueError, match="Invalid empty symbol path"):
+        resolve_symbol(loader, "")
+
+
+def test_resolve_symbol_module_not_found_raises(tmp_path):
+    """resolve_symbol raises ValueError when no module prefix can be loaded."""
+    loader = create_griffe_loader(search_paths=[str(tmp_path)])
+    with pytest.raises(ValueError, match="Could not load or resolve module"):
+        resolve_symbol(loader, "nonexistent_module_xyz")
+
+
+def test_is_symbol_visible_private_true():
+    """is_symbol_visible returns True for private names when include_private=True."""
+    assert is_symbol_visible("_private", include_private=True) is True
+
+
+def test_is_symbol_visible_private_false():
+    """is_symbol_visible returns False for private names when include_private=False."""
+    assert is_symbol_visible("_private", include_private=False) is False
+
+
+def test_is_symbol_visible_special_true():
+    """is_symbol_visible returns True for dunder names when include_special=True."""
+    assert is_symbol_visible("__init__", include_special=True) is True
+
+
+def test_is_symbol_visible_special_false():
+    """is_symbol_visible returns False for dunder names when include_special=False."""
+    assert is_symbol_visible("__magic__", include_special=False) is False
+
+
+def test_is_symbol_visible_public_always_true():
+    """is_symbol_visible returns True for public names regardless of flags."""
+    assert is_symbol_visible("public_name") is True
+    assert is_symbol_visible("public_name", include_private=False) is True
+    assert is_symbol_visible("public_name", include_special=False) is True
+
+
+# ---------------------------------------------------------------------------
+# Formatter function tests
+# ---------------------------------------------------------------------------
+
+
+def test_offset_headings_with_matches():
+    """_offset_headings shifts section headings down by offset levels."""
+    from golem.plugins.apidoc.core.formatter import _offset_headings
+
+    text = "= Title\n\n== Section\n\n=== Subsection\n"
+    result = _offset_headings(text, 1)
+    assert "== Title" in result
+    assert "=== Section" in result
+    assert "[absolute-level=2]" in result
+    assert "[absolute-level=3]" in result
+
+
+def test_offset_headings_no_matches_returns_unchanged():
+    """_offset_headings returns text unchanged when no headings present."""
+    from golem.plugins.apidoc.core.formatter import _offset_headings
+
+    text = "Plain text without headings.\n"
+    assert _offset_headings(text, 2) == text
+
+
+def test_offset_headings_offset_zero_returns_unchanged():
+    """_offset_headings with offset=0 returns text unchanged."""
+    from golem.plugins.apidoc.core.formatter import _offset_headings
+
+    text = "= Title\n== Section\n"
+    assert _offset_headings(text, 0) == text
+
+
+def test_format_parameters_keyword_only():
+    """format_parameters renders keyword-only parameters with a '*' separator."""
+    from golem.plugins.apidoc.core.formatter import format_parameters
+
+    import griffe
+
+    params = [
+        type("P", (), {"name": "a", "kind": griffe.ParameterKind.positional_only, "annotation": None, "default": None})(),
+        type("P", (), {"name": "b", "kind": griffe.ParameterKind.keyword_only, "annotation": None, "default": None})(),
+    ]
+    result = format_parameters(params)
+    assert "*" in result
+    assert "b" in result
+
+
+def test_format_parameters_trailing_positional_only():
+    """format_parameters appends '/' when last params are positional-only."""
+    from golem.plugins.apidoc.core.formatter import format_parameters
+
+    import griffe
+
+    params = [
+        type("P", (), {"name": "a", "kind": griffe.ParameterKind.positional_only, "annotation": None, "default": None})(),
+    ]
+    result = format_parameters(params)
+    assert "/ " in result or result == "a, /"
+
+
+def test_format_docstring_empty_returns_empty():
+    """format_docstring returns empty string for empty/None docstring."""
+    from golem.plugins.apidoc.core.formatter import format_docstring
+
+    assert format_docstring(None) == ""
+    assert format_docstring("") == ""
+    assert format_docstring("   ") == ""
+
+
+# ---------------------------------------------------------------------------
+# Remaining uncovered lines in extractor.py and formatter.py
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_symbol_member_not_found_raises(tmp_path):
+    """resolve_symbol raises ValueError when member not found in parent."""
+    pkg_dir = tmp_path / "member_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        "def foo() -> None:\n    pass\n",
+        encoding="utf-8",
+    )
+
+    sys_path_inserted = False
+    if str(tmp_path) not in sys.path:
+        sys.path.insert(0, str(tmp_path))
+        sys_path_inserted = True
+
+    try:
+        loader = create_griffe_loader(search_paths=[str(tmp_path)])
+        with pytest.raises(ValueError, match="Symbol 'nonexistent' not found"):
+            resolve_symbol(loader, "member_pkg.nonexistent")
+    finally:
+        if sys_path_inserted:
+            sys.path.remove(str(tmp_path))
+
+
+def test_format_class_attribute_no_description(tmp_path):
+    """format_class renders _(no description)_ for attribute without description/default."""
+    from golem.plugins.apidoc.core.formatter import format_class
+
+    pkg_dir = tmp_path / "attr_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''class Widget:
+    """A widget class."""
+
+    count: int
+''',
+        encoding="utf-8",
+    )
+
+    sys_path_inserted = False
+    if str(tmp_path) not in sys.path:
+        sys.path.insert(0, str(tmp_path))
+        sys_path_inserted = True
+
+    try:
+        api = AsciiDocApi(search_paths=[str(tmp_path)])
+        cls = api.resolve_symbol("attr_pkg.Widget")
+        rendered = format_class(cls, heading_level=2)
+        assert "_(no description)_" in rendered
+    finally:
+        if sys_path_inserted:
+            sys.path.remove(str(tmp_path))
+
+
+def test_format_module_heading_level_gt_1(tmp_path):
+    """format_module adds absolute-level when heading_level > 1."""
+    from golem.plugins.apidoc.core.formatter import format_module
+
+    pkg_dir = tmp_path / "mod_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Module docstring."""
+
+
+def func() -> None:
+    pass
+''',
+        encoding="utf-8",
+    )
+
+    sys_path_inserted = False
+    if str(tmp_path) not in sys.path:
+        sys.path.insert(0, str(tmp_path))
+        sys_path_inserted = True
+
+    try:
+        api = AsciiDocApi(search_paths=[str(tmp_path)])
+        mod = api.load_package("mod_pkg")
+        rendered = format_module(mod, heading_level=3)
+        assert "[absolute-level=3]" in rendered
+    finally:
+        if sys_path_inserted:
+            sys.path.remove(str(tmp_path))
+
+
+def test_format_module_attribute_no_description(tmp_path):
+    """format_module renders _(no description)_ for module attribute without description."""
+    from golem.plugins.apidoc.core.formatter import format_module
+
+    pkg_dir = tmp_path / "mod_attr_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Module docstring."""
+
+VERSION: int
+''',
+        encoding="utf-8",
+    )
+
+    sys_path_inserted = False
+    if str(tmp_path) not in sys.path:
+        sys.path.insert(0, str(tmp_path))
+        sys_path_inserted = True
+
+    try:
+        api = AsciiDocApi(search_paths=[str(tmp_path)])
+        mod = api.load_package("mod_attr_pkg")
+        rendered = format_module(mod, heading_level=2)
+        assert "_(no description)_" in rendered
+    finally:
+        if sys_path_inserted:
+            sys.path.remove(str(tmp_path))
+
+
+def test_format_module_with_submodules(tmp_path):
+    """format_module lists submodules when depth=all."""
+    from golem.plugins.apidoc.core.formatter import format_module
+
+    pkg_dir = tmp_path / "sub_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Parent package."""
+
+
+def root() -> None:
+    pass
+''',
+        encoding="utf-8",
+    )
+    sub_dir = pkg_dir / "sub"
+    sub_dir.mkdir()
+    (sub_dir / "__init__.py").write_text(
+        '''"""Sub module."""
+
+
+def helper() -> None:
+    pass
+''',
+        encoding="utf-8",
+    )
+
+    sys_path_inserted = False
+    if str(tmp_path) not in sys.path:
+        sys.path.insert(0, str(tmp_path))
+        sys_path_inserted = True
+
+    try:
+        api = AsciiDocApi(search_paths=[str(tmp_path)])
+        mod = api.load_package("sub_pkg")
+        rendered = format_module(mod, heading_level=2, depth="all")
+        assert "Submodules" in rendered
+        assert "sub" in rendered
+    finally:
+        if sys_path_inserted:
+            sys.path.remove(str(tmp_path))
+
+
+def test_resolve_symbol_child_of_non_container_raises(tmp_path):
+    """resolve_symbol raises ValueError when traversing into a non-container member."""
+    pkg_dir = tmp_path / "noncontainer_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''def func() -> None:
+    """A function."""
+
+
+''',
+        encoding="utf-8",
+    )
+
+    sys_path_inserted = False
+    if str(tmp_path) not in sys.path:
+        sys.path.insert(0, str(tmp_path))
+        sys_path_inserted = True
+
+    try:
+        loader = create_griffe_loader(search_paths=[str(tmp_path)])
+        # func is a Function (not Module/Class), so accessing a sub-member hits the else branch
+        with pytest.raises(ValueError, match="Cannot resolve child member"):
+            resolve_symbol(loader, "noncontainer_pkg.func.submember")
+    finally:
+        if sys_path_inserted:
+            sys.path.remove(str(tmp_path))
