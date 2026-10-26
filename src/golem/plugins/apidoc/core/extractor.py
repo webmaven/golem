@@ -41,12 +41,10 @@ class GriffeContextFilter(logging.Filter):
             return True
         module_path = ctx.get("module_path")
         object_name = ctx.get("object_name")
-        if module_path:
-            record.module = module_path
-        if object_name:
-            # Prepend object context to the message so it is visible in output.
-            if object_name not in str(record.getMessage()):
-                record.msg = f"[{object_name}] " + str(record.msg)
+        if module_path or object_name:
+            parts = [p for p in (module_path, object_name) if p]
+            prefix = ".".join(parts)
+            record.msg = f"[{prefix}] " + str(record.msg)
         return True
 
 

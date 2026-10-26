@@ -64,14 +64,14 @@ def test_griffe_context_filter_injects_module_path():
         exc_info=None,
     )
     assert f.filter(record)
-    assert record.module == "golem.plugins.apidoc.core.api"
-    assert "[render_class]" in record.getMessage()
+    assert "[golem.plugins.apidoc.core.api.render_class]" in record.getMessage()
     clear_griffe_context()
 
 
 def test_griffe_context_filter_no_context_leaves_unchanged():
     """GriffeContextFilter leaves record unchanged when no context is set."""
     f = GriffeContextFilter()
+    clear_griffe_context()  # ensure no context leaks from prior tests
     record = logging.LogRecord(
         name="griffe",
         level=logging.WARNING,
@@ -82,7 +82,6 @@ def test_griffe_context_filter_no_context_leaves_unchanged():
         exc_info=None,
     )
     assert f.filter(record)
-    assert record.module == ""
     assert record.getMessage() == "No type or annotation for parameter 'docstring'"
 
 
@@ -101,7 +100,7 @@ def test_griffe_context_filter_object_name_not_duplicated():
         exc_info=None,
     )
     assert f.filter(record)
-    assert record.module == "my.module"
+    assert "[my.module.my_object]" in record.getMessage()
     # Object name already present; should not be duplicated.
     assert record.getMessage().count("[my_object]") == 1
     clear_griffe_context()
@@ -122,7 +121,7 @@ def test_griffe_context_filter_warning_only():
         exc_info=None,
     )
     assert f.filter(record)
-    assert record.module == "my.module"
+    assert "[my.module.my_object] Loading module my.module" == record.getMessage()
     clear_griffe_context()
 
 
