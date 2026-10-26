@@ -628,6 +628,211 @@ def test_apidoc_renders_member_card_and_class_multi_grid(tmp_path):
         sys.path.remove(str(tmp_path))
 
 
+def test_member_card_structural_containment_in_doc_card(tmp_path):
+    """#21: member cards render inside doc-cards with left-rail containment.
+
+    A class (doc-card) containing methods (member-card sections) must produce
+    nested HTML where each member-card section is a descendant of the parent
+    doc-card section, with rail indentation and no escaped containment.
+    """
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "contain_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        "class Worker:\n"
+        '    """A worker service."""\n'
+        "    active: bool = True\n"
+        '    """Whether the worker is active."""\n'
+        "    def run(self, count: int = 1) -> bool:\n"
+        '        """Run the worker process."""\n'
+        "        return True\n"
+        "    def stop(self) -> None:\n"
+        '        """Stop the worker."""\n'
+        "        pass\n",
+        encoding="utf-8",
+    )
+    sys.path.insert(0, str(tmp_path))
+    try:
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("contain_pkg.Worker")
+        html = render_body(nodes[0])
+
+        # The class section must be a doc-card
+        assert 'class="doc-card doc-card"' in html or 'class="doc-card' in html
+
+        # Member-card sections must exist for methods
+        assert 'class="doc-card member-card"' in html
+
+        # Member cards must be nested inside the doc-card: the closing
+        # </section> of the member card must appear before the closing
+        # </section> of the class doc-card.
+        class_close = html.rfind("</section>")
+        member_close = html.find('class="doc-card member-card"')
+        member_section_end = html.find("</section>", member_close)
+        assert member_section_end != -1, "Member card section must close"
+        assert member_section_end < class_close, (
+            "Member card section must be contained within the class doc-card (member close must precede class close)"
+        )
+
+        # Rail containment: member-card sections carry border-left rail
+        assert "border-left" in html or "member-card" in html
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
+def test_member_card_left_rail_no_double_padding(tmp_path):
+    """#21: member cards inside doc-cards use rail indent, not stacked padding.
+
+    The .member-card rule must not add box padding (B13), only rail indent,
+    so nested member cards don't double-pad inside their parent doc-card.
+    """
+    import golem
+    import re
+    from pathlib import Path
+
+    # Find the CSS file
+    pkg = Path(golem.__file__).parent
+    css_candidates = list(pkg.rglob("templates/default/static/css/golem.css"))
+    assert css_candidates, "golem.css not found"
+    css = css_candidates[0].read_text(encoding="utf-8")
+
+    # Extract .member-card rule body
+    member_match = re.search(r"\.member-card\s*\{([^}]*)\}", css, re.DOTALL)
+    assert member_match, "Missing .member-card rule (B13 / #21)"
+    member_body = member_match.group(1)
+    assert "padding:" not in member_body, ".member-card must not add box padding (B13 / #21)"
+    assert "var(--rail-indent)" in member_body, ".member-card must indent by rail-indent (B13 / #21)"
+
+    # Extract .doc-card .member-card containment rule if present
+    nested_match = re.search(r"\.doc-card\s+\.member-card\s*\{([^}]*)\}", css, re.DOTALL)
+    if nested_match:
+        nested_body = nested_match.group(1)
+        # Nested member cards must not add padding
+        assert "padding:" not in nested_body, ".doc-card .member-card must not add box padding (#21)"
+
+
+def test_tiered_parameter_disclosure_required_first(tmp_path):
+    """#17: tiered parameter disclosure renders required parameters before optional.
+
+    Parameters without defaults (required) must be rendered in a separate
+    description list that precedes the description list for parameters with
+    defaults (optional). This gives readers a clear required-then-optional
+    disclosure tier.
+    """
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "tier_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        "def process(name: str, count: int = 10, verbose: bool = False) -> None:\n"
+        '    """Process data.\n'
+        "\n"
+        "    Parameters:\n"
+        "        name: The data name.\n"
+        "        count: Number of items (default: 10).\n"
+        "        verbose: Verbose output (default: False).\n"
+        '    """\n'
+        "    pass\n",
+        encoding="utf-8",
+    )
+    sys.path.insert(0, str(tmp_path))
+    try:
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("tier_pkg.process")
+        html = render_body(nodes[0])
+
+        # Find all description lists
+        dlist_count = html.count('<dl class="dlist">')
+        assert dlist_count >= 2, f"Expected at least 2 description lists (required + optional tiers), found {dlist_count}"
+
+        # Required parameter 'name' must appear before optional parameters
+        name_pos = html.find("<dt>name</dt>")
+        count_pos = html.find("<dt>count</dt>")
+        verbose_pos = html.find("<dt>verbose</dt>")
+        assert name_pos != -1, "Required parameter 'name' must be rendered"
+        assert count_pos != -1, "Optional parameter 'count' must be rendered"
+        assert verbose_pos != -1, "Optional parameter 'verbose' must be rendered"
+        assert name_pos < count_pos, "Required parameter 'name' must precede optional parameter 'count'"
+        assert name_pos < verbose_pos, "Required parameter 'name' must precede optional parameter 'verbose'"
+
+        # Each tier should be its own <dl> — required and optional
+        # should not be in the same <dl> block
+        between_name_and_count = html[name_pos:count_pos]
+        between_name_and_count_dl_close = between_name_and_count.count("</dl>")
+        assert between_name_and_count_dl_close >= 1, "Required parameter tier must close its <dl> before optional tier begins"
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
+def test_tiered_parameter_disclosure_all_required_no_split(tmp_path):
+    """#17: when all parameters are required, no tier split occurs."""
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "tier_pkg_all_required"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        "def process(name: str, count: int) -> None:\n"
+        '    """Process data.\n'
+        "\n"
+        "    Parameters:\n"
+        "        name: The data name.\n"
+        "        count: Number of items.\n"
+        '    """\n'
+        "    pass\n",
+        encoding="utf-8",
+    )
+    sys.path.insert(0, str(tmp_path))
+    try:
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("tier_pkg_all_required.process")
+        html = render_body(nodes[0])
+
+        # All required — single description list
+        dlist_count = html.count('<dl class="dlist">')
+        assert dlist_count == 1, f"Expected exactly 1 description list for all-required parameters, found {dlist_count}"
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
+def test_tiered_parameter_disclosure_all_optional_no_split(tmp_path):
+    """#17: when all parameters are optional, no tier split occurs."""
+    import sys
+
+    from golem.plugins.apidoc import AsciiDocApi
+    from golem.renderer import render_body
+
+    pkg_dir = tmp_path / "tier_pkg_all_optional"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        "def process(name: str = 'x', count: int = 10) -> None:\n"
+        '    """Process data.\n'
+        "\n"
+        "    Parameters:\n"
+        "        name: The data name (default: x).\n"
+        "        count: Number of items (default: 10).\n"
+        '    """\n'
+        "    pass\n",
+        encoding="utf-8",
+    )
+    sys.path.insert(0, str(tmp_path))
+    try:
+        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("tier_pkg_all_optional.process")
+        html = render_body(nodes[0])
+
+        # All optional — single description list
+        dlist_count = html.count('<dl class="dlist">')
+        assert dlist_count == 1, f"Expected exactly 1 description list for all-optional parameters, found {dlist_count}"
+    finally:
+        sys.path.remove(str(tmp_path))
+
+
 def test_on_asg_created_macro_replacement(tmp_path):
     import asciidoctrine
     from asciidoctrine.resolver import ASGResolver

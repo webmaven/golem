@@ -846,14 +846,67 @@ class AsciiDocApi:
 
         Used for parameter/attribute blocks that asciidocstring has already parsed
         into `DocstringParam`/`DocstringAttribute` models.
+
+        Parameters are emitted with tiered disclosure (#17): required parameters
+        (no default) in a first description list, optional parameters (with
+        default) in a second. Attributes keep the existing single-list behavior.
         """
         kind = _semantic_role(block)
         model_name = "attributes" if kind == "attributes" else "parameters"
         entries = list(getattr(doc, model_name, None) or [])
-        nodes: list[Node] = []
+        if not entries:
+            return []
+
+        # Parameters: tiered disclosure — required first, then optional (#17)
+        if kind == "parameters":
+            required = [e for e in entries if getattr(e, "default", None) is None]
+            optional = [e for e in entries if getattr(e, "default", None) is not None]
+            nodes: list[Node] = []
+            dlists = cls._description_lists(block)
+            if not dlists:
+                return []
+            dlist = dlists[0]
+            items = list(getattr(dlist, "items", None) or [])
+            # Split items positionally to match the entry split
+            req_items = items[: len(required)]
+            opt_items = items[len(required) :]
+            if required:
+                nodes.extend(cls._description_list_from_items(dlist, req_items, required, heading_offset))
+            if optional:
+                nodes.extend(cls._description_list_from_items(dlist, opt_items, optional, heading_offset))
+            return nodes
+
+        # Attributes: single description list (existing behavior)
+        attr_nodes: list[Node] = []
         for dlist in cls._description_lists(block):
-            nodes.extend(cls._description_list(dlist, entries, heading_offset))
-        return nodes
+            attr_nodes.extend(cls._description_list(dlist, entries, heading_offset))
+        return attr_nodes
+
+    @classmethod
+    def _description_list_from_items(
+        cls,
+        dlist: Node,
+        items: Sequence[Node],
+        entries: Sequence[Any],
+        heading_offset: int,
+    ) -> list[Node]:
+        """Build a DescriptionList from specific items and entry pairs.
+
+        Same pairing logic as `_description_list`, but operates on explicit
+        item/entry subsets rather than the full dlist. Used for tiered
+        parameter disclosure (#17).
+        """
+        dlist_items: list[DescriptionListItem] = []
+        for item, entry in zip(items, entries):
+            name = str(getattr(entry, "name", "") or "")
+            type_name = getattr(entry, "type_name", None)
+            label = f"{name} ({type_name})" if type_name and name else name or _node_text(item)
+            term = DescriptionListTerm(inlines=[Text(label)])
+            blocks = cls._description_blocks(item, entry, heading_offset)
+            dlist_items.append(DescriptionListItem(terms=[term], blocks=blocks))
+        if not dlist_items:
+            return []
+        return [DescriptionList(items=dlist_items)]
 
     @classmethod
     def _value_blocks_from_section(cls, block: Node, doc: Any, heading_offset: int) -> list[Node]:
