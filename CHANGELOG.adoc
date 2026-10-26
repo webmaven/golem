@@ -41,6 +41,10 @@ toc::[]
 * *Class Attribute Default Value Retention:* Preserved `Default value: <value>` paragraphs for class attributes documented with docstrings during ASG generation.
 * *Griffe Alias Member Unwrapping:* Resolved Griffe `Alias` references across modules and classes so re-exported symbols are properly documented.
 * *Template Search Path Precedence:* Aligned `StalenessTracker` search path ordering with `AsciiDoctypeRenderer` so registered plugin templates take precedence over fallback directories.
+* *Doubled Header on Level-0 Sections:* Fixed `skeleton.pt` header guard that checked for a `class="adoc-section level-0"` attribute never emitted by section templates, causing duplicate `<h1>` titles on pages with top-level document titles (root `index.html`, `about/*` pages).
+* *Click `isolated_filesystem` Deprecation:* Replaced `runner.isolated_filesystem()` with `monkeypatch.chdir(tmp_path)` in tests to avoid Click 9.0 removal path; suppressed transitional `DeprecationWarning` via `pytest filterwarnings`.
+* *MyPy Missing-Stubs Suppression:* Added `[tool.mypy]` override ignoring missing imports for `asciidoctype.*` (external alpha dependency ships no `py.typed` marker).
+* *Apidoc Test Assertions:* Fixed stale `test_modifier_pills_render_after_heading` assertions missing `title="Method"` on glyph spans; fixed `test_apidoc_class_headings_nested_in_level_3` and `test_apidoc_headings_with_heading_level_offset` section title lookups to match actual rendered titles instead of substring-matching parent sections.
 
 == 0.1.0a3 - 2026-09-19
 
