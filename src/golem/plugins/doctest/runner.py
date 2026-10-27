@@ -16,6 +16,10 @@ def run_adoc_file(
 ) -> tuple[int, int, list[str]]:
     """Execute AsciiDoc doctest blocks extracted from a single .adoc file.
 
+    Parameters:
+        path (Path | str): Path to the .adoc file.
+        mode (str): DocTest execution mode (``"explicit"``, ``"eager"``, ``"auto"``).
+        split_sections (bool): Whether to split tests by section.
     Returns:
         tuple[int, int, list[str]]: (passed_count, failed_count, error_messages)
     """
@@ -76,6 +80,9 @@ def run_adoc_file(
 def run_docstring_tests(source_target: Path | str, mode: str = "explicit") -> tuple[int, int, list[str]]:
     """Extract and execute AsciiDoc docstring tests from a Python file, directory, or module.
 
+    Parameters:
+        source_target (Path | str): Python file, directory, or module to extract tests from.
+        mode (str): DocTest execution mode (``"explicit"``, ``"eager"``, ``"auto"``).
     Returns:
         tuple[int, int, list[str]]: (passed_count, failed_count, error_messages)
     """
@@ -98,6 +105,11 @@ def run_path(
 ) -> tuple[int, int, list[str]]:
     """Execute AsciiDoc doctests for a single file or recursively for a directory.
 
+    Parameters:
+        path (Path | str): Path to a file or directory.
+        mode (str): DocTest execution mode (``"explicit"``, ``"eager"``, ``"auto"``).
+        fail_fast (bool): Whether to stop on the first failure.
+        split_sections (bool): Whether to split tests by section.
     Returns:
         tuple[int, int, list[str]]: (passed_count, failed_count, error_messages)
     """
@@ -139,6 +151,13 @@ def run_all(
 ) -> int:
     """Run all specified test paths and/or Python source targets.
 
+    Parameters:
+        paths (Sequence[Path | str] | None): Paths to test files or directories.
+        source (str | None): Python package or source file to extract tests from.
+        mode (str): DocTest execution mode (``"explicit"``, ``"eager"``, ``"auto"``).
+        verbose (bool): Whether to print verbose output.
+        fail_fast (bool): Whether to stop on the first failure.
+        split_sections (bool): Whether to split tests by section.
     Returns:
         int: 0 if all tests passed, 1 if any failure occurred.
     """

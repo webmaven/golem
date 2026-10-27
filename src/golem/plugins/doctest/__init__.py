@@ -30,7 +30,18 @@ def run_doctests(
     fail_fast: bool = False,
     split_sections: bool = False,
 ) -> int:
-    """Programmatic entry point to run AsciiDoc doctests."""
+    """Programmatic entry point to run AsciiDoc doctests.
+
+    Parameters:
+        paths (Sequence[Path | str] | None): Paths to test files or directories.
+        source (str | None): Python package or source file to extract tests from.
+        mode (str): DocTest execution mode (``"explicit"``, ``"eager"``, ``"auto"``).
+        verbose (bool): Whether to print verbose output.
+        fail_fast (bool): Whether to stop on the first failure.
+        split_sections (bool): Whether to split tests by section.
+    Returns:
+        int: 0 if all tests passed, 1 if any failure occurred.
+    """
     target_paths: list[Path | str] = []
     if paths:
         target_paths.extend(paths)

@@ -162,10 +162,10 @@ def format_docstring(
     `Optional[float]`) and named return structures cleanly via asciidocstring.
 
     Args:
-        docstring: The docstring to convert.
-        style: Docstring parsing style (``"google"``, ``"numpy"``, ``"sphinx"``,
+        docstring (str): The docstring to convert.
+        style (str): Docstring parsing style (``"google"``, ``"numpy"``, ``"sphinx"``,
             or ``"auto"``).
-        heading_offset: Number of heading levels to shift any ``=`` headings
+        heading_offset (int): Number of heading levels to shift any ``=`` headings
             found in the docstring text.  Use this when embedding a docstring
             inside a document that already has a root heading, so that a
             docstring opening with ``= Title`` doesn't produce a second
