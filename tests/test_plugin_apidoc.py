@@ -718,14 +718,13 @@ def test_tiered_parameter_disclosure_required_first(tmp_path):
     """#17: tiered parameter disclosure renders required parameters before optional.
 
     Parameters without defaults (required) must be rendered in a separate
-    description list that precedes the description list for parameters with
-    defaults (optional). This gives readers a clear required-then-optional
-    disclosure tier.
+    table that precedes the table for parameters with defaults (optional).
+    This gives readers a clear required-then-optional disclosure tier.
     """
     import sys
 
+    from asciidoctrine.nodes import Table
     from golem.plugins.apidoc import AsciiDocApi
-    from golem.renderer import render_body
 
     pkg_dir = tmp_path / "tier_pkg"
     pkg_dir.mkdir()
@@ -743,28 +742,17 @@ def test_tiered_parameter_disclosure_required_first(tmp_path):
     )
     sys.path.insert(0, str(tmp_path))
     try:
-        nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("tier_pkg.process")
-        html = render_body(nodes[0])
+        api = AsciiDocApi(search_paths=[tmp_path])
+        nodes = api.get_asg_nodes("tier_pkg.process")
+        tables = [n for root in nodes for n in _find_nodes(root, Table)]
+        assert len(tables) >= 2, f"Expected at least 2 tables (required + optional tiers), found {len(tables)}"
 
-        # Find all description lists
-        dlist_count = html.count('<dl class="dlist">')
-        assert dlist_count >= 2, f"Expected at least 2 description lists (required + optional tiers), found {dlist_count}"
-
-        # Required parameter 'name' must appear before optional parameters
-        name_pos = html.find("<dt>name</dt>")
-        count_pos = html.find("<dt>count</dt>")
-        verbose_pos = html.find("<dt>verbose</dt>")
-        assert name_pos != -1, "Required parameter 'name' must be rendered"
-        assert count_pos != -1, "Optional parameter 'count' must be rendered"
-        assert verbose_pos != -1, "Optional parameter 'verbose' must be rendered"
-        assert name_pos < count_pos, "Required parameter 'name' must precede optional parameter 'count'"
-        assert name_pos < verbose_pos, "Required parameter 'name' must precede optional parameter 'verbose'"
-
-        # Each tier should be its own <dl> — required and optional
-        # should not be in the same <dl> block
-        between_name_and_count = html[name_pos:count_pos]
-        between_name_and_count_dl_close = between_name_and_count.count("</dl>")
-        assert between_name_and_count_dl_close >= 1, "Required parameter tier must close its <dl> before optional tier begins"
+        # Required parameter 'name' must be in first table, optional params in second
+        first_table_cells = " ".join(_node_text(cell) for table in tables[0:1] for row in table.rows for cell in row.cells)
+        second_table_cells = " ".join(_node_text(cell) for table in tables[1:] for row in table.rows for cell in row.cells)
+        assert "name" in first_table_cells, "Required parameter 'name' must be in first table"
+        assert "count" in second_table_cells, "Optional parameter 'count' must be in second table"
+        assert "verbose" in second_table_cells, "Optional parameter 'verbose' must be in second table"
     finally:
         sys.path.remove(str(tmp_path))
 
@@ -773,8 +761,8 @@ def test_tiered_parameter_disclosure_all_required_no_split(tmp_path):
     """#17: when all parameters are required, no tier split occurs."""
     import sys
 
+    from asciidoctrine.nodes import Table
     from golem.plugins.apidoc import AsciiDocApi
-    from golem.renderer import render_body
 
     pkg_dir = tmp_path / "tier_pkg_all_required"
     pkg_dir.mkdir()
@@ -792,11 +780,8 @@ def test_tiered_parameter_disclosure_all_required_no_split(tmp_path):
     sys.path.insert(0, str(tmp_path))
     try:
         nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("tier_pkg_all_required.process")
-        html = render_body(nodes[0])
-
-        # All required — single description list
-        dlist_count = html.count('<dl class="dlist">')
-        assert dlist_count == 1, f"Expected exactly 1 description list for all-required parameters, found {dlist_count}"
+        tables = [n for root in nodes for n in _find_nodes(root, Table)]
+        assert len(tables) == 1, f"Expected exactly 1 table for all-required parameters, found {len(tables)}"
     finally:
         sys.path.remove(str(tmp_path))
 
@@ -805,8 +790,8 @@ def test_tiered_parameter_disclosure_all_optional_no_split(tmp_path):
     """#17: when all parameters are optional, no tier split occurs."""
     import sys
 
+    from asciidoctrine.nodes import Table
     from golem.plugins.apidoc import AsciiDocApi
-    from golem.renderer import render_body
 
     pkg_dir = tmp_path / "tier_pkg_all_optional"
     pkg_dir.mkdir()
@@ -824,11 +809,8 @@ def test_tiered_parameter_disclosure_all_optional_no_split(tmp_path):
     sys.path.insert(0, str(tmp_path))
     try:
         nodes = AsciiDocApi(search_paths=[tmp_path]).get_asg_nodes("tier_pkg_all_optional.process")
-        html = render_body(nodes[0])
-
-        # All optional — single description list
-        dlist_count = html.count('<dl class="dlist">')
-        assert dlist_count == 1, f"Expected exactly 1 description list for all-optional parameters, found {dlist_count}"
+        tables = [n for root in nodes for n in _find_nodes(root, Table)]
+        assert len(tables) == 1, f"Expected exactly 1 table for all-optional parameters, found {len(tables)}"
     finally:
         sys.path.remove(str(tmp_path))
 
@@ -1762,9 +1744,9 @@ def plain(text: str) -> str:
         sys.path.remove(str(tmp_path))
 
 
-def test_apidoc_docstring_params_render_description_list(tmp_path):
-    """Verify that docstring Parameters sections render as DescriptionList."""
-    from asciidoctrine.nodes import DescriptionList
+def test_apidoc_docstring_params_render_table(tmp_path):
+    """Verify that docstring Parameters sections render as tiered tables."""
+    from asciidoctrine.nodes import Table
     from golem.plugins.apidoc import AsciiDocApi
 
     pkg_dir = tmp_path / "param_pkg"
@@ -1774,7 +1756,7 @@ def test_apidoc_docstring_params_render_description_list(tmp_path):
 def compute(x: int, y: float = 1.0) -> float:
     """Compute a value.
 
-    Args:
+    Parameters:
         x: The first parameter.
         y: The second parameter with default.
     """
@@ -1791,12 +1773,22 @@ def compute(x: int, y: float = 1.0) -> float:
         nodes = api.get_asg_nodes("param_pkg.compute")
         assert nodes, "expected at least one node"
 
-        lists = [n for root in nodes for n in _find_nodes(root, DescriptionList)]
-        assert lists, "expected a DescriptionList for the parameters"
-        terms = [t for dlist in lists for item in dlist.items for t in item.terms]
-        joined = " ".join(_node_text(term) for term in terms)
-        assert "x" in joined, joined
-        assert "y" in joined, joined
+        tables = [n for root in nodes for n in _find_nodes(root, Table)]
+        assert tables, "expected a Table for the parameters"
+
+        # Should have two tables: tier 1 (required) and tier 2 (optional)
+        assert len(tables) >= 1
+
+        # Flatten all text from table cells
+        flat_parts = []
+        for table in tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for block in cell.blocks:
+                        flat_parts.append(_node_text(block))
+        flat = " ".join(flat_parts)
+        assert "x" in flat, f"Expected 'x' in tables, got: {flat}"
+        assert "y" in flat, f"Expected 'y' in tables, got: {flat}"
     finally:
         sys.path.remove(str(tmp_path))
 

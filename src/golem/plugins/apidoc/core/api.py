@@ -884,7 +884,7 @@ class AsciiDocApi:
 
         Parameters are emitted with tiered disclosure (#17): required parameters
         (no default) in a first description list, optional parameters (with
-        default) in a second description list wrapped in a <details> element.
+        default) in a second description list wrapped in a Collapsible node.
         Attributes keep the existing single-list behavior.
         """
         kind = _semantic_role(block)
@@ -897,7 +897,6 @@ class AsciiDocApi:
         if kind == "parameters":
             required = [e for e in entries if getattr(e, "default", None) is None]
             optional = [e for e in entries if getattr(e, "default", None) is not None]
-            result_nodes: list[Node] = []
             dlists = cls._description_lists(block)
             if not dlists:
                 return []
@@ -906,24 +905,76 @@ class AsciiDocApi:
             # Split items positionally to match the entry split
             req_items = items[: len(required)]
             opt_items = items[len(required) :]
+            param_nodes: list[Node] = []
             if required:
-                result_nodes = cls._description_list_from_items(dlist, req_items, required, heading_offset)
+                param_nodes = cls._build_parameter_table(req_items, required, heading_offset, tier=1)
             else:
-                result_nodes = []
+                param_nodes = []
             if optional:
-                opt_nodes = cls._description_list_from_items(dlist, opt_items, optional, heading_offset)
+                opt_nodes = cls._build_parameter_table(opt_items, optional, heading_offset, tier=2)
                 if opt_nodes:
                     opt_dl = opt_nodes[0]
-                    # Wrap optional parameters in <details> for progressive disclosure
-                    collapsible = Collapsible(title=Title(inlines=[Text("Optional parameters")]), blocks=[opt_dl])
-                    result_nodes.append(collapsible)
-            return result_nodes
+                    # Wrap optional parameters in Collapsible for progressive disclosure
+                    collapsible = Collapsible(
+                        title=Title(inlines=[Text("Optional parameters")]),
+                        blocks=[opt_dl],
+                    )
+                    param_nodes.append(collapsible)
+            return param_nodes
 
         # Attributes: single description list (existing behavior)
         attr_nodes: list[Node] = []
         for dlist in cls._description_lists(block):
             attr_nodes.extend(cls._description_list(dlist, entries, heading_offset))
         return attr_nodes
+
+    @classmethod
+    def _build_parameter_table(
+        cls,
+        items: Sequence[Node],
+        entries: Sequence[Any],
+        heading_offset: int,
+        tier: int,
+    ) -> list[Node]:
+        """Build a parameter table (tier 1 = required, tier 2 = optional)."""
+        from asciidoctrine.nodes import Table, TableRow, TableCell
+
+        rows: list[TableRow] = []
+
+        # Header row
+        header_cells = [
+            TableCell(blocks=[Paragraph(inlines=[Text("Parameter")])]),
+            TableCell(blocks=[Paragraph(inlines=[Text("Type")])]),
+            TableCell(blocks=[Paragraph(inlines=[Text("Description")])]),
+        ]
+        rows.append(TableRow(cells=header_cells))
+
+        for item, entry in zip(items, entries):
+            name = str(getattr(entry, "name", "") or "")
+            type_name = getattr(entry, "type_name", "")
+
+            # Parameter name with required/optional tag
+            param_name_parts: list = [Text(name)]
+            if getattr(entry, "default", None) is None:
+                param_name_parts.append(Text("*required"))
+            else:
+                default_val = getattr(entry, "default", None)
+                if default_val is not None:
+                    param_name_parts.append(Text(f"default: {default_val}"))
+
+            name_cell = TableCell(blocks=[Paragraph(inlines=param_name_parts)])
+
+            # Type cell
+            type_cell = TableCell(blocks=[Paragraph(inlines=[Text(type_name)])] if type_name else [])
+
+            # Description cell
+            description = cls._description_blocks(item, entry, heading_offset)
+            desc_cell = TableCell(blocks=description)
+
+            rows.append(TableRow(cells=[name_cell, type_cell, desc_cell]))
+
+        table = Table(rows=rows)
+        return [table]
 
     @classmethod
     def _description_list_from_items(
