@@ -956,7 +956,7 @@ class AsciiDocApi:
             # Parameter name with required/optional tag
             param_name_parts: list = [Text(name)]
             if getattr(entry, "default", None) is None:
-                param_name_parts.append(Text("*required"))
+                param_name_parts.append(Text(" *required"))
             else:
                 default_val = getattr(entry, "default", None)
                 if default_val is not None:
