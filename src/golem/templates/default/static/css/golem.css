@@ -1675,6 +1675,14 @@ i.conum b {
     border-style: solid;
 }
 
+/* ── Required Parameter Tag ─────────────────────────── */
+.param-required-tag {
+    color: #dc2626;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    margin-left: 0.25rem;
+}
+
 /* ── In-Situ Source Drawer ─────────────────────────── */
 details.source-drawer {
     margin: var(--space-sm) 0 var(--space-md) 0;
