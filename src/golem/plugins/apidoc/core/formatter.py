@@ -161,15 +161,15 @@ def format_docstring(
     Handles composite and union type annotations (e.g. `Union[dict[str, int], list[str]]`,
     `Optional[float]`) and named return structures cleanly via asciidocstring.
 
-    Args:
+    Parameters:
         docstring (str): The docstring to convert.
         style (str): Docstring parsing style (``"google"``, ``"numpy"``, ``"sphinx"``,
-            or ``"auto"``).
+            or ``"auto"``, default: ``"auto"``).
         heading_offset (int): Number of heading levels to shift any ``=`` headings
             found in the docstring text.  Use this when embedding a docstring
             inside a document that already has a root heading, so that a
             docstring opening with ``= Title`` doesn't produce a second
-            document-root-level heading.
+            document-root-level heading (default: 0).
     """
     if not docstring:
         return ""
