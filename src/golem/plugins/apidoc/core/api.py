@@ -11,6 +11,7 @@ import asciidocstring
 import asciidoctrine
 from asciidoctrine.nodes import (
     Admonition,
+    Collapsible,
     DescriptionList,
     DescriptionListItem,
     DescriptionListTerm,
@@ -883,7 +884,8 @@ class AsciiDocApi:
 
         Parameters are emitted with tiered disclosure (#17): required parameters
         (no default) in a first description list, optional parameters (with
-        default) in a second. Attributes keep the existing single-list behavior.
+        default) in a second description list wrapped in a <details> element.
+        Attributes keep the existing single-list behavior.
         """
         kind = _semantic_role(block)
         model_name = "attributes" if kind == "attributes" else "parameters"
@@ -895,7 +897,7 @@ class AsciiDocApi:
         if kind == "parameters":
             required = [e for e in entries if getattr(e, "default", None) is None]
             optional = [e for e in entries if getattr(e, "default", None) is not None]
-            nodes: list[Node] = []
+            result_nodes: list[Node] = []
             dlists = cls._description_lists(block)
             if not dlists:
                 return []
@@ -905,10 +907,17 @@ class AsciiDocApi:
             req_items = items[: len(required)]
             opt_items = items[len(required) :]
             if required:
-                nodes.extend(cls._description_list_from_items(dlist, req_items, required, heading_offset))
+                result_nodes = cls._description_list_from_items(dlist, req_items, required, heading_offset)
+            else:
+                result_nodes = []
             if optional:
-                nodes.extend(cls._description_list_from_items(dlist, opt_items, optional, heading_offset))
-            return nodes
+                opt_nodes = cls._description_list_from_items(dlist, opt_items, optional, heading_offset)
+                if opt_nodes:
+                    opt_dl = opt_nodes[0]
+                    # Wrap optional parameters in <details> for progressive disclosure
+                    collapsible = Collapsible(title=Title(inlines=[Text("Optional parameters")]), blocks=[opt_dl])
+                    result_nodes.append(collapsible)
+            return result_nodes
 
         # Attributes: single description list (existing behavior)
         attr_nodes: list[Node] = []

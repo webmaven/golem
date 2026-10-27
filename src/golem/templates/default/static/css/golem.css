@@ -1647,6 +1647,34 @@ i.conum b {
     color: var(--code-type);
 }
 
+/* ── Collapsible Secondary Parameters Drawer ─────────── */
+.secondary-params-drawer {
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-sm);
+    margin-top: 0.75rem;
+    background: var(--bg-surface-subtle);
+}
+.secondary-params-drawer summary {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.secondary-params-drawer summary::-webkit-details-marker {
+    display: none;
+}
+.secondary-params-drawer summary:hover {
+    text-decoration: underline;
+}
+.secondary-params-drawer[open] {
+    border-style: solid;
+}
+
 /* ── In-Situ Source Drawer ─────────────────────────── */
 details.source-drawer {
     margin: var(--space-sm) 0 var(--space-md) 0;
