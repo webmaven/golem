@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 from typing import Any, Generator
@@ -436,3 +437,115 @@ output_dir = "api"
     api_html = project_dir / "dist" / "api" / "sample_pkg.html"
     assert api_html.exists()
     assert "Calculator" in api_html.read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def untyped_package(tmp_path: Path) -> Generator[dict[str, Any], None, None]:
+    """Create a temporary Python package whose functions have docstring Parameters
+    without type annotations, triggering griffe 'No type or annotation' warnings
+    during docstring parsing."""
+    pkg_dir = tmp_path / "untyped_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text(
+        '''"""Package with untyped parameters."""
+
+def documented(x, y):
+    """Documented function.
+
+    Parameters:
+        x: The first value.
+        y: The second value.
+    """
+
+    return x + y
+
+
+def another(a, b, c):
+    """Another documented function.
+
+    Parameters:
+        a: Alpha parameter.
+        b: Beta parameter.
+        c: Gamma parameter.
+    """
+
+    return a + b + c
+''',
+        encoding="utf-8",
+    )
+
+    sys.path.insert(0, str(tmp_path))
+    try:
+        yield {
+            "pkg_dir": pkg_dir,
+            "tmp_path": tmp_path,
+            "pkg_name": "untyped_pkg",
+        }
+    finally:
+        if str(tmp_path) in sys.path:
+            sys.path.remove(str(tmp_path))
+        sys.modules.pop("untyped_pkg", None)
+        for mod in list(sys.modules.keys()):
+            if mod.startswith("untyped_pkg."):
+                sys.modules.pop(mod, None)
+
+
+def test_e2e_griffe_warnings_carry_context(tmp_path: Path, untyped_package: dict[str, Any]):
+    """E2E: griffe warnings during a full build carry module/object context.
+
+    Builds a site with the apidoc plugin processing untyped_pkg. Griffe emits
+    "No type or annotation" warnings while parsing the docstring Parameters.
+    Those warnings must include module path and object name context (not bare
+    "<module>"), proving the griffe ContextVar tracking is active throughout
+    the build pipeline.
+    """
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.adoc").write_text(
+        """= Home Page
+
+Welcome to our project documentation.
+""",
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "dist"
+    config = GolemConfig(
+        content_dir=str(content_dir),
+        output_dir=str(output_dir),
+        plugins=["golem.plugins.apidoc"],
+        api_packages=["untyped_pkg"],
+        api_output_dir="api",
+    )
+
+    engine = BuildEngine(config)
+
+    captured: list[str] = []
+
+    class Handler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            captured.append(record.getMessage())
+
+    handler = Handler()
+    handler.setLevel(logging.WARNING)
+    griffe_logger = logging.getLogger("griffe")
+    griffe_logger.addHandler(handler)
+    griffe_logger.setLevel(logging.WARNING)
+
+    try:
+        compiled = engine.build_site()
+        assert len(compiled) >= 1
+
+        api_html = output_dir / "api" / "untyped_pkg.html"
+        assert api_html.exists()
+    finally:
+        griffe_logger.removeHandler(handler)
+
+    # At least one warning should carry context (module path or object name).
+    contextful = [m for m in captured if "documented" in m or "another" in m or "untyped_pkg" in m]
+    assert contextful, f"No contextful griffe warnings captured during build. Got: {captured}"
+
+    # Every warning must carry context (module/object prefix), not bare
+    # "<module>" alone. The prefix proves griffe ContextVar tracking is active.
+    for m in captured:
+        assert "untyped_pkg" in m, f"Warning missing module/object context: {m}"
